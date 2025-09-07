@@ -2,6 +2,14 @@
 
 Este es el repositorio oficial del sistema de gestión de reservas. El proyecto está contenerizado con Docker para garantizar un entorno de desarrollo consistente.
 
+## Tecnologías Utilizadas 🛠️
+* Backend: Node.js, Express, Prisma
+* Frontend: React
+* Base de Datos: PostgreSQL
+* Contenerización: Docker, Docker Compose
+* Testing: Jest, Supertest
+
+
 ## Prerrequisitos
 
 Antes de comenzar, asegúrate de tener instalado:
@@ -28,9 +36,9 @@ cp backend/.env.example backend/.env
 **Nota:** Los valores en este archivo son estándar para todo el equipo de desarrollo. No es necesario modificarlos.
 
 ### 3. Levantar los Contenedores
-Este comando construirá y ejecutará todos los servicios (frontend, backend, base de datos) definidos en `docker-compose.yml`.
+Este comando construirá y ejecutará todos los servicios (frontend, backend, base de datos) en segundo plano `(-d)`.
 ```bash
-docker-compose up --build
+docker compose up -d --build
 ```
 La primera vez que ejecutes este comando, Docker descargará las imágenes necesarias y construirá los contenedores, lo cual puede tardar varios minutos. Las siguientes veces será mucho más rápido.
 
@@ -39,9 +47,32 @@ La primera vez que ejecutes este comando, Docker descargará las imágenes neces
 Una vez que los contenedores estén corriendo, puedes verificar que todo funciona correctamente:
 
 * **Aplicación Frontend:** Abre tu navegador y ve a `http://localhost:3000`
-* **API Backend:** Abre otra pestaña y ve a `http://localhost:3001/api/test-db` para confirmar la conexión con la base de datos. Deberías ver un mensaje JSON de éxito.
+* **API Backend**: Abre otra pestaña y ve a http://localhost:3001/test. Deberías ver el mensaje Hello Test!.
 
-## Detener el Entorno
+## 🧪 Ejecutar las Pruebas
+Para asegurar la calidad y el correcto funcionamiento del backend, puedes ejecutar la suite de pruebas automatizadas.
+
+### 1. Asegúrate de que los contenedores estén corriendo
+```bash
+docker compose ps
+```
+(Deberías ver los tres servicios: frontend_client, backend_api y db_postgres con el estado Up).
+
+### 2. Navega a la carpeta del backend e instala las dependencias (solo si es la primera vez).
+```bash
+cd backend
+npm install
+```
+
+### 3. Ejecuta los tests con Jest
+```bash
+npm test
+```
+Deberías ver un resultado indicando que todas las pruebas pasaron exitosamente.
+
+
+
+## 🛑 Detener el Entorno
 Para detener todos los contenedores, presiona `Ctrl + C` en una nueva terminal, en la ruta donde se encuentra ubicado la carpeta `sistema-reservas`. Para eliminarlos y liberar recursos, puedes ejecutar:
 ```bash
 docker-compose down
