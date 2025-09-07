@@ -41,6 +41,8 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./${{ matrix.project }}/coverage
+          files: ./sistema-reservas/${{ matrix.project }}/coverage/lcov.info
           fail_ci_if_error: true
           verbose: true
+      - name: List coverage files
+        run: ls -R ./sistema-reservas/${{ matrix.project }}/coverage || echo "No coverage files"
