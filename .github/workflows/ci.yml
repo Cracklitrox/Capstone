@@ -9,8 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: [backend, frontend]
-        node: [20]
+        include:
+          - project: backend
+            node: 20
+            lockfile: sistema-reservas/backend/package-lock.json
+          - project: frontend
+            node: 20
+            lockfile: sistema-reservas/frontend/package-lock.json
     defaults:
       run:
         working-directory: ./${{ matrix.project }}
@@ -24,6 +29,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: 'npm'
+          cache-dependency-path: ${{ matrix.lockfile }}
 
       - name: Install dependencies
         run: npm ci
