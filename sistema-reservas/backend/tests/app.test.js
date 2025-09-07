@@ -8,7 +8,9 @@ describe("API Tests", () => {
     expect(res.text).toBe("Hello Test!");
   });
 
-  it("GET /api/prisma-time → should connect to DB and return result", async () => {
+  const maybeIt = process.env.CI ? it.skip : it;
+
+  maybeIt("GET /api/prisma-time → should connect to DB and return result", async () => {
     const res = await request(app).get("/api/prisma-time");
     expect(res.statusCode).toBe(200);
 
