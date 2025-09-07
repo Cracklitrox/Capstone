@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
       POSTGRES_DB: reservas_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -28,7 +28,7 @@ services:
       - db
     volumes:
       - ./backend:/usr/src/app
-      - /usr/src/app/node_modules
+    command: sh -c "npx prisma generate && node index.js"
 
   # Servicio del Frontend (Nuestra App React)
   frontend:

@@ -1,0 +1,420 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model activity_logs {
+  id             Int       @id @default(autoincrement())
+  user_id        Int?
+  user_role      String?   @db.VarChar(30)
+  action         String?   @db.VarChar(80)
+  timestamp      DateTime? @default(now()) @db.Timestamp(6)
+  affected_table String?   @db.VarChar(60)
+  record_id      Int?
+  details        String?
+  users          users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model alert_read_status {
+  id         Int                @id @default(autoincrement())
+  alert_id   Int
+  user_id    Int
+  status     alert_status_enum? @default(pending)
+  updated_at DateTime?          @default(now()) @db.Timestamp(6)
+  alerts     alerts             @relation(fields: [alert_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model alerts {
+  id                Int                 @id @default(autoincrement())
+  type              alert_type_enum
+  status            alert_status_enum?  @default(pending)
+  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  origin_user_id    Int?
+  reservation_id    Int?
+  payment_id        Int?
+  detail            String?             @db.VarChar(250)
+  alert_read_status alert_read_status[]
+  users             users?              @relation(fields: [origin_user_id], references: [id], onUpdate: NoAction)
+  payments          payments?           @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
+  reservations      reservations?       @relation(fields: [reservation_id], references: [id], onUpdate: NoAction)
+  maintenance_tasks maintenance_tasks[]
+}
+
+model cleaning_records {
+  id              Int       @id @default(autoincrement())
+  room_id         Int
+  receptionist_id Int
+  record_date     DateTime? @default(now()) @db.Timestamp(6)
+  observations    String?   @db.VarChar(250)
+  is_completed    Boolean?  @default(false)
+  completed_at    DateTime? @db.Timestamp(6)
+  users           users     @relation(fields: [receptionist_id], references: [id], onUpdate: NoAction)
+  rooms           rooms     @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model guest_details {
+  user_id               Int      @id
+  travels_with_children Boolean?
+  special_requests      String?  @db.VarChar(200)
+  observations          String?  @db.VarChar(250)
+  users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model maintenance_tasks {
+  id              Int                        @id @default(autoincrement())
+  alert_id        Int?
+  room_id         Int?
+  category        maintenance_category_enum
+  description     String?
+  start_date      DateTime?                  @db.Timestamp(6)
+  end_date        DateTime?                  @db.Timestamp(6)
+  status          maintenance_status_enum?
+  priority        maintenance_priority_enum?
+  created_by_id   Int
+  last_updated_at DateTime?                  @db.Timestamp(6)
+  created_at      DateTime?                  @default(now()) @db.Timestamp(6)
+  alerts          alerts?                    @relation(fields: [alert_id], references: [id], onUpdate: NoAction)
+  users           users                      @relation(fields: [created_by_id], references: [id], onUpdate: NoAction)
+  rooms           rooms?                     @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+}
+
+model notification_read_status {
+  id              Int                       @id @default(autoincrement())
+  notification_id Int
+  user_id         Int
+  status          notification_status_enum? @default(unread)
+  updated_at      DateTime?                 @default(now()) @db.Timestamp(6)
+  notifications   notifications             @relation(fields: [notification_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model notifications {
+  id                       Int                        @id @default(autoincrement())
+  sender_id                Int
+  target_role_id           Int?
+  title                    String                     @db.VarChar(120)
+  message                  String?
+  sent_at                  DateTime?                  @default(now()) @db.Timestamp(6)
+  notification_read_status notification_read_status[]
+  users                    users                      @relation(fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles                    roles?                     @relation(fields: [target_role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model payments {
+  id             Int                  @id @default(autoincrement())
+  reservation_id Int
+  payment_method payment_method_enum?
+  status         payment_status_enum? @default(pending)
+  amount         Int
+  is_deposit     Boolean?             @default(false)
+  transaction_id String?              @db.VarChar(255)
+  created_at     DateTime?            @default(now()) @db.Timestamp(6)
+  alerts         alerts[]
+  reservations   reservations         @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model promotions {
+  id                     Int                      @id @default(autoincrement())
+  code                   String                   @unique @db.VarChar(50)
+  description            String?
+  discount_percentage    Decimal                  @db.Decimal(5, 2)
+  start_date             DateTime?                @db.Date
+  end_date               DateTime?                @db.Date
+  is_active              Boolean?                 @default(true)
+  reservation_promotions reservation_promotions[]
+}
+
+model reservation_guests {
+  id             Int          @id @default(autoincrement())
+  reservation_id Int
+  guest_id       Int
+  users          users        @relation(fields: [guest_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model reservation_promotions {
+  id             Int          @id @default(autoincrement())
+  reservation_id Int
+  promotion_id   Int
+  applied_at     DateTime?    @default(now()) @db.Timestamp(6)
+  promotions     promotions   @relation(fields: [promotion_id], references: [id], onUpdate: NoAction)
+  reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model reservation_rooms {
+  id             Int          @id @default(autoincrement())
+  reservation_id Int
+  room_id        Int
+  start_date     DateTime     @db.Timestamp(6)
+  end_date       DateTime     @db.Timestamp(6)
+  unit_price     Int
+  subtotal       Int
+  reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms          rooms        @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+}
+
+model reservation_services {
+  id             Int          @id @default(autoincrement())
+  reservation_id Int
+  service_id     Int
+  quantity       Int
+  unit_price     Int
+  subtotal       Int
+  reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  services       services     @relation(fields: [service_id], references: [id], onUpdate: NoAction)
+}
+
+model reservations {
+  id                                        Int                       @id @default(autoincrement())
+  code                                      String                    @unique @db.VarChar(20)
+  main_guest_id                             Int
+  channel                                   reservation_channel_enum?
+  status                                    reservation_status_enum?  @default(pending)
+  check_in_date                             DateTime                  @db.Timestamp(6)
+  check_out_date                            DateTime                  @db.Timestamp(6)
+  guest_count                               Int
+  total_amount                              Int?
+  paid_amount                               Int?                      @default(0)
+  receptionist_id                           Int?
+  created_at                                DateTime?                 @default(now()) @db.Timestamp(6)
+  updated_at                                DateTime?                 @default(now()) @db.Timestamp(6)
+  alerts                                    alerts[]
+  payments                                  payments[]
+  reservation_guests                        reservation_guests[]
+  reservation_promotions                    reservation_promotions[]
+  reservation_rooms                         reservation_rooms[]
+  reservation_services                      reservation_services[]
+  users_reservations_main_guest_idTousers   users                     @relation("reservations_main_guest_idTousers", fields: [main_guest_id], references: [id], onUpdate: NoAction)
+  users_reservations_receptionist_idTousers users?                    @relation("reservations_receptionist_idTousers", fields: [receptionist_id], references: [id], onUpdate: NoAction)
+}
+
+model roles {
+  id            Int             @id @default(autoincrement())
+  name          role_name_enum  @unique
+  description   String?         @db.VarChar(200)
+  created_at    DateTime?       @default(now()) @db.Timestamp(6)
+  notifications notifications[]
+  user_roles    user_roles[]
+}
+
+model room_types {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique @db.VarChar(50)
+  base_capacity Int
+  description   String?  @db.VarChar(200)
+  is_active     Boolean? @default(true)
+  rooms         rooms[]
+}
+
+model rooms {
+  id                Int                 @id @default(autoincrement())
+  room_number       String              @unique @db.VarChar(10)
+  floor             Int?
+  room_type_id      Int
+  capacity          Int
+  base_price        Int
+  status            room_status_enum?   @default(available)
+  description       String?             @db.VarChar(250)
+  is_active         Boolean?            @default(true)
+  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?           @default(now()) @db.Timestamp(6)
+  cleaning_records  cleaning_records[]
+  maintenance_tasks maintenance_tasks[]
+  reservation_rooms reservation_rooms[]
+  room_types        room_types          @relation(fields: [room_type_id], references: [id], onUpdate: NoAction)
+}
+
+model seasons {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique @db.VarChar(100)
+  start_date     DateTime @db.Date
+  end_date       DateTime @db.Date
+  price_modifier Decimal  @db.Decimal(5, 2)
+  is_active      Boolean? @default(true)
+}
+
+model services {
+  id                   Int                    @id @default(autoincrement())
+  name                 String                 @unique @db.VarChar(80)
+  unit                 service_unit_enum
+  price                Int
+  is_active            Boolean?               @default(true)
+  reservation_services reservation_services[]
+}
+
+model system_errors {
+  id            Int                  @id @default(autoincrement())
+  timestamp     DateTime?            @default(now()) @db.Timestamp(6)
+  user_id       Int?
+  user_role     String?              @db.VarChar(30)
+  description   String?
+  origin_module String?              @db.VarChar(40)
+  severity      error_severity_enum?
+  status        error_status_enum?   @default(pending)
+  users         users?               @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model user_roles {
+  id      Int   @id @default(autoincrement())
+  user_id Int
+  role_id Int
+  roles   roles @relation(fields: [role_id], references: [id], onUpdate: NoAction)
+  users   users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model users {
+  id                                               Int                        @id @default(autoincrement())
+  rut                                              String                     @unique @db.VarChar(8)
+  rut_dv                                           String                     @db.Char(1)
+  first_name                                       String                     @db.VarChar(100)
+  paternal_last_name                               String                     @db.VarChar(80)
+  maternal_last_name                               String?                    @db.VarChar(80)
+  email                                            String                     @unique @db.VarChar(150)
+  phone_number                                     String?                    @db.VarChar(30)
+  birth_date                                       DateTime?                  @db.Date
+  gender                                           gender_enum?
+  country                                          String?                    @db.VarChar(100)
+  region                                           String?                    @db.VarChar(100)
+  city                                             String?                    @db.VarChar(100)
+  commune                                          String?                    @db.VarChar(100)
+  password_hash                                    String                     @db.VarChar(255)
+  status                                           user_status_enum?          @default(active)
+  last_login_at                                    DateTime?                  @db.Timestamp(6)
+  created_at                                       DateTime?                  @default(now()) @db.Timestamp(6)
+  updated_at                                       DateTime?                  @default(now()) @db.Timestamp(6)
+  activity_logs                                    activity_logs[]
+  alert_read_status                                alert_read_status[]
+  alerts                                           alerts[]
+  cleaning_records                                 cleaning_records[]
+  guest_details                                    guest_details?
+  maintenance_tasks                                maintenance_tasks[]
+  notification_read_status                         notification_read_status[]
+  notifications                                    notifications[]
+  reservation_guests                               reservation_guests[]
+  reservations_reservations_main_guest_idTousers   reservations[]             @relation("reservations_main_guest_idTousers")
+  reservations_reservations_receptionist_idTousers reservations[]             @relation("reservations_receptionist_idTousers")
+  system_errors                                    system_errors[]
+  user_roles                                       user_roles[]
+}
+
+enum alert_status_enum {
+  pending
+  resolved
+  ignored
+}
+
+enum alert_type_enum {
+  reservation
+  payment
+  maintenance
+  guest
+}
+
+enum error_severity_enum {
+  low
+  medium
+  high
+  critical
+}
+
+enum error_status_enum {
+  pending
+  in_review
+  resolved
+}
+
+enum gender_enum {
+  male
+  female
+  other
+}
+
+enum maintenance_category_enum {
+  room
+  common_area
+  other
+}
+
+enum maintenance_priority_enum {
+  low
+  medium
+  high
+  critical
+}
+
+enum maintenance_status_enum {
+  pending
+  in_progress
+  delayed
+  completed
+  blocked
+}
+
+enum notification_status_enum {
+  read
+  unread
+  archived
+}
+
+enum payment_method_enum {
+  bank_transfer
+  cash
+  credit_card
+  debit_card
+}
+
+enum payment_status_enum {
+  pending
+  confirmed
+  rejected
+  refunded
+}
+
+enum reservation_channel_enum {
+  chatbot
+  reception
+  walk_in
+  web
+}
+
+enum reservation_status_enum {
+  pending
+  confirmed
+  in_progress
+  canceled
+  completed
+  no_show
+}
+
+enum role_name_enum {
+  administrator
+  receptionist
+  guest
+}
+
+enum room_status_enum {
+  available
+  pending
+  occupied
+  unavailable
+  cleaning
+  maintenance
+}
+
+enum service_unit_enum {
+  per_night
+  per_person
+  per_unit
+}
+
+enum user_status_enum {
+  active
+  inactive
+  suspended
+}

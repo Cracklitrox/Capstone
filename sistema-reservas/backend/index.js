@@ -1,30 +1,35 @@
-const express = require('express'); // Framework del servidor
-const cors = require('cors'); // Un paquete crucial para permitir que el frontend (que corre en un puerto diferente) se comunique con tu backend.
-const { Pool } = require('pg'); // Cliente para conectarse a la base de datos PostgreSQL
-require('dotenv').config(); // Para gestionar variables de entorno (como contraseñas de la base de datos) de forma segura.
+const express = require("express");
+const cors = require("cors");
+const { PrismaClient } = require("@prisma/client");
 
 const app = express();
-app.use(cors());
-const port = 3001;
+const prisma = new PrismaClient();
 
-// Configuración de la conexión a PostgreSQL usando la variable de entorno
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+app.use(cors());
+app.use(express.json());
+
+app.get("/test", (req, res) => {
+  res.send("Hello Test!");
 });
 
-// Ruta de prueba para verificar la conexión a la base de datos
-app.get('/api/test-db', async (req, res) => {
+app.get("/api/prisma-time", async (req, res) => {
   try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT NOW()');
-    res.json({ message: 'Conexión a la base de datos exitosa!', time: result.rows[0].now });
-    client.release();
-  } catch (err) {
-    console.error('Error al conectar a la base de datos', err);
-    res.status(500).json({ error: 'No se pudo conectar a la base de datos' });
+    const result = await prisma.$queryRaw`SELECT NOW() as now`;
+    res.json(result[0]);
+  } catch (error) {
+    console.error("--- ERROR DE PRISMA EN RUTA ---");
+    console.error(error);
+    console.error("-----------------------------");
+
+    res.status(500).json({ error: "Error con Prisma", details: error.message });
   }
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Servidor backend escuchando en http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
