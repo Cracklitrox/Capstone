@@ -40,7 +40,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          # token: ${{ secrets.CODECOV_TOKEN }} Dejar comentado ya que no es necesario para repositorios públicos
+          token: ${{ secrets.CODECOV_TOKEN }}
           directory: ./${{ matrix.project }}/coverage
           fail_ci_if_error: true
           verbose: true
