@@ -18,7 +18,7 @@ jobs:
             lockfile: sistema-reservas/frontend/package-lock.json
     defaults:
       run:
-        working-directory: ./${{ matrix.project }}
+        working-directory: ./sistema-reservas/${{ matrix.project }}
 
     steps:
       - name: Checkout repository
