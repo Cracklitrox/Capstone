@@ -17,9 +17,6 @@ app.get("/api/prisma-time", async (req, res) => {
     const result = await prisma.$queryRaw`SELECT NOW() as now`;
     res.json(result[0]);
   } catch (error) {
-    console.error("--- ERROR DE PRISMA EN RUTA ---");
-    console.error(error);
-    console.error("-----------------------------");
 
     res.status(500).json({ error: "Error con Prisma", details: error.message });
   }

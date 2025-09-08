@@ -1,4 +1,4 @@
-# Sistema de Reservas - Hotel Don Teo
+# Sistema de Reservas - Hotel Don Teo ![Coverage](https://codecov.io/github/Cracklitrox/Capstone/coverage.svg?token=JNX1J56MH0)
 
 Este es el repositorio oficial del sistema de gestión de reservas. El proyecto está contenerizado con Docker para garantizar un entorno de desarrollo consistente.
 
@@ -78,3 +78,9 @@ Para detener todos los contenedores, presiona `Ctrl + C` en una nueva terminal, 
 docker-compose down
 ```
 Haz esto cada vez que termines de trabajar para evitar seguir consumiendo recursos.
+
+## 📊 Cobertura de Código
+
+Este proyecto utiliza Codecov para medir la cobertura de pruebas.
+La siguiente gráfica muestra qué partes del código están cubiertas por tests:
+![Coverage](https://codecov.io/github/Cracklitrox/Capstone/coverage.svg?token=JNX1J56MH0)
