@@ -52,6 +52,8 @@ Una vez que los contenedores estén corriendo, puedes verificar que todo funcion
 ## 🧪 Ejecutar las Pruebas
 Para asegurar la calidad y el correcto funcionamiento del backend, puedes ejecutar la suite de pruebas automatizadas.
 
+### Backend
+
 ### 1. Asegúrate de que los contenedores estén corriendo
 ```bash
 docker compose ps
@@ -71,6 +73,25 @@ npm test
 Deberías ver un resultado indicando que todas las pruebas pasaron exitosamente.
 
 
+## Frontend
+
+### 1. Asegúrate de que los contenedores estén corriendo
+```bash
+docker compose ps
+```
+(Deberías ver los tres servicios: frontend_client, backend_api y db_postgres con el estado Up).
+
+### 2. Navega a la carpeta del frontend e instala las dependencias (solo si es la primera vez).
+```bash
+cd frontend
+npm install
+```
+
+### 3. Ejecuta los tests con Jest
+```bash
+npm test
+```
+Deberías ver un resultado indicando que todas las pruebas pasaron exitosamente.
 
 ## 🛑 Detener el Entorno
 Para detener todos los contenedores, presiona `Ctrl + C` en una nueva terminal, en la ruta donde se encuentra ubicado la carpeta `sistema-reservas`. Para eliminarlos y liberar recursos, puedes ejecutar:
