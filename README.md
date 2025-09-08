@@ -82,5 +82,5 @@ Haz esto cada vez que termines de trabajar para evitar seguir consumiendo recurs
 ## 📊 Cobertura de Código
 
 Este proyecto utiliza Codecov para medir la cobertura de pruebas.
-La siguiente gráfica muestra qué partes del código están cubiertas por tests:
-![Coverage](https://codecov.io/github/Cracklitrox/Capstone/coverage.svg?token=JNX1J56MH0)
+
+Puedes ver el reporte completo en: [Codecov Dashboard](https://app.codecov.io/gh/Cracklitrox/Capstone)
