@@ -28,7 +28,7 @@ services:
       - db
     volumes:
       - ./backend:/usr/src/app
-    command: sh -c "npx prisma generate && node index.js"
+    command: sh -c "npx prisma migrate deploy && node index.js"
 
   # Servicio del Frontend (Nuestra App React)
   frontend:

@@ -104,4 +104,4 @@ Haz esto cada vez que termines de trabajar para evitar seguir consumiendo recurs
 
 Este proyecto utiliza Codecov para medir la cobertura de pruebas.
 
-Puedes ver el reporte completo en: [Codecov Dashboard](https://app.codecov.io/gh/Cracklitrox/Capstone)
+Puedes ver el reporte completo en: [Codecov Dashboard](https://app.codecov.io/gh/Cracklitrox/Capstone)                                  
