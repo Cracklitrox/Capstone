@@ -1,6 +1,7 @@
 const prisma = require('../../db/prisma.client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const redisClient = require('../../db/redis.client');
 
 /**
  * Autentica a un usuario y devuelve un token JWT si las credenciales son válidas.
@@ -40,6 +41,65 @@ const login = async (email, password) => {
   return { user: userWithoutPassword, token };
 };
 
+
+const logout = async (token) => {
+  // Decodificamos el token para saber su tiempo de expiración
+  const decoded = jwt.decode(token);
+  // 'exp' es la fecha de expiración en segundos (timestamp)
+  const expirationTime = decoded.exp;
+  const currentTime = Math.floor(Date.now() / 1000);
+  
+  // Calculamos cuántos segundos le quedan de vida al token
+  const ttl = expirationTime - currentTime;
+
+  // Si el token ya expiró, no hacemos nada
+  if (ttl <= 0) {
+    return { message: 'El token ya ha expirado.' };
+  }
+
+  // Guardamos el token en Redis con el tiempo de vida restante
+  // La clave será el propio token, y el valor puede ser cualquier cosa (ej: 'blocked')
+  await redisClient.set(token, 'blocked', {
+    EX: ttl, // EX significa que el tiempo de expiración está en segundos
+  });
+
+  return { message: 'Sesión cerrada exitosamente.' };
+};
+
+
+/**
+ * Obtiene el perfil de un usuario por su ID.
+ * @param {number} userId - El ID del usuario.
+ */
+const getProfile = (userId) => {
+  return prisma.users.findUnique({
+    where: {
+      id: userId,
+    },
+    // Seleccionamos los campos que son seguros de mostrar
+    select: {
+      id: true,
+      email: true,
+      first_name: true,
+      paternal_last_name: true,
+      maternal_last_name: true,
+      status: true,
+      user_roles: {
+        select: {
+          roles: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+};
+
+
 module.exports = {
   login,
+  logout,
+  getProfile,
 };

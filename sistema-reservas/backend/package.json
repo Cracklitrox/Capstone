@@ -22,7 +22,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.5",
-    "pg-hstore": "^2.3.4"
+    "pg-hstore": "^2.3.4",
+    "redis": "^5.8.2"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
+const redisClient = require('../db/redis.client');
 
-const verifyToken = (req, res, next) => {
+
+const verifyToken = async (req, res, next) => {
   // 1. Buscamos el token en los headers de la petición
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -12,7 +14,14 @@ const verifyToken = (req, res, next) => {
 
   // 3. Verificamos que el token sea válido
   try {
-    // jwt.verify() decodifica el token. Si es inválido (expirado, malformado), lanzará un error.
+    // 1. Verificamos si el token está en nuestra lista negra
+    const isBlocked = await redisClient.get(token);
+    
+    if (isBlocked) {
+      return res.status(401).json({ message: 'Token inválido (sesión cerrada).' });
+    }
+
+    // 2. Verificamos la firma del token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Guardamos el payload decodificado (que tiene el id del usuario) en el objeto 'req'

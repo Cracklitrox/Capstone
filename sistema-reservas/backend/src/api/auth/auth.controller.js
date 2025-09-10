@@ -18,6 +18,39 @@ const loginUser = async (req, res) => {
   }
 };
 
+
+const logoutUser = async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader.split(' ')[1];
+    const result = await authService.logout(token);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Error interno al cerrar sesión.' });
+  }
+};
+
+
+const getUserProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const userProfile = await authService.getProfile(userId);
+
+    if (!userProfile) {
+      return res.status(404).json({ message: 'Perfil de usuario no encontrado.' });
+    }
+
+    res.status(200).json(userProfile);
+  } catch (error) {
+    console.error('Error al obtener el perfil:', error);
+    res.status(500).json({ message: 'Error interno al obtener el perfil.' });
+  }
+};
+
+
 module.exports = {
   loginUser,
+  logoutUser,
+  getUserProfile,
 };
