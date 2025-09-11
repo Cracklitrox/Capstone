@@ -25,13 +25,20 @@ const Login = () => {
         <h2 className="mb-6 text-center text-2xl font-bold text-gray-800">
           Iniciar Sesión
         </h2>
-        <form onSubmit={handleSubmit} className="space-y-5">
+
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
               Correo electrónico
             </label>
             <input
+              id="email"
+              name="email"
               type="email"
+              autoComplete="email"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               placeholder="ejemplo@correo.com"
               value={email}
@@ -41,12 +48,18 @@ const Login = () => {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
               Contraseña
             </label>
             <div className="relative">
               <input
+                id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 placeholder="••••••••"
                 value={password}
@@ -55,8 +68,9 @@ const Login = () => {
               />
               <button
                 type="button"
+                aria-label="Mostrar u ocultar contraseña"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((v) => !v)}
               >
                 {showPassword ? (
                   <EyeSlashIcon className="h-5 w-5" />
