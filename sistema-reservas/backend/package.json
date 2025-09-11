@@ -1,30 +1,36 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend para el sistema de reservas del Hotel Don Teo",
+  "main": "src/server.js",
   "scripts": {
+    "start": "node src/server.js",
+    "dev": "dotenv -e .env.development -- nodemon src/server.js",
     "test": "cross-env NODE_ENV=test jest --runInBand",
-    "prisma:pull": "cross-env DATABASE_URL=$DATABASE_URL_HOST prisma db pull",
-    "prisma:generate": "cross-env DATABASE_URL=$DATABASE_URL_HOST prisma generate"
+    "migrate:dev": "dotenv -e .env.development -- npx prisma migrate dev",
+    "prisma:dev": "dotenv -e .env.development -- npx prisma"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^6.15.0",
+    "@prisma/client": "^5.15.0",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.1",
-    "pg": "^8.13.1",
-    "pg-hstore": "^2.3.4"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "pg-hstore": "^2.3.4",
+    "redis": "^5.8.2"
   },
   "devDependencies": {
-    "cross-env": "^10.0.0",
-    "glob": "^10.4.5",
+    "cross-env": "^7.0.3",
+    "dotenv-cli": "^7.4.2",
     "jest": "^29.7.0",
-    "prisma": "^6.15.0",
-    "superagent": "^10.2.3",
-    "supertest": "^7.1.4"
+    "nodemon": "^3.1.0",
+    "prisma": "^5.15.0",
+    "supertest": "^7.0.0"
   }
 }
