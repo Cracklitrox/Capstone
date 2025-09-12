@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import Login from "../pages/login";
 
-beforeAll(() => {
+beforeEach(() => {
   window.alert = jest.fn();
 });
 
