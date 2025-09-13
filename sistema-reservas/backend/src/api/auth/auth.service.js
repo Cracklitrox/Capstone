@@ -9,9 +9,22 @@ const redisClient = require('../../db/redis.client');
  * @param {string} password - La contraseña en texto plano del usuario.
  */
 const login = async (email, password) => {
-  // 1. Buscar al usuario por su email
+  // 1. Buscar al usuario por su email e incluir sus roles
   const user = await prisma.users.findUnique({
     where: { email },
+    // --- ESTE ES EL CAMBIO IMPORTANTE ---
+    include: {
+      user_roles: {
+        select: {
+          roles: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    // ------------------------------------
   });
 
   // Si no se encuentra el usuario, lanzamos un error
@@ -37,7 +50,7 @@ const login = async (email, password) => {
   // Omitimos la contraseña de la respuesta por seguridad
   const { password_hash, ...userWithoutPassword } = user;
 
-  // 4. Devolvemos el usuario y el token
+  // 4. Devolvemos el usuario (ahora con sus roles) y el token
   return { user: userWithoutPassword, token };
 };
 
@@ -48,7 +61,7 @@ const logout = async (token) => {
   // 'exp' es la fecha de expiración en segundos (timestamp)
   const expirationTime = decoded.exp;
   const currentTime = Math.floor(Date.now() / 1000);
-  
+
   // Calculamos cuántos segundos le quedan de vida al token
   const ttl = expirationTime - currentTime;
 

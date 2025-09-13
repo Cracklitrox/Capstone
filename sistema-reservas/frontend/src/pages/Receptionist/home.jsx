@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import Navbar from '../../components/Navbar'; 
 import Sidebar from '../../components/Sidebar'; 
-import Footer from '../../components/Footer';   
+import Footer from '../../components/Footer';
+
 
 const RoomCard = ({ number, status }) => {
   const statusStyles = {
@@ -98,7 +99,6 @@ const ReceptionistHome = () => {
           </div>
         </main>
       </div>
-
       <Footer />
     </div>
   );

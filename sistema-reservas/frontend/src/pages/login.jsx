@@ -1,21 +1,40 @@
+// frontend/src/pages/login.jsx
+
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import { authService } from "../services/services";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
 
-    // Aquí luego se conectará al backend con axios/fetch
-    if (email === "admin@gmail.com" && password === "123") {
-      setError("");
-      alert("Login exitoso ✅");
-    } else {
-      setError("Credenciales incorrectas ❌");
+    try {
+      const { user, token } = await authService.login({ email, password });
+
+      localStorage.setItem("token", token);
+
+      const userRole = user?.user_roles?.[0]?.roles?.name;
+
+      if (userRole === 'administrator') {
+        navigate("/admin");
+      } else if (userRole === 'receptionist') {
+        navigate("/receptionist");
+      } else {
+        setError("Rol de usuario no reconocido.");
+        localStorage.removeItem("token");
+      }
+
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || "Credenciales incorrectas o error en el servidor ❌";
+      setError(errorMessage);
     }
   };
 
@@ -25,8 +44,8 @@ const Login = () => {
         <h2 className="mb-6 text-center text-2xl font-bold text-gray-800">
           Iniciar Sesión
         </h2>
-
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          {/* Email Input */}
           <div>
             <label
               htmlFor="email"
@@ -47,6 +66,7 @@ const Login = () => {
             />
           </div>
 
+          {/* Password Input */}
           <div>
             <label
               htmlFor="password"
@@ -80,9 +100,7 @@ const Login = () => {
               </button>
             </div>
           </div>
-
           {error && <div className="text-sm text-red-600">{error}</div>}
-
           <button
             type="submit"
             className="w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700"
