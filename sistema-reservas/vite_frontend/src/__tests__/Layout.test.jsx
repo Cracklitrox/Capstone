@@ -1,4 +1,4 @@
-// src/__tests__/Layout.test.jsx
+import { vi } from 'vitest';
 import { render, screen } from "@testing-library/react";
 import Layout from "../components/Layout";
 

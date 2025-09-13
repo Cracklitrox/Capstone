@@ -1,4 +1,4 @@
-// src/__tests__/Navbar.test.jsx
+import { vi } from 'vitest';
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom"; // Importa BrowserRouter
 import Navbar from "../components/Navbar";
@@ -14,7 +14,7 @@ describe("Navbar", () => {
   });
 
   test("el botón de menú abre el sidebar en dispositivos móviles", () => {
-    const setSidebarOpen = jest.fn(); // Mock para simular la función de abrir el sidebar
+    const setSidebarOpen = vi.fn(); // Mock para simular la función de abrir el sidebar
     render(
       <BrowserRouter> {/* Envolver en Router */}
         <Navbar setSidebarOpen={setSidebarOpen} />

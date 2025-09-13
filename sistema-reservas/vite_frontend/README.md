@@ -68,3 +68,54 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+### Tree:
+
+vite_frontend                      
+├─ public                          
+│  ├─ favicon.ico                  
+│  ├─ index.html                   
+│  ├─ logo192.png                  
+│  ├─ logo512.png                  
+│  ├─ manifest.json                
+│  ├─ robots.txt                   
+│  └─ vite.svg                     
+├─ src                             
+│  ├─ components                   
+│  │  ├─ Footer.jsx                
+│  │  ├─ layout.jsx                
+│  │  ├─ Navbar.jsx                
+│  │  └─ Sidebar.jsx               
+│  ├─ pages                        
+│  │  ├─ Admin                     
+│  │  │  └─ home.jsx               
+│  │  ├─ Receptionist              
+│  │  │  └─ home.jsx               
+│  │  └─ login.jsx                 
+│  ├─ services                     
+│  │  └─ services.jsx              
+│  ├─ __tests__                    
+│  │  ├─ Admin                     
+│  │  │  └─ Home_Inicial.test.jsx  
+│  │  ├─ Receptionist              
+│  │  │  └─ Home_Inicial.test.jsx  
+│  │  ├─ App.test.js               
+│  │  ├─ Footer.test.jsx           
+│  │  ├─ Layout.test.jsx           
+│  │  ├─ Login.test.jsx            
+│  │  ├─ Navbar.test.jsx           
+│  │  └─ Sidebar.test.jsx          
+│  ├─ App.css                      
+│  ├─ App.js                       
+│  ├─ index.css                    
+│  ├─ index.js                     
+│  ├─ logo.svg                     
+│  └─ setupTests.js                
+├─ eslint.config.js                
+├─ index.html                      
+├─ package-lock.json               
+├─ package.json                    
+├─ postcss.config.js               
+├─ README.md                       
+├─ tailwind.config.js              
+└─ vite.config.js                  

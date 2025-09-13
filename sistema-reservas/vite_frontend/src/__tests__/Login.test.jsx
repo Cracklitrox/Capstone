@@ -1,9 +1,10 @@
+import { vi } from 'vitest';
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import Login from "../pages/login";
 
 beforeEach(() => {
-  window.alert = jest.fn();
+  window.alert = vi.fn();
 });
 
 describe("Login Component", () => {

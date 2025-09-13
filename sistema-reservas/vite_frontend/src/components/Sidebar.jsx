@@ -8,9 +8,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 className={`fixed inset-0 bg-black bg-opacity-50 z-20 transition-opacity md:hidden ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
                     }`}
                 onClick={() => setSidebarOpen(false)}
+                data-testid="sidebar-overlay"
             ></div>
 
             <aside
+                data-testid="sidebar-component"
                 className={`
           // --- Base y comportamiento móvil (superposición) ---
           fixed top-0 left-0 h-screen w-64 bg-gray-800 text-white p-4 z-30

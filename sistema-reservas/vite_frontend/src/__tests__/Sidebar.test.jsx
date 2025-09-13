@@ -1,4 +1,4 @@
-// src/__tests__/Sidebar.test.jsx
+import { vi } from 'vitest';
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom"; // Importa BrowserRouter
 import Sidebar from "../components/Sidebar";
@@ -15,21 +15,24 @@ describe("Sidebar", () => {
 
   test("oculta el menú lateral cuando sidebarOpen es false", () => {
     render(
-      <BrowserRouter> {/* Envolver en Router */}
+      <BrowserRouter>
         <Sidebar sidebarOpen={false} setSidebarOpen={() => {}} />
       </BrowserRouter>
     );
-    expect(screen.queryByText(/Gestionar Reservas/i)).not.toBeInTheDocument();
+
+    const sidebar = screen.getByTestId("sidebar-component");
+    expect(sidebar).toHaveClass('-translate-x-full');
+    expect(sidebar).not.toHaveClass('translate-x-0');
   });
 
   test("cierra el sidebar al hacer clic en el fondo", () => {
-    const setSidebarOpen = jest.fn();
+    const setSidebarOpen = vi.fn();
     render(
       <BrowserRouter> {/* Envolver en Router */}
         <Sidebar sidebarOpen={true} setSidebarOpen={setSidebarOpen} />
       </BrowserRouter>
     );
-    fireEvent.click(screen.getByRole("button")); // Aquí se hace clic en el fondo (si está configurado así)
+    fireEvent.click(screen.getByTestId("sidebar-overlay"));
     expect(setSidebarOpen).toHaveBeenCalledWith(false);
   });
 });
