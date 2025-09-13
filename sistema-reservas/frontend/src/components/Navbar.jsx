@@ -16,8 +16,8 @@ const Navbar = ({ setSidebarOpen }) => {
 
             <div className="hidden md:flex items-center">
                 <Link to="/admin" className="mx-2 hover:underline">Inicio</Link>
-                <Link to="/admin/reservas" className="mx-2 hover:underline">Reservas</Link>
-                <Link to="/admin/usuarios" className="mx-2 hover:underline">Usuarios</Link>
+                <Link to="/admin" className="mx-2 hover:underline">Reservas</Link>
+                <Link to="/admin" className="mx-2 hover:underline">Usuarios</Link>
             </div>
         </nav>
     );

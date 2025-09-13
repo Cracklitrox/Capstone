@@ -30,17 +30,17 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                             </Link>
                         </li>
                         <li className="py-2">
-                            <Link to="/admin/reservas" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
+                            <Link to="/admin" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
                                 Gestionar Reservas
                             </Link>
                         </li>
                         <li className="py-2">
-                            <Link to="/admin/usuarios" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
+                            <Link to="/admin" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
                                 Gestionar Usuarios
                             </Link>
                         </li>
                         <li className="py-2">
-                            <Link to="/admin/configuracion" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
+                            <Link to="/admin" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
                                 Configuración
                             </Link>
                         </li>
