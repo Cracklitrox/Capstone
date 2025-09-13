@@ -1,20 +1,41 @@
-import React from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom"; // Importar BrowserRouter y Routes
-import Login from "./pages/login"; // Página de login
-import AdminHome from "./pages/Admin/home"; // Página de login
-import ReceptionistHome from "./pages/Receptionist/home"; // Página de login
+// frontend/src/App.js
 
-import "./index.css"; // Tailwind CSS
+import React from "react";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import Login from "./pages/login";
+import AdminHome from "./pages/Admin/home";
+import ReceptionistHome from "./pages/Receptionist/home";
+import ProtectedRoute from "./components/ProtectedRoute";
+
+import "./index.css";
 
 function App() {
   return (
     <Router>
       <div className="min-h-screen">
-        {/* Definir las rutas */}
         <Routes>
-          <Route path="/" element={<Login />} /> {/* Página de Logueo */}
-          <Route path="/admin" element={<AdminHome />} /> {/* Página de Admin */}
-          <Route path="/receptionist" element={<ReceptionistHome />} /> {/* Página de Recepcionista */}
+          {/* Ruta de Login: Es pública, no necesita protección */}
+          <Route path="/" element={<Login />} />
+
+          {/* Ruta de Admin: Ahora está protegida */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminHome />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Ruta de Recepcionista: También protegida */}
+          <Route
+            path="/receptionist"
+            element={
+              <ProtectedRoute>
+                <ReceptionistHome />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>
