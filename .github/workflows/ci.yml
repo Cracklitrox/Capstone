@@ -36,15 +36,12 @@ jobs:
 
   backend-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./sistema-reservas/backend
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Run Backend CI Pipeline
+      
+      - name: Run Dockerized Backend CI Pipeline
         run: |
           # Create a custom Docker network
           docker network create backend_network
@@ -67,22 +64,18 @@ jobs:
           done
           echo "PostgreSQL is ready!"
           
-          # Install dependencies
-          npm ci --ignore-scripts
-
-          # Pass environment variables explicitly to the commands
-          DATABASE_URL="postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test"
-          REDIS_URL="redis://redis_service:6379"
-          JWT_SECRET="test-secret-key-for-ci"
-          
-          # Apply Migrations
-          echo "Applying migrations..."
-          DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy --schema prisma/schema.prisma
-          
-          # Run tests with coverage
-          echo "Running tests with coverage..."
-          DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" JWT_SECRET="$JWT_SECRET" npm run coverage
-
+          # Run all Node.js/Prisma commands inside a temporary container
+          docker run --rm --network backend_network -v ${{ github.workspace }}/sistema-reservas/backend:/app \
+          -w /app node:20-alpine /bin/sh -c " \
+            npm ci --ignore-scripts && \
+            DATABASE_URL='postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test' \
+            npx prisma migrate deploy --schema prisma/schema.prisma && \
+            DATABASE_URL='postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test' \
+            REDIS_URL='redis://redis_service:6379' \
+            JWT_SECRET='test-secret-key-for-ci' \
+            npm run coverage \
+          "
+        
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
