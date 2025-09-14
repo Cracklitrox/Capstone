@@ -5,38 +5,16 @@ on:
   pull_request:
 
 jobs:
-  frontend-test:
+  test-and-coverage:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [backend, frontend]
+
     defaults:
       run:
-        working-directory: ./sistema-reservas/frontend
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+        working-directory: ./sistema-reservas/${{ matrix.project }}
 
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: ./sistema-reservas/frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Run tests with coverage
-        run: npm run coverage
-
-      - name: Upload Frontend Coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: frontend
-          fail_ci_if_error: true
-
-  backend-test:
-    runs-on: ubuntu-latest
-    
     services:
       postgres:
         image: postgres:15-alpine
@@ -49,7 +27,6 @@ jobs:
           --health-interval 10s
           --health-timeout 10s
           --health-retries 10
-
       redis:
         image: redis:alpine
         options: >-
@@ -67,37 +44,36 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: ./sistema-reservas/backend/package-lock.json
+          cache-dependency-path: ./sistema-reservas/${{ matrix.project }}/package-lock.json
 
-      - name: Install backend dependencies
+      - name: Install dependencies
         run: npm ci --ignore-scripts
-        working-directory: ./sistema-reservas/backend
 
-      - name: Wait for PostgreSQL to be ready
+      - name: Run backend pipeline
+        if: ${{ matrix.project == 'backend' }}
         run: |
-          until docker exec $(docker ps -q -f name=postgres) pg_isready -U reservas_user -d reservas_db_test; do
-            echo "Waiting for postgres to be ready..."
-            sleep 3
-          done
-
-      - name: Check PostgreSQL container logs
-        run: |
-          docker logs $(docker ps -q -f name=postgres)
-
-      - name: Run Prisma and Tests
-        run: |
+          # Espera explícita a que PostgreSQL esté listo
+          echo "Waiting for Postgres to be ready..."
+          /usr/bin/timeout 60s bash -c 'until pg_isready --dbname="reservas_db_test" --host="postgres" --username="reservas_user"; do sleep 1; done'
+          
+          # Genera el cliente de Prisma y ejecuta las migraciones
           npx prisma generate
           npx prisma migrate deploy
+          
+          # Ejecuta las pruebas
           npm run coverage
-        working-directory: ./sistema-reservas/backend
         env:
           DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
           REDIS_URL: "redis://redis:6379"
           JWT_SECRET: "test-secret-key-for-ci"
 
-      - name: Upload Backend Coverage to Codecov
+      - name: Run frontend tests
+        if: ${{ matrix.project == 'frontend' }}
+        run: npm run coverage
+
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: backend
+          flags: ${{ matrix.project }}
           fail_ci_if_error: true
