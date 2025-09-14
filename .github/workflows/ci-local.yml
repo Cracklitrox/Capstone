@@ -81,13 +81,13 @@ jobs:
       - name: Apply Migrations
         run: npx prisma migrate deploy
         env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db_test"
 
       - name: Run tests with coverage
         run: npm run coverage
         env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
-          REDIS_URL: "redis://redis:6379"
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db_test"
+          REDIS_URL: "redis://localhost:6379"
           JWT_SECRET: "test-secret-key-for-ci"
 
       - name: Upload Backend Coverage to Codecov
