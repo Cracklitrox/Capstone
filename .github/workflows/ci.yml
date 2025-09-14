@@ -13,20 +13,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: ./sistema-reservas/frontend/package-lock.json
-
       - name: Install dependencies
         run: npm ci --ignore-scripts
-
       - name: Run tests with coverage
         run: npm run coverage
-
       - name: Upload Frontend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -36,28 +32,24 @@ jobs:
 
   backend-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./sistema-reservas/backend
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js and run backend services
+      - name: Run Backend CI Pipeline
         run: |
           # Create a custom Docker network
           docker network create backend_network
           
-          # Start PostgreSQL service in the custom network
-          docker run --name postgres_service -d --network backend_network \
+          # Start services in the new network
+          docker run --rm --name postgres_service -d --network backend_network \
           -e POSTGRES_USER=reservas_user \
           -e POSTGRES_PASSWORD=p4ssw0rd_s3gUr4_2025! \
           -e POSTGRES_DB=reservas_db_test \
           postgres:15-alpine
           
-          # Start Redis service in the custom network
-          docker run --name redis_service -d --network backend_network redis:alpine
+          docker run --rm --name redis_service -d --network backend_network redis:alpine
           
           # Wait for PostgreSQL to be ready
           echo "Waiting for PostgreSQL to be ready..."
@@ -67,31 +59,19 @@ jobs:
           done
           echo "PostgreSQL is ready!"
           
-          # Setup Node.js in the same environment
-          npm install -g n
-          n 20
-          node -v
-          npm -v
-          
-          # Install dependencies and handle lockfile
-          rm -f package-lock.json
-          npm install --ignore-scripts
-          
-          # Run Prisma commands
-          echo "Running Prisma generate..."
-          npx prisma generate --schema prisma/schema.prisma
-          
-          echo "Applying migrations..."
-          npx prisma migrate deploy --schema prisma/schema.prisma
-          
-          # Run tests and coverage
-          echo "Running tests with coverage..."
-          npm run coverage
+          # Run all Node.js/Prisma commands inside a temporary container
+          docker run --rm --network backend_network -v ${{ github.workspace }}/sistema-reservas/backend:/app \
+          --workdir /app node:20-alpine /bin/sh -c "\
+            npm ci --ignore-scripts && \
+            npx prisma generate --schema prisma/schema.prisma && \
+            npx prisma migrate deploy --schema prisma/schema.prisma && \
+            npm run coverage \
+          "
         env:
           DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test"
           REDIS_URL: "redis://redis_service:6379"
           JWT_SECRET: "test-secret-key-for-ci"
-          
+      
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -101,4 +81,4 @@ jobs:
           
       - name: Clean up Docker containers
         if: always()
-        run: docker rm -f postgres_service redis_service
+        run: docker rm -f postgres_service redis_service && docker network rm backend_network
