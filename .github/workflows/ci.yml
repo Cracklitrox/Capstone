@@ -77,16 +77,14 @@ jobs:
         
       - name: Install dependencies
         run: |
-          # Primero, borra el archivo de bloqueo antiguo
           rm -f ./sistema-reservas/backend/package-lock.json
-          # Luego, genera uno nuevo e instala las dependencias
           npm install --ignore-scripts
       
       - name: Generate Prisma Client
-        run: npx prisma generate
-
+        run: npx prisma generate --schema ./prisma/schema.prisma
+      
       - name: Apply Migrations
-        run: npx prisma migrate deploy
+        run: npx prisma migrate deploy --schema ./prisma/schema.prisma
 
       - name: Run tests with coverage
         run: npm run coverage
@@ -100,4 +98,4 @@ jobs:
           
       - name: Clean up Docker containers
         if: always()
-        run: docker rm -f postgres_service redis_service}
+        run: docker rm -f postgres_service redis_service
