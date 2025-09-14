@@ -67,22 +67,21 @@ jobs:
           done
           echo "PostgreSQL is ready!"
           
-          # Install dependencies
+          # Set up Node.js environment
           npm ci --ignore-scripts
-          
-          # Pass environment variables directly to Prisma and NPM commands
-          DATABASE_URL="postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test"
-          REDIS_URL="redis://redis_service:6379"
-          JWT_SECRET="test-secret-key-for-ci"
-          
-          echo "Running Prisma generate..."
-          DATABASE_URL="$DATABASE_URL" npx prisma generate --schema prisma/schema.prisma
-          
+
+          # Create .env file for Prisma and other tools
+          echo "DATABASE_URL=postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test" > .env
+          echo "REDIS_URL=redis://redis_service:6379" >> .env
+          echo "JWT_SECRET=test-secret-key-for-ci" >> .env
+
+          # Apply Migrations
           echo "Applying migrations..."
-          DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy --schema prisma/schema.prisma
-          
+          npx prisma migrate deploy --schema prisma/schema.prisma
+
+          # Run tests with coverage
           echo "Running tests with coverage..."
-          DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" JWT_SECRET="$JWT_SECRET" npm run coverage
+          npm run coverage
       
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
