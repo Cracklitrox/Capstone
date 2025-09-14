@@ -63,7 +63,7 @@ jobs:
 
     env:
       PGPASSWORD: p4ssw0rd_s3gUr4_2025!
-      DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db"
+      DATABASE_URL: DATABASE_URL=postgres://reservas_user:p4ssw0rd_s3gUr4_2025!@db:5432/reservas_db
 
     steps:
       - name: Checkout repository
@@ -84,7 +84,8 @@ jobs:
         run: |
           until pg_isready --host=postgres --port=5432 --dbname=reservas_db --username=reservas_user; do
             echo "Waiting for PostgreSQL database to be ready..."
-            docker logs $(docker ps -q -f "ancestor=postgres:15-alpine") # Esto imprimirá los logs de PostgreSQL
+            # Imprimir los logs de PostgreSQL para ayudar a depurar
+            docker logs $(docker ps -q -f "ancestor=postgres:15-alpine") 
             sleep 5
           done
 
