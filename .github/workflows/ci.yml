@@ -70,20 +70,15 @@ jobs:
           cache-dependency-path: ./sistema-reservas/backend/package-lock.json
 
       - name: Install backend dependencies
+        run: npm ci --ignore-scripts
+        working-directory: ./sistema-reservas/backend
+
+      - name: Run Prisma and Tests
         run: |
-          rm -f ./sistema-reservas/backend/package-lock.json
-          npm install --prefix ./sistema-reservas/backend
-          
-      - name: Generate Prisma Client
-        run: npx prisma generate --schema ./sistema-reservas/backend/prisma/schema.prisma
-
-      - name: Apply Migrations
-        run: npx prisma migrate deploy --schema ./sistema-reservas/backend/prisma/schema.prisma
-        env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
-
-      - name: Run tests with coverage
-        run: npm run coverage --prefix ./sistema-reservas/backend
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run coverage
+        working-directory: ./sistema-reservas/backend
         env:
           DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
           REDIS_URL: "redis://redis:6379"
