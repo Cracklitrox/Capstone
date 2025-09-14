@@ -63,7 +63,7 @@ jobs:
 
     env:
       PGPASSWORD: p4ssw0rd_s3gUr4_2025!
-      DATABASE_URL: DATABASE_URL=postgres://reservas_user:p4ssw0rd_s3gUr4_2025!@db:5432/reservas_db
+      DATABASE_URL: postgres://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db
 
     steps:
       - name: Checkout repository
