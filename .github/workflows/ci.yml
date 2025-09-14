@@ -89,13 +89,6 @@ jobs:
           npm run coverage
         working-directory: ./sistema-reservas/backend
         env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
+          DATABASE_URL: "postgresql://reservas_user:${{ services.postgres.env.POSTGRES_PASSWORD }}@postgres:5432/reservas_db_test"
           REDIS_URL: "redis://redis:6379"
           JWT_SECRET: "test-secret-key-for-ci"
-
-      - name: Upload Backend Coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: backend
-          fail_ci_if_error: true
