@@ -84,10 +84,19 @@ jobs:
         run: |
           until pg_isready --host=postgres --port=5432 --dbname=reservas_db --username=reservas_user; do
             echo "Waiting for PostgreSQL database to be ready..."
-            # Imprimir los logs de PostgreSQL para ayudar a depurar
-            docker logs $(docker ps -q -f "ancestor=postgres:15-alpine") 
+            docker logs $(docker ps -q -f "ancestor=postgres:15-alpine") # Imprimir los logs de PostgreSQL para ayudar a depurar
             sleep 5
           done
+
+      - name: Create root role if not exists
+        run: |
+          echo "Verificando si el rol 'root' existe..."
+          psql -U postgres -d reservas_db -c "DO \$\$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'root') THEN
+              CREATE ROLE root LOGIN PASSWORD 'root_password';
+              GRANT reservas_user TO root;
+            END IF;
+          END \$\$;"
 
       - name: Run Prisma and Tests
         run: |
