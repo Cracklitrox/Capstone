@@ -73,20 +73,16 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: ./sistema-reservas/backend
 
-      - name: List Docker containers to verify PostgreSQL container
-        run: |
-          docker ps
-
       - name: Wait for PostgreSQL to be ready
         run: |
-          until docker exec $(docker ps -q -f "name=postgres") pg_isready -U reservas_user -d reservas_db_test; do
+          until docker exec $(docker ps -q -f "name=42150f37d89e4edba153a4a6a3a6ec33_postgres15alpine_3f758f") pg_isready -U reservas_user -d reservas_db_test; do
             echo "Waiting for postgres to be ready..."
             sleep 3
           done
 
       - name: Check PostgreSQL container logs
         run: |
-          docker logs $(docker ps -q -f "name=postgres")
+          docker logs $(docker ps -q -f "name=42150f37d89e4edba153a4a6a3a6ec33_postgres15alpine_3f758f")
 
       - name: Run Prisma and Tests
         run: |
