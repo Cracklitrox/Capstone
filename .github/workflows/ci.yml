@@ -73,6 +73,10 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: ./sistema-reservas/backend
 
+      # Step to list the running Docker containers and get the container ID/name for PostgreSQL
+      - name: List running Docker containers
+        run: docker ps
+
       - name: Wait for PostgreSQL to be ready
         run: |
           until docker exec $(docker ps -q -f name=postgres) pg_isready -U reservas_user -d reservas_db_test; do
