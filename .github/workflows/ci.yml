@@ -36,12 +36,15 @@ jobs:
 
   backend-test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sistema-reservas/backend
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Run Dockerized Backend CI Pipeline
+
+      - name: Run Backend CI Pipeline
         run: |
           # Create a custom Docker network
           docker network create backend_network
@@ -66,7 +69,7 @@ jobs:
           
           # Run all Node.js/Prisma commands inside a temporary container
           docker run --rm --network backend_network -v ${{ github.workspace }}/sistema-reservas/backend:/app \
-          -w /app node:20-alpine /bin/sh -c " \
+          -w /app node:20 /bin/sh -c " \
             npm ci --ignore-scripts && \
             DATABASE_URL='postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test' \
             npx prisma migrate deploy --schema prisma/schema.prisma && \
