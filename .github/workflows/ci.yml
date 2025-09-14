@@ -44,41 +44,45 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run Backend CI Pipeline
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ./sistema-reservas/backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      
+      - name: Setup Docker services
         run: |
-          # Create a custom Docker network
           docker network create backend_network
-          
-          # Start PostgreSQL service in the custom network
           docker run --name postgres_service -d --network backend_network \
-          -e POSTGRES_USER=reservas_user \
-          -e POSTGRES_PASSWORD=p4ssw0rd_s3gUr4_2025! \
-          -e POSTGRES_DB=reservas_db_test \
-          postgres:15-alpine
-          
-          # Start Redis service in the custom network
+            -e POSTGRES_USER=reservas_user \
+            -e POSTGRES_PASSWORD=p4ssw0rd_s3gUr4_2025! \
+            -e POSTGRES_DB=reservas_db_test \
+            postgres:15-alpine
           docker run --name redis_service -d --network backend_network redis:alpine
           
-          # Wait for PostgreSQL to be ready
           echo "Waiting for PostgreSQL to be ready..."
-          until docker exec postgres_service pg_isready --host=localhost --username="reservas_user" -p 5432; do
-            echo "PostgreSQL is not ready, re-trying..."
-            sleep 1
+          until nc -z -v -w3 postgres_service 5432; do
+            echo "PostgreSQL is not ready, retrying in 3 seconds..."
+            sleep 3
           done
           echo "PostgreSQL is ready!"
-          
-          # Run all Node.js/Prisma commands inside a temporary container
-          docker run --rm --network backend_network -v ${{ github.workspace }}/sistema-reservas/backend:/app \
-          -w /app node:20 /bin/sh -c " \
-            npm ci --ignore-scripts && \
-            DATABASE_URL='postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test' \
-            npx prisma migrate deploy --schema prisma/schema.prisma && \
-            DATABASE_URL='postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test' \
-            REDIS_URL='redis://redis_service:6379' \
-            JWT_SECRET='test-secret-key-for-ci' \
-            npm run coverage \
-          "
-        
+        env:
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test"
+
+      - name: Run Prisma Migrations and Tests
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run coverage
+        env:
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test"
+          REDIS_URL: "redis://redis_service:6379"
+          JWT_SECRET: "test-secret-key-for-ci"
+
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
