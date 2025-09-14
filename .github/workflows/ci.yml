@@ -1,12 +1,10 @@
 # Nombre del flujo de trabajo
 name: CI - Build, Test and Coverage
 
-# Disparadores del flujo de trabajo
+# Disparadores del flujo de trabajo (se ejecuta en cualquier push o pull request)
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
 
 jobs:
   # ----- TRABAJO PARA EL BACKEND -----
@@ -14,26 +12,21 @@ jobs:
     name: Test Backend
     runs-on: ubuntu-latest
 
-    # Servicios externos (contenedores) para las pruebas del backend
     services:
-      # Contenedor de PostgreSQL con tu configuración específica
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_USER: reservas_user
+          POSTPOSTGRES_USER: reservas_user
           POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
           POSTGRES_DB: reservas_db
-        # El healthcheck espera a que la BD esté lista antes de empezar los pasos
         options: >-
           --health-cmd "pg_isready -U reservas_user -d reservas_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          # Mapea el puerto del contenedor al host del runner
           - 5432:5432
       
-      # Contenedor de Redis
       redis:
         image: redis:alpine
         options: >-
@@ -61,9 +54,7 @@ jobs:
 
       - name: Run Prisma migrations and tests
         working-directory: ./sistema-reservas/backend
-        # Define las variables de entorno necesarias para este paso
         env:
-          # IMPORTANTE: En GitHub Actions, los servicios se conectan vía 'localhost'
           DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db"
           REDIS_URL: "redis://localhost:6379"
           JWT_SECRET: "test-secret-key-for-ci"
@@ -76,7 +67,7 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: backend # Flag para identificar el reporte del backend
+          flags: backend
 
   # ----- TRABAJO PARA EL FRONTEND -----
   test-frontend:
@@ -110,4 +101,4 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: frontend # Flag para identificar el reporte del frontend
+          flags: frontend
