@@ -73,6 +73,13 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: ./sistema-reservas/backend
 
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          while ! pg_isready -h postgres -U reservas_user -d reservas_db_test; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+
       - name: Run Prisma and Tests
         run: |
           npx prisma generate
