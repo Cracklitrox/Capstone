@@ -73,6 +73,7 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: ./sistema-reservas/backend
 
+      # Wait for PostgreSQL to be ready
       - name: Wait for PostgreSQL to be ready
         run: |
           until docker exec $(docker ps -q -f "ancestor=postgres:15-alpine") pg_isready -U reservas_user -d reservas_db_test; do
@@ -80,10 +81,12 @@ jobs:
             sleep 10
           done
 
+      # Check PostgreSQL container logs
       - name: Check PostgreSQL container logs
         run: |
           docker logs $(docker ps -q -f "ancestor=postgres:15-alpine")
 
+      # Run Prisma and Tests
       - name: Run Prisma and Tests
         run: |
           npx prisma generate
@@ -91,10 +94,11 @@ jobs:
           npm run coverage
         working-directory: ./sistema-reservas/backend
         env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db_test"
-          REDIS_URL: "redis://localhost:6379"
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
+          REDIS_URL: "redis://redis:6379"
           JWT_SECRET: "test-secret-key-for-ci"
 
+      # Upload Backend Coverage to Codecov
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
