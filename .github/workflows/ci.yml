@@ -43,27 +43,22 @@ jobs:
 
       - name: Set up Docker network and services
         run: |
-          # Create a custom Docker network
           docker network create backend_network
           
-          # Start PostgreSQL service in the custom network
           docker run --name postgres_service -d --network backend_network \
           -e POSTGRES_USER=reservas_user \
           -e POSTGRES_PASSWORD=p4ssw0rd_s3gUr4_2025! \
           -e POSTGRES_DB=reservas_db_test \
           postgres:15-alpine
           
-          # Start Redis service in the custom network
           docker run --name redis_service -d --network backend_network redis:alpine
           
-          # Wait for PostgreSQL to be ready
           echo "Waiting for PostgreSQL to be ready..."
           until docker exec postgres_service pg_isready --host=localhost --username="reservas_user" -p 5432; do
             sleep 1
           done
           echo "PostgreSQL is ready!"
           
-          # Set DATABASE_URL and REDIS_URL environment variables for subsequent steps
           echo "DATABASE_URL=postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test" >> $GITHUB_ENV
           echo "REDIS_URL=redis://redis_service:6379" >> $GITHUB_ENV
 
@@ -81,7 +76,11 @@ jobs:
           npm -v
         
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        run: |
+          # Primero, borra el archivo de bloqueo antiguo
+          rm -f ./sistema-reservas/backend/package-lock.json
+          # Luego, genera uno nuevo e instala las dependencias
+          npm install --ignore-scripts
       
       - name: Generate Prisma Client
         run: npx prisma generate
