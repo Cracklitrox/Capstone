@@ -1,42 +1,42 @@
 const jwt = require('jsonwebtoken');
-const redisClient = require('../db/redis.client');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-
-const verifyToken = async (req, res, next) => {
-  // 1. Buscamos el token en los headers de la petición
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  // 2. Si no hay token, enviamos un error 403 (Forbidden)
-  if (!token) {
-    return res.status(403).json({ message: 'Acceso denegado' });
-  }
-
-  // 3. Verificamos que el token sea válido
+const authenticate = async (req, res, next) => {
   try {
-    // 1. Verificamos si el token está en nuestra lista negra
-    const isBlocked = await redisClient.get(token);
-    
-    if (isBlocked) {
-      return res.status(401).json({ message: 'Token inválido (sesión cerrada).' });
+    const authHeader = req.headers['authorization'];
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Acceso denegado. No se proporcionó un token.' });
     }
 
-    // 2. Verificamos la firma del token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const token = authHeader.split(' ')[1];
     
-    // Guardamos el payload decodificado (que tiene el id del usuario) en el objeto 'req'
-    // para que los siguientes middlewares o controladores puedan usarlo.
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Si todo está bien, llamamos a next() para que la petición continúe
+    const user = await prisma.users.findUnique({
+      where: { id: decoded.id },
+      include: {
+        user_roles: {
+          select: {
+            roles: {
+              select: { name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Usuario no encontrado.' });
+    }
+    
+    req.user = user;
     next();
   } catch (error) {
     console.error('Error al verificar el token:', error.message);
-    // Si el token no es válido, enviamos un error 401 (Unauthorized)
     return res.status(401).json({ message: 'Token inválido o expirado.' });
   }
 };
 
-module.exports = {
-  verifyToken,
-};
+module.exports = authenticate;

@@ -1,18 +1,18 @@
 # ---- Etapa 1: Construcción (Build Stage) ----
-FROM node:18-alpine AS builder
+FROM node:20-alpine as builder
 
 WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci --ignore-scripts
 
 COPY . .
 
 RUN npm run build
 
-# ---- Etapa 2: Servir con Nginx ----
-FROM nginx:stable-alpine
+# ---- Etapa 2: Servidor (Serve Stage) ----
+FROM nginx:1.27-alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 

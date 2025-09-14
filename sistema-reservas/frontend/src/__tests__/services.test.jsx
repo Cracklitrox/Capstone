@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import axios from 'axios';
-import reservationService from '../services/services.jsx';
+import { reservationService } from '../services/services';
 
 vi.mock('axios', () => ({
   default: {
@@ -8,6 +8,8 @@ vi.mock('axios', () => ({
     post: vi.fn(),
   },
 }));
+
+const API_URL = 'http://localhost:3001/api/v1';
 
 describe('reservationService', () => {
   beforeEach(() => {
@@ -21,15 +23,15 @@ describe('reservationService', () => {
 
       const result = await reservationService.getReservations();
 
-      expect(axios.get).toHaveBeenCalledWith('http://localhost:3000/api/reservations');
+      expect(axios.get).toHaveBeenCalledWith(`${API_URL}/reservations`);
       expect(result).toEqual(mockReservations);
     });
 
     it('debería lanzar un error si la petición falla', async () => {
-        const error = new Error('API Error');
-        axios.get.mockRejectedValue(error);
+      const error = new Error('API Error');
+      axios.get.mockRejectedValue(error);
 
-        await expect(reservationService.getReservations()).rejects.toThrow('API Error');
+      await expect(reservationService.getReservations()).rejects.toThrow('API Error');
     });
   });
 
@@ -42,7 +44,7 @@ describe('reservationService', () => {
 
       const result = await reservationService.createReservation(reservationData);
 
-      expect(axios.post).toHaveBeenCalledWith('http://localhost:3000/api/reservations', reservationData);
+      expect(axios.post).toHaveBeenCalledWith(`${API_URL}/reservations`, reservationData);
       expect(result).toEqual(newReservation);
     });
   });

@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN echo "Forzando la reinstalación de dependencias en $(date)" > /tmp/log.txt
+
+RUN npm install --ignore-scripts
+
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host"]

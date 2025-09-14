@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-  # Servicio de la Base de Datos (PostgreSQL)
   db:
     image: postgres:15-alpine
     container_name: db_postgres
@@ -14,8 +11,12 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reservas_user -d reservas_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   
-  # Servicio de Cache (Redis)
   redis:
     image: redis:alpine
     container_name: redis_cache
@@ -25,7 +26,6 @@ services:
     volumes:
       - redisdata:/data
 
-  # Servicio del Backend (Nuestra API Node.js)
   backend:
     container_name: backend_api
     build: ./backend
@@ -35,23 +35,25 @@ services:
     env_file:
       - ./backend/.env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     working_dir: /app
     volumes:
       - ./backend:/app
-      - /src/node_modules
-    command: sh -c "./docker-entrypoint.sh"
+      - /app/node_modules
+    # command: sh -c "./docker-entrypoint.sh"
 
-  # Servicio del Frontend (Nuestra App React)
   frontend:
     container_name: frontend_client
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     restart: always
     ports:
-      - "3000:80"
+      - "5173:5173"
     volumes:
-      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
       - ./frontend:/app
       - /app/node_modules
 

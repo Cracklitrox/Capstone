@@ -1,14 +1,16 @@
+#!/bin/sh
+set -e
+
+until pg_isready -h db -U reservas_user -d reservas_db; do
+  echo "Esperando que la base de datos esté lista..."
+  sleep 2
+done
+
 echo "Aplicando migraciones..."
 npx prisma migrate deploy
 
-USER_COUNT=$(npx prisma eval 'await prisma.users.count()')
-
-if [ $USER_COUNT -eq 0 ]; then
-  echo "La base de datos está vacía. Ejecutando el script de seed..."
-  npx prisma db seed
-else
-  echo "La base de datos ya tiene datos. Omitiendo el seed."
-fi
+echo "Verificando si la base de datos necesita ser poblada (seed)..."
+node prisma/check-seed.js
 
 echo "Iniciando el servidor..."
 exec node src/server.js

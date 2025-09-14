@@ -17,7 +17,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^5.15.0",
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.19.2",
@@ -25,8 +26,7 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.5",
     "pg-hstore": "^2.3.4",
-    "redis": "^5.8.2",
-    "bcryptjs": "^3.0.2"
+    "redis": "^5.8.2"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.0.0",
