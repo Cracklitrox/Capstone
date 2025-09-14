@@ -100,4 +100,4 @@ jobs:
           
       - name: Clean up Docker containers
         if: always()
-        run: docker rm -f postgres_service redis_service
+        run: docker rm -f postgres_service redis_service}
