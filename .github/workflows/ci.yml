@@ -52,15 +52,8 @@ jobs:
       - name: Run backend pipeline
         if: ${{ matrix.project == 'backend' }}
         run: |
-          # Espera explícita a que PostgreSQL esté listo
-          echo "Waiting for Postgres to be ready..."
-          /usr/bin/timeout 60s bash -c 'until pg_isready --dbname="reservas_db_test" --host="postgres" --username="reservas_user"; do sleep 1; done'
-          
-          # Genera el cliente de Prisma y ejecuta las migraciones
           npx prisma generate
           npx prisma migrate deploy
-          
-          # Ejecuta las pruebas
           npm run coverage
         env:
           DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
