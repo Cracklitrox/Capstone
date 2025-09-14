@@ -35,70 +35,64 @@ jobs:
           fail_ci_if_error: true
 
   backend-test:
-    runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: reservas_user
-          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
-          POSTGRES_DB: reservas_db_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 10s
-          --health-retries 10
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: reservas_user
+          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
+          POSTGRES_DB: reservas_db_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 10
 
-      redis:
-        image: redis:alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      redis:
+        image: redis:alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: ./sistema-reservas/backend/package-lock.json
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ./sistema-reservas/backend/package-lock.json
 
-      - name: Install backend dependencies
-        run: npm ci --ignore-scripts
-        working-directory: ./sistema-reservas/backend
+      - name: Install backend dependencies
+        run: npm ci --ignore-scripts
+        working-directory: ./sistema-reservas/backend
+      
+      - name: Wait for database to be ready
+        run: |
+          until pg_isready --host=postgres --port=5432 --dbname=reservas_db_test --username=reservas_user; do
+            echo "Waiting for PostgreSQL database to be ready..."
+            sleep 5
+          done
+        env:
+          PGPASSWORD: ${{ services.postgres.env.POSTGRES_PASSWORD }}
 
-      # Wait for PostgreSQL to be ready
-      - name: Wait for PostgreSQL to be ready
-        run: |
-          until docker exec $(docker ps -q -f "ancestor=postgres:15-alpine") pg_isready -U reservas_user -d reservas_db_test; do
-            echo "Waiting for postgres to be ready..."
-            sleep 10
-          done
+      - name: Run Prisma and Tests
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run coverage
+        working-directory: ./sistema-reservas/backend
+        env:
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
+          REDIS_URL: "redis://redis:6379"
+          JWT_SECRET: "test-secret-key-for-ci"
 
-      # Check PostgreSQL container logs
-      - name: Check PostgreSQL container logs
-        run: |
-          docker logs $(docker ps -q -f "ancestor=postgres:15-alpine")
-
-      # Run Prisma and Tests
-      - name: Run Prisma and Tests
-        run: |
-          npx prisma generate
-          npx prisma migrate deploy
-          npm run coverage
-        working-directory: ./sistema-reservas/backend
-        env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
-          REDIS_URL: "redis://redis:6379"
-          JWT_SECRET: "test-secret-key-for-ci"
-
-      # Upload Backend Coverage to Codecov
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
