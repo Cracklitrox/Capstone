@@ -47,6 +47,8 @@ jobs:
           POSTGRES_USER: reservas_user
           POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
           POSTGRES_DB: reservas_db_test
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -55,6 +57,8 @@ jobs:
 
       redis:
         image: redis:alpine
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
