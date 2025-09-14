@@ -79,6 +79,21 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
       
+      - name: Wait for PostgreSQL
+        run: |
+          n=0
+          until [ $n -ge 5 ]; do
+            nc -z -v -w5 postgres 5432 && break
+            n=$((n+1))
+            echo "PostgreSQL no está listo, reintentando... ($n/5)"
+            sleep 5
+          done
+          if [ $n -ge 5 ]; then
+            echo "No se pudo conectar a PostgreSQL después de 5 intentos."
+            exit 1
+          fi
+          echo "PostgreSQL está listo, continuando."
+
       - name: Generate Prisma Client
         run: npx prisma generate
 
