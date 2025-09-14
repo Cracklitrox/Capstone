@@ -1,93 +1,132 @@
-name: CI - Test and Coverage with Services
+name: CI - Tests and Coverage
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 jobs:
-  backend-tests:
+  test-and-coverage:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: reservas_user
-          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
-          POSTGRES_DB: reservas_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U reservas_user"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    strategy:
+      matrix:
+        include:
+          - project: backend
+            node: 20
+            lockfile: sistema-reservas/backend/package-lock.json
+          - project: frontend
+            node: 20
+            lockfile: sistema-reservas/frontend/package-lock.json
+    defaults:
+      run:
+        working-directory: ./sistema-reservas/${{ matrix.project }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js 20.x
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.lockfile }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./sistema-reservas/${{ matrix.project }}/coverage/lcov.info
+          fail_ci_if_error: true
+          verbose: true
+
+      - name: List coverage files
+        run: ls -R ./sistema-reservas/${{ matrix.project }}/coverage || echo "No coverage files"
+
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:15-alpine
+        container_name: db_postgres
+        restart: always
+        environment:
+          POSTGRES_USER: reservas_user
+          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
+          POSTGRES_DB: reservas_db
+        ports:
+          - "5433:5432"
+        volumes:
+          - pgdata:/var/lib/postgresql/data
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U reservas_user -d reservas_db"]
+          interval: 10s
+          timeout: 10s
+          retries: 10
+
+      redis:
+        image: redis:alpine
+        container_name: redis_cache
+        restart: always
+        ports:
+          - "6379:6379"
+        volumes:
+          - redisdata:/data
+
+    env:
+      PGPASSWORD: p4ssw0rd_s3gUr4_2025!
+      DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@db:5432/reservas_db"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "test-secret-key-for-ci"
+      JWT_EXPIRES_IN: "1d"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: ./sistema-reservas/backend/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install backend dependencies
+        run: npm ci --ignore-scripts
         working-directory: ./sistema-reservas/backend
 
-      - name: Set up environment variables
+      - name: Wait for PostgreSQL to be ready
         run: |
-          echo "DATABASE_URL=postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db" >> $GITHUB_ENV
-          echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
-        working-directory: ./sistema-reservas/backend
+          until pg_isready --host=postgres --port=5432 --dbname=reservas_db --username=reservas_user; do
+            echo "Waiting for PostgreSQL database to be ready..."
+            docker logs $(docker ps -q -f "ancestor=postgres:15-alpine") # Imprime los logs de PostgreSQL mientras espera
+            sleep 5
+          done
 
-      - name: Run backend tests with coverage
-        run: npm test
+      - name: Run Prisma and Tests
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run coverage
         working-directory: ./sistema-reservas/backend
         env:
-          DATABASE_URL: postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db
-          REDIS_URL: redis://localhost:6379
+          REDIS_URL: "redis://redis:6379"
+          JWT_SECRET: "test-secret-key-for-ci"
 
-      - name: Upload backend coverage to Codecov
+      - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./sistema-reservas/backend/coverage/lcov.info
+          flags: backend
           fail_ci_if_error: true
-          verbose: true
-      
 
-  frontend-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js 20.x
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: ./sistema-reservas/frontend/package-lock.json
-      
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./sistema-reservas/frontend
-
-      - name: Run frontend tests
-        run: npm test
-        working-directory: ./sistema-reservas/frontend
+volumes:
+  pgdata:
+    name: sistema-reservas-pgdata
+  redisdata:
+    name: sistema-reservas-redisdata
