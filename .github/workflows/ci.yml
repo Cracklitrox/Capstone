@@ -40,30 +40,34 @@ jobs:
       run:
         working-directory: ./sistema-reservas/backend
     
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: reservas_user
-          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
-          POSTGRES_DB: reservas_db_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Docker and run services
+        run: |
+          echo "Starting Docker services..."
+          # Start PostgreSQL service
+          docker run --name postgres_service -d -p 5432:5432 \
+          -e POSTGRES_USER=reservas_user \
+          -e POSTGRES_PASSWORD=p4ssw0rd_s3gUr4_2025! \
+          -e POSTGRES_DB=reservas_db_test \
+          postgres:15-alpine
+          
+          # Start Redis service
+          docker run --name redis_service -d -p 6379:6379 redis:alpine
+          
+          # Wait for PostgreSQL to be ready
+          echo "Waiting for PostgreSQL to be ready..."
+          until docker exec postgres_service pg_isready --dbname="reservas_db_test" --host="localhost" --username="reservas_user"; do
+            sleep 1
+          done
+          echo "PostgreSQL is ready!"
+          
+          # Get the Docker IP for the database
+          # Use host.docker.internal for modern Docker versions
+          DATABASE_HOST_IP=host.docker.internal
+          echo "DATABASE_HOST_IP=$DATABASE_HOST_IP" >> $GITHUB_ENV
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
@@ -77,21 +81,19 @@ jobs:
       
       - name: Generate Prisma Client
         run: npx prisma generate
-
-      - name: Apply Migrations and Run Tests
-        run: |
-          echo "Waiting for Postgres..."
-          # Este comando esperará 30 segundos
-          /usr/bin/timeout 30s bash -c 'until pg_isready --dbname="reservas_db_test" --host="postgres" --username="reservas_user"; do sleep 1; done'
-          
-          echo "Running Prisma migrations..."
-          npx prisma migrate deploy
-          
-          echo "Running tests with coverage..."
-          npm run coverage
         env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres:5432/reservas_db_test"
-          REDIS_URL: "redis://redis:6379"
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@${{ env.DATABASE_HOST_IP }}:5432/reservas_db_test"
+
+      - name: Apply Migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@${{ env.DATABASE_HOST_IP }}:5432/reservas_db_test"
+
+      - name: Run tests with coverage
+        run: npm run coverage
+        env:
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@${{ env.DATABASE_HOST_IP }}:5432/reservas_db_test"
+          REDIS_URL: "redis://host.docker.internal:6379"
           JWT_SECRET: "test-secret-key-for-ci"
 
       - name: Upload Backend Coverage to Codecov
