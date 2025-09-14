@@ -36,38 +36,36 @@ jobs:
 
   backend-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./sistema-reservas/backend
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker and run services
+      - name: Set up Docker network and services
         run: |
-          echo "Starting Docker services..."
-          # Start PostgreSQL service
-          docker run --name postgres_service -d -p 5432:5432 \
+          # Create a custom Docker network
+          docker network create backend_network
+          
+          # Start PostgreSQL service in the custom network
+          docker run --name postgres_service -d --network backend_network \
           -e POSTGRES_USER=reservas_user \
           -e POSTGRES_PASSWORD=p4ssw0rd_s3gUr4_2025! \
           -e POSTGRES_DB=reservas_db_test \
           postgres:15-alpine
           
-          # Start Redis service
-          docker run --name redis_service -d -p 6379:6379 redis:alpine
+          # Start Redis service in the custom network
+          docker run --name redis_service -d --network backend_network redis:alpine
           
           # Wait for PostgreSQL to be ready
           echo "Waiting for PostgreSQL to be ready..."
-          until docker exec postgres_service pg_isready --dbname="reservas_db_test" --host="localhost" --username="reservas_user"; do
+          until docker exec postgres_service pg_isready --host=localhost --username="reservas_user" -p 5432; do
             sleep 1
           done
           echo "PostgreSQL is ready!"
           
-          # Get the Docker IP for the database
-          # Use host.docker.internal for modern Docker versions
-          DATABASE_HOST_IP=host.docker.internal
-          echo "DATABASE_HOST_IP=$DATABASE_HOST_IP" >> $GITHUB_ENV
+          # Set DATABASE_URL and REDIS_URL environment variables for subsequent steps
+          echo "DATABASE_URL=postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test" >> $GITHUB_ENV
+          echo "REDIS_URL=redis://redis_service:6379" >> $GITHUB_ENV
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
@@ -75,26 +73,22 @@ jobs:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: ./sistema-reservas/backend/package-lock.json
-
+        run: |
+          echo "Verifying Node.js and npm versions..."
+          node -v
+          npm -v
+        
       - name: Install dependencies
         run: npm ci --ignore-scripts
       
       - name: Generate Prisma Client
         run: npx prisma generate
-        env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@${{ env.DATABASE_HOST_IP }}:5432/reservas_db_test"
 
       - name: Apply Migrations
         run: npx prisma migrate deploy
-        env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@${{ env.DATABASE_HOST_IP }}:5432/reservas_db_test"
 
       - name: Run tests with coverage
         run: npm run coverage
-        env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@${{ env.DATABASE_HOST_IP }}:5432/reservas_db_test"
-          REDIS_URL: "redis://host.docker.internal:6379"
-          JWT_SECRET: "test-secret-key-for-ci"
 
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -102,3 +96,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: backend
           fail_ci_if_error: true
+          
+      - name: Clean up Docker containers
+        if: always()
+        run: docker rm -f postgres_service redis_service
