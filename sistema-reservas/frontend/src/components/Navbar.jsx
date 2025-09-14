@@ -24,6 +24,7 @@ const Navbar = ({ setSidebarOpen }) => {
                 <button
                     className="md:hidden text-2xl"
                     onClick={() => setSidebarOpen(true)}
+                    aria-label="Abrir menú"
                 >
                     ☰
                 </button>
