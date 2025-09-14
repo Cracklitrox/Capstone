@@ -50,6 +50,8 @@ jobs:
           --health-interval 10s
           --health-timeout 10s
           --health-retries 10
+        ports:
+          - "5432:5432"
 
       redis:
         image: redis:alpine
@@ -78,7 +80,7 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: ./sistema-reservas/backend
 
-      - name: Wait for database to be ready
+      - name: Wait for PostgreSQL to be ready
         run: |
           until pg_isready --host=postgres --port=5432 --dbname=reservas_db_test --username=reservas_user; do
             echo "Waiting for PostgreSQL database to be ready..."
