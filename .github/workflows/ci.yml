@@ -53,7 +53,7 @@ jobs:
           docker run --name postgres_service -d --network backend_network \
           -e POSTGRES_USER=reservas_user \
           -e POSTGRES_PASSWORD=p4ssw0rd_s3gUr4_2025! \
-          -e POSTGRES_DB: reservas_db_test \
+          -e POSTGRES_DB=reservas_db_test \
           postgres:15-alpine
           
           # Start Redis service in the custom network
@@ -84,7 +84,6 @@ jobs:
           echo "Applying migrations..."
           npx prisma migrate deploy --schema prisma/schema.prisma
           
-          # Run tests and coverage
           echo "Running tests with coverage..."
           npm run coverage
         env:
