@@ -36,6 +36,9 @@ jobs:
 
   backend-test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sistema-reservas/backend # Este es el directorio de trabajo
     
     steps:
       - name: Checkout repository
@@ -77,14 +80,14 @@ jobs:
         
       - name: Install dependencies
         run: |
-          rm -f ./sistema-reservas/backend/package-lock.json
+          rm -f package-lock.json # Se busca en el working-directory
           npm install --ignore-scripts
       
       - name: Generate Prisma Client
-        run: npx prisma generate --schema ./prisma/schema.prisma
+        run: npx prisma generate --schema prisma/schema.prisma # Se busca en el working-directory
       
       - name: Apply Migrations
-        run: npx prisma migrate deploy --schema ./prisma/schema.prisma
+        run: npx prisma migrate deploy --schema prisma/schema.prisma # Se busca en el working-directory
 
       - name: Run tests with coverage
         run: npm run coverage
