@@ -75,14 +75,14 @@ jobs:
 
       - name: Wait for PostgreSQL to be ready
         run: |
-          until docker exec $(docker ps -q -f "name=ab0809d58e7c2622b242dd6bf3159649aba3fc7b36373ef7794ee592d0ba1da8") pg_isready -U reservas_user -d reservas_db_test; do
+          until docker exec $(docker ps -q -f "ancestor=postgres:15-alpine") pg_isready -U reservas_user -d reservas_db_test; do
             echo "Waiting for postgres to be ready..."
             sleep 10
           done
 
       - name: Check PostgreSQL container logs
         run: |
-          docker logs $(docker ps -q -f "name=42150f37d89e4edba153a4a6a3a6ec33_postgres15alpine_3f758f")
+          docker logs $(docker ps -q -f "ancestor=postgres:15-alpine")
 
       - name: Run Prisma and Tests
         run: |
