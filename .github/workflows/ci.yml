@@ -67,29 +67,22 @@ jobs:
           done
           echo "PostgreSQL is ready!"
           
-          # Setup Node.js in the same environment
-          npm install -g n
-          n 20
-          node -v
-          npm -v
+          # Install dependencies
+          npm ci --ignore-scripts
           
-          # Install dependencies and handle lockfile
-          rm -f package-lock.json
-          npm install --ignore-scripts
+          # Pass environment variables directly to Prisma and NPM commands
+          DATABASE_URL="postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test"
+          REDIS_URL="redis://redis_service:6379"
+          JWT_SECRET="test-secret-key-for-ci"
           
-          # Run Prisma commands
           echo "Running Prisma generate..."
-          npx prisma generate --schema prisma/schema.prisma
+          DATABASE_URL="$DATABASE_URL" npx prisma generate --schema prisma/schema.prisma
           
           echo "Applying migrations..."
-          npx prisma migrate deploy --schema prisma/schema.prisma
+          DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy --schema prisma/schema.prisma
           
           echo "Running tests with coverage..."
-          npm run coverage
-        env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@postgres_service:5432/reservas_db_test"
-          REDIS_URL: "redis://redis_service:6379"
-          JWT_SECRET: "test-secret-key-for-ci"
+          DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" JWT_SECRET="$JWT_SECRET" npm run coverage
       
       - name: Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -100,4 +93,6 @@ jobs:
           
       - name: Clean up Docker containers and network
         if: always()
-        run: docker rm -f postgres_service redis_service && docker network rm backend_network
+        run: |
+          docker rm -f postgres_service redis_service
+          docker network rm backend_network
