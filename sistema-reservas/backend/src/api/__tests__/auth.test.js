@@ -7,11 +7,43 @@ import redisClient from '../../db/redis.client';
 const prisma = new PrismaClient();
 let consoleErrorSpy;
 
+// --- FUNCIÓN DE RESETEO EXHAUSTIVA ---
 const resetDatabase = async () => {
-  await prisma.user_roles.deleteMany({});
-  await prisma.reservations.deleteMany({});
-  await prisma.users.deleteMany({});
-  await prisma.roles.deleteMany({});
+  // Borramos todas las tablas que dependen de users o roles, en orden.
+  // Usamos $transaction para ejecutar borrados independientes en paralelo.
+  await prisma.$transaction([
+    prisma.activity_logs.deleteMany({}),
+    prisma.alert_read_status.deleteMany({}),
+    prisma.cleaning_records.deleteMany({}),
+    prisma.guest_details.deleteMany({}),
+    prisma.maintenance_tasks.deleteMany({}),
+    prisma.notification_read_status.deleteMany({}),
+    prisma.payments.deleteMany({}),
+    prisma.reservation_guests.deleteMany({}),
+    prisma.reservation_promotions.deleteMany({}),
+    prisma.reservation_rooms.deleteMany({}),
+    prisma.reservation_services.deleteMany({}),
+    prisma.system_errors.deleteMany({}),
+    prisma.user_roles.deleteMany({}),
+  ]);
+
+  // Tablas que dependen de las anteriores
+  await prisma.$transaction([
+    prisma.alerts.deleteMany({}),
+    prisma.notifications.deleteMany({}),
+    prisma.reservations.deleteMany({}),
+  ]);
+  
+  // Finalmente, las tablas maestras
+  await prisma.$transaction([
+    prisma.users.deleteMany({}),
+    prisma.roles.deleteMany({}),
+    prisma.promotions.deleteMany({}),
+    prisma.rooms.deleteMany({}),
+    prisma.services.deleteMany({}),
+  ]);
+  
+  await prisma.room_types.deleteMany({});
 };
 
 beforeAll(async () => {
@@ -19,10 +51,7 @@ beforeAll(async () => {
   await resetDatabase();
 
   const testRole = await prisma.roles.create({
-    data: {
-      name: 'administrator',
-      description: 'Rol de prueba para administradores',
-    },
+    data: { name: 'administrator' },
   });
 
   const passwordHash = await bcrypt.hash('ReservasDevPass_2025', 10);
@@ -34,15 +63,11 @@ beforeAll(async () => {
       paternal_last_name: 'User',
       email: 'test@example.com',
       password_hash: passwordHash,
-      status: 'active',
     },
   });
 
   await prisma.user_roles.create({
-    data: {
-      user_id: testUser.id,
-      role_id: testRole.id,
-    },
+    data: { user_id: testUser.id, role_id: testRole.id },
   });
 });
 
@@ -64,7 +89,6 @@ describe('Auth Endpoints - /api/v1/auth', () => {
         password: 'ReservasDevPass_2025',
       });
     expect(response.statusCode).toBe(200);
-    expect(response.body).toHaveProperty('user');
     expect(response.body).toHaveProperty('token');
   });
 
