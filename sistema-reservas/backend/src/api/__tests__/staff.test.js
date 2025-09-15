@@ -9,24 +9,31 @@ const prisma = new PrismaClient();
 let adminToken;
 
 const resetDatabase = async () => {
-  // Obtenemos todos los nombres de las tablas del schema de Prisma
-  const tableNames = Object.keys(prisma).filter(
-    (key) => !key.startsWith('_') && !key.startsWith('$')
-  );
-
-  // Creamos un comando SQL para truncar todas las tablas
-  const truncateQuery = `TRUNCATE TABLE ${tableNames
-    .map((name) => `"${name}"`)
-    .join(', ')} RESTART IDENTITY CASCADE;`;
-
-  try {
-    // Usamos $executeRawUnsafe para ejecutar el comando de limpieza
-    await prisma.$executeRawUnsafe(truncateQuery);
-  } catch (error) {
-    console.error('Error al truncar la base de datos:', error);
-    throw error;
-  }
-};
+  const tableNames = [
+    'activity_logs',
+    'alert_read_status',
+    'alerts',
+    'cleaning_records',
+    'guest_details',
+    'maintenance_tasks',
+    'notification_read_status',
+    'notifications',
+    'payments',
+    'promotions',
+    'reservation_guests',
+    'reservation_promotions',
+    'reservation_rooms',
+    'reservation_services',
+    'reservations',
+    'roles',
+    'room_types',
+    'rooms',
+    'seasons',
+    'services',
+    'system_errors',
+    'user_roles',
+    'users',
+  ];
 
 beforeAll(async () => {
   // consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
