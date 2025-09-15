@@ -9,45 +9,22 @@ const prisma = new PrismaClient();
 let adminToken;
 
 const resetDatabase = async () => {
-  // Primero, eliminamos los registros de las tablas que tienen múltiples dependencias (join tables)
-  await prisma.reservation_guests.deleteMany({});
-  await prisma.reservation_promotions.deleteMany({});
-  await prisma.reservation_rooms.deleteMany({});
-  await prisma.reservation_services.deleteMany({});
-  await prisma.alert_read_status.deleteMany({});
-  await prisma.notification_read_status.deleteMany({});
-  await prisma.user_roles.deleteMany({});
+  const modelNames = Object.keys(prisma).filter(
+    (key) =>
+      !key.startsWith('_') &&
+      !key.startsWith('$') &&
+      typeof prisma[key] === 'object' &&
+      'deleteMany' in prisma[key]
+  );
 
-  // Luego, tablas que dependen de otras pero son "padres" de las anteriores
-  await prisma.payments.deleteMany({});
-  await prisma.maintenance_tasks.deleteMany({});
-  await prisma.cleaning_records.deleteMany({});
-  await prisma.alerts.deleteMany({});
-  await prisma.notifications.deleteMany({});
-  
-  // Tablas que dependen principalmente de 'users'
-  await prisma.activity_logs.deleteMany({});
-  await prisma.guest_details.deleteMany({});
-  await prisma.system_errors.deleteMany({});
-
-  // Ahora podemos eliminar las reservaciones, ya que sus dependencias fueron eliminadas
-  await prisma.reservations.deleteMany({});
-  
-  // Y ahora los usuarios y roles, que son dependencias de muchas tablas ya limpias
-  await prisma.users.deleteMany({});
-  await prisma.roles.deleteMany({});
-
-  // Finalmente, tablas que no tienen muchas dependencias entrantes
-  await prisma.rooms.deleteMany({});
-  await prisma.room_types.deleteMany({});
-  await prisma.services.deleteMany({});
-  await prisma.promotions.deleteMany({});
-  await prisma.seasons.deleteMany({});
+  const deletePromises = modelNames.map((model) => prisma[model].deleteMany());
+  await prisma.$transaction(deletePromises);
 };
 
 beforeAll(async () => {
   // consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   await resetDatabase();
+  print(resetDatabase)
 
   const adminRole = await prisma.roles.create({
     data: {
@@ -87,6 +64,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await resetDatabase();
+  print(resetDatabase)
   await prisma.$disconnect();
   await redisClient.disconnect();
 });
