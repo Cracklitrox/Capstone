@@ -5,7 +5,6 @@ import bcrypt from 'bcryptjs';
 import redisClient from '../../db/redis.client';
 
 const prisma = new PrismaClient();
-let consoleErrorSpy;
 
 const resetDatabase = async () => {
   // Primero, eliminamos los registros de las tablas que tienen múltiples dependencias (join tables)
@@ -45,7 +44,6 @@ const resetDatabase = async () => {
 };
 
 beforeAll(async () => {
-  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   await resetDatabase();
 
   const testRole = await prisma.roles.create({
@@ -80,9 +78,6 @@ afterAll(async () => {
   await resetDatabase();
   await prisma.$disconnect();
   await redisClient.disconnect();
-  if (consoleErrorSpy) {
-    consoleErrorSpy.mockRestore();
-  }
 });
 
 describe('Auth Endpoints - /api/v1/auth', () => {

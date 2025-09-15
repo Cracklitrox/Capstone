@@ -7,7 +7,6 @@ import redisClient from '../../db/redis.client';
 
 const prisma = new PrismaClient();
 let adminToken;
-let consoleErrorSpy;
 
 const resetDatabase = async () => {
   // Primero, eliminamos los registros de las tablas que tienen múltiples dependencias (join tables)
@@ -47,7 +46,7 @@ const resetDatabase = async () => {
 };
 
 beforeAll(async () => {
-  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  // consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   await resetDatabase();
 
   const adminRole = await prisma.roles.create({
@@ -90,9 +89,6 @@ afterAll(async () => {
   await resetDatabase();
   await prisma.$disconnect();
   await redisClient.disconnect();
-  if (consoleErrorSpy) {
-    consoleErrorSpy.mockRestore();
-  }
 });
 
 describe('Auth Middleware y Staff Endpoints', () => {
