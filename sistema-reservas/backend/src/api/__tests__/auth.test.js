@@ -19,7 +19,7 @@ beforeAll(async () => {
   await prisma.user_roles.deleteMany({});
   await prisma.users.deleteMany({});
 
-  const passwordHash = await bcrypt.hash('p4ssw0rd_s3gUr4_2025%21', 10);
+  const passwordHash = await bcrypt.hash('ReservasDevPass_2025', 10);
   await prisma.users.create({
     data: {
       rut: '12345678',
@@ -44,7 +44,7 @@ describe('Auth Endpoints - /api/v1/auth', () => {
       .post('/api/v1/auth/login')
       .send({
         email: 'test@example.com',
-        password: 'p4ssw0rd_s3gUr4_2025%21',
+        password: 'ReservasDevPass_2025',
       });
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty('user');

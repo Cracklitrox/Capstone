@@ -57,7 +57,7 @@ jobs:
         restart: always
         environment:
           POSTGRES_USER: reservas_user
-          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025%21
+          POSTGRES_PASSWORD: ReservasDevPass_2025
           POSTGRES_DB: reservas_db
         ports:
           - "5433:5432"
@@ -80,8 +80,8 @@ jobs:
           - redisdata:/data
 
     env:
-      PGPASSWORD: p4ssw0rd_s3gUr4_2025%21
-      DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025%21@db:5432/reservas_db"
+      PGPASSWORD: ReservasDevPass_2025
+      DATABASE_URL: "postgresql://reservas_user:ReservasDevPass_2025@db:5432/reservas_db"
       REDIS_URL: "redis://redis:6379"
       JWT_SECRET: "test-secret-key-for-ci"
       JWT_EXPIRES_IN: "1d"
