@@ -1,0 +1,19 @@
+# Ignorar dependencias, se instalarán dentro del contenedor
+node_modules
+
+# Ignorar carpeta de build local
+dist
+
+# Ignorar logs de npm
+npm-debug.log
+
+# Ignorar variables de entorno
+.env
+.env.*
+
+# Ignorar la carpeta de Git
+.git
+
+# Ignorar reportes de test y coverage
+coverage
+test-results

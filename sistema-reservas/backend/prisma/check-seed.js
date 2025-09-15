@@ -1,4 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
+const { main: runSeed } = require('./seed.js'); 
+
 const prisma = new PrismaClient();
 
 async function checkAndSeed() {
@@ -6,15 +8,17 @@ async function checkAndSeed() {
 
   if (userCount === 0) {
     console.log("La base de datos está vacía. Ejecutando el script de seed...");
-    await prisma.$executeRaw('CALL runSeedScript()');
+    await runSeed();
   } else {
     console.log(`La base de datos ya tiene datos (${userCount} usuarios). Omitiendo el seed.`);
   }
-
-  await prisma.$disconnect();
 }
 
-checkAndSeed().catch(e => {
-  console.error(e);
-  process.exit(1);
-});
+checkAndSeed()
+  .catch(e => {
+    console.error('❌ Error durante el check-and-seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
