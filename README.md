@@ -7,7 +7,7 @@ Este es el repositorio oficial del sistema de gestión de reservas. El proyecto 
 * Frontend: React
 * Base de Datos: PostgreSQL
 * Contenerización: Docker, Docker Compose
-* Testing: Jest, Supertest
+* Testing: Vitest, Playwright, Supertest
 
 
 ## Prerrequisitos
@@ -72,7 +72,7 @@ docker-compose up --build
 
 Una vez que los contenedores estén corriendo, puedes verificar que todo funciona correctamente:
 
-* **Aplicación Frontend:** Abre tu navegador y ve a `http://localhost:3000`
+* **Aplicación Frontend:** Abre tu navegador y ve a `http://localhost:5173`
 * **API Backend**: Abre otra pestaña y ve a http://localhost:3001/test. Deberías ver el mensaje Hello Test!.
 
 
@@ -125,9 +125,13 @@ cd backend
 npm install
 ```
 
-### 3. Ejecuta los tests con Jest
+### 3. Ejecuta los tests con Vitest
 ```bash
+# Para correr los tests en modo interactivo (watch)
 npm test
+
+# Para generar el reporte de cobertura de código
+npm run coverage
 ```
 Deberías ver un resultado indicando que todas las pruebas pasaron exitosamente.
 
@@ -145,7 +149,7 @@ cd frontend
 npm install
 ```
 
-### 3. Ejecuta los tests con Jest
+### 3. Ejecuta los tests con Vitest
 ```bash
 npm test
 ```
@@ -162,4 +166,4 @@ Haz esto cada vez que termines de trabajar para evitar seguir consumiendo recurs
 
 Este proyecto utiliza Codecov para medir la cobertura de pruebas.
 
-Puedes ver el reporte completo en: [Codecov Dashboard](https://app.codecov.io/gh/Cracklitrox/Capstone)                                  
+Puedes ver el reporte completo en: [Codecov Dashboard](https://app.codecov.io/gh/Cracklitrox/Capstone)

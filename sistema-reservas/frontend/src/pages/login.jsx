@@ -1,5 +1,3 @@
-// frontend/src/pages/login.jsx
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
@@ -10,16 +8,20 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
     try {
       const { user, token } = await authService.login({ email, password });
 
       localStorage.setItem("token", token);
+      setSuccess("Login exitoso ✅");
 
       const userRole = user?.user_roles?.[0]?.roles?.name;
 
@@ -33,7 +35,7 @@ const Login = () => {
       }
 
     } catch (err) {
-      const errorMessage = err.response?.data?.message || "Credenciales incorrectas o error en el servidor ❌";
+      const errorMessage = err.response?.data?.message || "Credenciales incorrectas ❌";
       setError(errorMessage);
     }
   };
@@ -101,6 +103,7 @@ const Login = () => {
             </div>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}
+          {success && <div className="text-sm text-green-600">{success}</div>}
           <button
             type="submit"
             className="w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700"

@@ -22,6 +22,9 @@ node_modules/
 # Esto cubre .env, .env.test, .env.local, etc., en cualquier carpeta.
 **/.env*
 
+# Archivo de claves de Workflows
+.secrets
+
 # --- Pruebas ---
 # Ignorar reportes de cobertura generados por Jest u otras herramientas.
 coverage/

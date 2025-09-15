@@ -39,19 +39,19 @@ const ReceptionistHome = () => {
 
           <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 bg-white rounded-lg shadow text-center">
-              <h3 className="text-lg font-semibold text-gray-600">Ocupación</h3>
+              <h2 className="text-lg font-semibold text-gray-600">Ocupación</h2>
               <p className="text-3xl font-bold text-blue-600">72%</p>
             </div>
             <div className="p-4 bg-white rounded-lg shadow text-center">
-              <h3 className="text-lg font-semibold text-gray-600">Pendientes</h3>
+              <h2 className="text-lg font-semibold text-gray-600">Pendientes</h2>
               <p className="text-3xl font-bold text-yellow-600">4</p>
             </div>
             <div className="p-4 bg-white rounded-lg shadow text-center">
-              <h3 className="text-lg font-semibold text-gray-600">Check In</h3>
+              <h2 className="text-lg font-semibold text-gray-600">Check In</h2>
               <p className="text-3xl font-bold text-green-600">11</p>
             </div>
             <div className="p-4 bg-white rounded-lg shadow text-center">
-              <h3 className="text-lg font-semibold text-gray-600">Check Out</h3>
+              <h2 className="text-lg font-semibold text-gray-600">Check Out</h2>
               <p className="text-3xl font-bold text-red-600">9</p>
             </div>
           </div>

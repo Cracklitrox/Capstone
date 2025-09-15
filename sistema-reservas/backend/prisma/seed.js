@@ -186,11 +186,4 @@ async function main() {
   console.log('🎉 Seed finalizado exitosamente!');
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Error durante el seeding:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+module.exports = { main };

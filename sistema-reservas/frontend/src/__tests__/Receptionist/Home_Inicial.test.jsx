@@ -1,30 +1,37 @@
-// src/__tests__/Admin/Home_Inicial.test.jsx
+import { axe } from 'jest-axe';
 import React from "react";
+import { vi } from 'vitest';
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import ReceptionistHome from "../../pages/Receptionist/home";
 
-// Mock de componentes secundarios para evitar dependencias externas
-jest.mock("../../components/Footer", () => () => <div data-testid="footer" />);
-jest.mock("../../components/Navbar", () => {
-  return function NavbarMock({ setSidebarOpen }) {
+
+vi.mock("../../components/Footer", () => ({
+  default: () => <div data-testid="footer" />
+}));
+
+
+vi.mock("../../components/Navbar", () => ({
+  default: function NavbarMock({ setSidebarOpen }) {
     return (
       <button onClick={() => setSidebarOpen(true)}>
         abrir sidebar
       </button>
     );
-  };
-});
-jest.mock("../../components/Sidebar", () => {
-  return function SidebarMock({ sidebarOpen, setSidebarOpen }) {
+  }
+}));
+
+
+vi.mock("../../components/Sidebar", () => ({
+  default: function SidebarMock({ sidebarOpen, setSidebarOpen }) {
     return (
       <aside data-testid="sidebar">
         {sidebarOpen ? "abierto" : "cerrado"}
         <button onClick={() => setSidebarOpen(false)}>cerrar sidebar</button>
       </aside>
     );
-  };
-});
+  }
+}));
 
 describe("home.jsx (solo Home, hijos mockeados)", () => {
   it("renderiza el título principal y los KPIs del resumen", () => {
@@ -97,4 +104,16 @@ describe("home.jsx (solo Home, hijos mockeados)", () => {
     expect(byLabel("07")).toHaveClass("border-green-500", "text-green-700", "bg-green-50"); // disponible
     expect(byLabel("09")).toHaveClass("border-orange-500", "text-orange-700", "bg-orange-50"); // no habitado
   });
+});
+
+// Imagen
+it('debería renderizar el home correctamente', () => {
+  const { container } = render(<ReceptionistHome />);
+  expect(container).toMatchSnapshot();
+});
+
+// Accesibilidad
+it('no debería tener violaciones de accesibilidad', async () => {
+  const { container } = render(<ReceptionistHome />);
+  expect(await axe(container)).toHaveNoViolations();
 });

@@ -8,9 +8,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 className={`fixed inset-0 bg-black bg-opacity-50 z-20 transition-opacity md:hidden ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
                     }`}
                 onClick={() => setSidebarOpen(false)}
+                data-testid="sidebar-overlay"
             ></div>
 
             <aside
+                data-testid="sidebar-component"
                 className={`
           // --- Base y comportamiento móvil (superposición) ---
           fixed top-0 left-0 h-screen w-64 bg-gray-800 text-white p-4 z-30
@@ -30,17 +32,17 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                             </Link>
                         </li>
                         <li className="py-2">
-                            <Link to="/admin/reservas" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
+                            <Link to="/admin" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
                                 Gestionar Reservas
                             </Link>
                         </li>
                         <li className="py-2">
-                            <Link to="/admin/usuarios" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
+                            <Link to="/admin" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
                                 Gestionar Usuarios
                             </Link>
                         </li>
                         <li className="py-2">
-                            <Link to="/admin/configuracion" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
+                            <Link to="/admin" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
                                 Configuración
                             </Link>
                         </li>

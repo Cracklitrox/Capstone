@@ -1,14 +1,44 @@
+#!/bin/sh
+set -e
+
+# Esperamos a que la base de datos esté lista
+# Usamos las variables de entorno para que sea consistente
+until pg_isready -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
+  echo "Esperando que la base de datos esté lista..."
+  sleep 2
+done
+
+# Creamos el rol "root" si no existe
+echo "Verificando si el rol 'root' existe..."
+
+# Le pasamos la contraseña a psql
+export PGPASSWORD=$POSTGRES_PASSWORD
+
+# LA CORRECCIÓN FINAL: Usamos $POSTGRES_DB para el nombre de la base de datos (-d)
+psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DO \$\$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'root') THEN
+    CREATE ROLE root LOGIN PASSWORD 'root_password';
+    GRANT \"$POSTGRES_USER\" TO root;
+  END IF;
+END \$\$;"
+
+# Limpiamos la variable por seguridad
+unset PGPASSWORD
+
 echo "Aplicando migraciones..."
 npx prisma migrate deploy
 
-USER_COUNT=$(npx prisma eval 'await prisma.users.count()')
+echo "Verificando si la base de datos necesita ser poblada (seed)..."
+node prisma/check-seed.js
 
-if [ $USER_COUNT -eq 0 ]; then
-  echo "La base de datos está vacía. Ejecutando el script de seed..."
-  npx prisma db seed
-else
-  echo "La base de datos ya tiene datos. Omitiendo el seed."
-fi
+echo ""
+echo "---------------------------------------------"
+echo "🚀 ¡Sistema de Reservas listo para usar!"
+echo ""
+echo "✅ API Backend corriendo en: http://localhost:3001/test"
+echo "✅ Aplicación Frontend disponible en: http://localhost:5173"
+echo "---------------------------------------------"
+echo ""
+echo "Iniciando el proceso del servidor..."
 
-echo "Iniciando el servidor..."
 exec node src/server.js

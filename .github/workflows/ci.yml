@@ -1,48 +1,110 @@
-name: CI - Tests and Coverage
+# Nombre del flujo de trabajo
+name: CI - Build, Test and Coverage
 
+# Disparadores del flujo de trabajo (se ejecuta en cualquier push o pull request)
 on:
   push:
   pull_request:
 
 jobs:
-  test-and-coverage:
+  # ----- TRABAJO PARA EL BACKEND -----
+  test-backend:
+    name: "Backend: Test & Coverage"
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - project: backend
-            node: 20
-            lockfile: sistema-reservas/backend/package-lock.json
-          - project: frontend
-            node: 20
-            lockfile: sistema-reservas/frontend/package-lock.json
+
     defaults:
       run:
-        working-directory: ./sistema-reservas/${{ matrix.project }}
+        working-directory: ./sistema-reservas/backend
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: ReservasDevPass_2025
+          POSTGRES_DB: reservas_db_ci
+        options: >-
+          --health-cmd "pg_isready -U postgres -d reservas_db_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
-      - name: Checkout repository
+      - name: ⬇️ Checkout repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node }}
+      - name: 🟢 Setup Node.js v20
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: ${{ matrix.lockfile }}
+          cache-dependency-path: 'sistema-reservas/backend/package-lock.json'
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: npm ci
 
-      - name: Run tests with coverage
-        run: npm test
+      - name: 🚀 Run Prisma migrations and tests
+        working-directory: ./sistema-reservas/backend
+        env:
+          DATABASE_URL: "postgresql://postgres:ReservasDevPass_2025@localhost:5432/reservas_db_ci"
+          REDIS_URL: "redis://localhost:6379"
+          JWT_SECRET: "test-secret-key-for-ci"
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run coverage
 
-      - name: Upload coverage to Codecov
+      - name: ⬆️ Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./sistema-reservas/${{ matrix.project }}/coverage/lcov.info
-          fail_ci_if_error: true
-          verbose: true
-      - name: List coverage files
-        run: ls -R ./sistema-reservas/${{ matrix.project }}/coverage || echo "No coverage files"
+          flags: backend
+
+  # ----- TRABAJO PARA EL FRONTEND -----
+  test-frontend:
+    name: "Frontend: Test & Coverage"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./sistema-reservas/frontend
+    
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'sistema-reservas/frontend/package-lock.json'
+
+      - name: 📦 Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps
+      
+      - name: 🧪 Run tests and generate coverage
+        run: npm run coverage
+
+      - name: 🏗️ Build frontend project
+        run: npm run build
+
+      - name: ⬆️ Upload Frontend Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: frontend
