@@ -20,11 +20,10 @@ jobs:
       postgres:
         image: postgres:15-alpine
         env:
-          POSTPOSTGRES_USER: reservas_user
           POSTGRES_PASSWORD: ReservasDevPass_2025
-          POSTGRES_DB: reservas_db
+          POSTGRES_DB: reservas_db_ci
         options: >-
-          --health-cmd "pg_isready -U reservas_user -d reservas_db"
+          --health-cmd "pg_isready -U postgres -d reservas_db_ci"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -58,7 +57,7 @@ jobs:
       - name: 🚀 Run Prisma migrations and tests
         working-directory: ./sistema-reservas/backend
         env:
-          DATABASE_URL: "postgresql://reservas_user:ReservasDevPass_2025@localhost:5432/reservas_db"
+          DATABASE_URL: "postgresql://postgres:ReservasDevPass_2025@localhost:5432/reservas_db_ci"
           REDIS_URL: "redis://localhost:6379"
           JWT_SECRET: "test-secret-key-for-ci"
         run: |
