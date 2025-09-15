@@ -9,8 +9,12 @@ on:
 jobs:
   # ----- TRABAJO PARA EL BACKEND -----
   test-backend:
-    name: Test Backend
+    name: "Backend: Test & Coverage"
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./sistema-reservas/backend
 
     services:
       postgres:
@@ -38,21 +42,20 @@ jobs:
           - 6379:6379
 
     steps:
-      - name: Checkout repository
+      - name: ⬇️ Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js v20
+      - name: 🟢 Setup Node.js v20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'sistema-reservas/backend/package-lock.json'
 
-      - name: Install backend dependencies
-        working-directory: ./sistema-reservas/backend
+      - name: 📦 Install dependencies
         run: npm ci
 
-      - name: Run Prisma migrations and tests
+      - name: 🚀 Run Prisma migrations and tests
         working-directory: ./sistema-reservas/backend
         env:
           DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db"
@@ -63,7 +66,7 @@ jobs:
           npx prisma migrate deploy
           npm run coverage
 
-      - name: Upload Backend Coverage to Codecov
+      - name: ⬆️ Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -71,33 +74,37 @@ jobs:
 
   # ----- TRABAJO PARA EL FRONTEND -----
   test-frontend:
-    name: Test Frontend
+    name: "Frontend: Test & Coverage"
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./sistema-reservas/frontend
     
     steps:
-      - name: Checkout repository
+      - name: ⬇️ Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js v20
+      - name: 🟢 Setup Node.js v20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'sistema-reservas/frontend/package-lock.json'
 
-      - name: Install frontend dependencies
-        working-directory: ./sistema-reservas/frontend
+      - name: 📦 Install dependencies
         run: npm ci
 
-      - name: Run frontend tests and coverage
-        working-directory: ./sistema-reservas/frontend
-        run: npm test -- --coverage
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps
       
-      - name: Build frontend project
-        working-directory: ./sistema-reservas/frontend
+      - name: 🧪 Run tests and generate coverage
+        run: npm run coverage
+
+      - name: 🏗️ Build frontend project
         run: npm run build
 
-      - name: Upload Frontend Coverage to Codecov
+      - name: ⬆️ Upload Frontend Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
