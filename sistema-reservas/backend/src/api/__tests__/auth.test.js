@@ -6,22 +6,46 @@ import redisClient from '../../db/redis.client';
 
 const prisma = new PrismaClient();
 
-// SOLUCIÓN FINAL: Usar TRUNCATE CASCADE con los nombres de tabla correctos.
 const resetDatabase = async () => {
-  const tableNames = [
-    'activity_logs', 'alert_read_status', 'alerts', 'cleaning_records', 'guest_details',
-    'maintenance_tasks', 'notification_read_status', 'notifications', 'payments', 'promotions',
-    'reservation_guests', 'reservation_promotions', 'reservation_rooms', 'reservation_services',
-    'reservations', 'roles', 'room_types', 'rooms', 'seasons', 'services',
-    'system_errors', 'user_roles', 'users'
-  ];
-
-  const truncateQuery = `TRUNCATE TABLE ${tableNames.map(name => `"${name}"`).join(', ')} RESTART IDENTITY CASCADE;`;
-
   try {
-    await prisma.$executeRawUnsafe(truncateQuery);
+    await prisma.$transaction([
+      // Empezamos por las tablas que tienen muchas dependencias de otras
+      prisma.activity_logs.deleteMany(),
+      prisma.alert_read_status.deleteMany(),
+      prisma.maintenance_tasks.deleteMany(),
+      prisma.notification_read_status.deleteMany(),
+      prisma.system_errors.deleteMany(),
+      prisma.user_roles.deleteMany(),
+      prisma.guest_details.deleteMany(),
+      prisma.cleaning_records.deleteMany(),
+      
+      // Tablas de "unión" de reservaciones
+      prisma.reservation_guests.deleteMany(),
+      prisma.reservation_promotions.deleteMany(),
+      prisma.reservation_rooms.deleteMany(),
+      prisma.reservation_services.deleteMany(),
+
+      // Tablas que dependen de reservaciones
+      prisma.payments.deleteMany(),
+      
+      // Tablas que dependen de otras principales
+      prisma.notifications.deleteMany(),
+      prisma.alerts.deleteMany(),
+
+      // Ahora las tablas "padre" principales
+      prisma.reservations.deleteMany(),
+      prisma.users.deleteMany(),
+      prisma.roles.deleteMany(),
+      prisma.rooms.deleteMany(),
+      
+      // Y finalmente las tablas con menos dependencias entrantes
+      prisma.promotions.deleteMany(),
+      prisma.room_types.deleteMany(),
+      prisma.seasons.deleteMany(),
+      prisma.services.deleteMany(),
+    ]);
   } catch (error) {
-    console.error('Error al truncar la base de datos:', error);
+    console.error('Error durante el reseteo transaccional de la BD:', error);
     throw error;
   }
 };
