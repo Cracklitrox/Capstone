@@ -7,7 +7,6 @@ import redisClient from '../../db/redis.client';
 
 const prisma = new PrismaClient();
 
-let adminUser;
 let adminToken;
 let consoleErrorSpy;
 
@@ -15,17 +14,21 @@ let consoleErrorSpy;
 beforeAll(async () => {
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
+  await prisma.user_roles.deleteMany({});
+  await prisma.users.deleteMany({});
+  await prisma.roles.deleteMany({});
+
   const adminRole = await prisma.roles.upsert({
     where: { name: 'administrator' },
     update: {},
     create: {
       name: 'administrator',
-      description: 'Rol de administrador para pruebas de staff',
+      description: 'Rol para pruebas de staff',
     },
   });
 
   const passwordHash = await bcrypt.hash('password123', 10);
-  adminUser = await prisma.users.create({
+  const adminUser = await prisma.users.create({
     data: {
       rut: '98765432',
       rut_dv: '1',
@@ -54,26 +57,21 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // 1. Borramos PRIMERO la tabla intermedia para romper las relaciones.
   await prisma.user_roles.deleteMany({});
-
-  // 2. Ahora sí podemos borrar los usuarios y roles sin problemas.
   await prisma.users.deleteMany({});
   await prisma.roles.deleteMany({});
 
-  // 3. Cerramos las conexiones.
   await prisma.$disconnect();
   await redisClient.disconnect();
 
-  // 4. Restauramos el spy de la consola (si está definido).
   if (consoleErrorSpy) {
     consoleErrorSpy.mockRestore();
   }
 });
 
 
-describe('Auth Middleware y Staff Endpoints', () => {
 
+describe('Auth Middleware y Staff Endpoints', () => {
   describe('Middleware de Autenticación', () => {
     it('debería devolver 401 si no se provee el header de Authorization', async () => {
       const response = await request(app).get('/api/v1/staff');
