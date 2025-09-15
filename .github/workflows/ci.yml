@@ -21,7 +21,7 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTPOSTGRES_USER: reservas_user
-          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025!
+          POSTGRES_PASSWORD: p4ssw0rd_s3gUr4_2025%21
           POSTGRES_DB: reservas_db
         options: >-
           --health-cmd "pg_isready -U reservas_user -d reservas_db"
@@ -58,7 +58,7 @@ jobs:
       - name: 🚀 Run Prisma migrations and tests
         working-directory: ./sistema-reservas/backend
         env:
-          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025!@localhost:5432/reservas_db"
+          DATABASE_URL: "postgresql://reservas_user:p4ssw0rd_s3gUr4_2025%21@localhost:5432/reservas_db"
           REDIS_URL: "redis://localhost:6379"
           JWT_SECRET: "test-secret-key-for-ci"
         run: |
@@ -93,7 +93,7 @@ jobs:
           cache-dependency-path: 'sistema-reservas/frontend/package-lock.json'
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps
