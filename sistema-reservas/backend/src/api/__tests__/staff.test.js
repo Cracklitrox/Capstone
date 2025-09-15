@@ -54,19 +54,22 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.users.deleteMany({
-    where: { email: 'admin.staff@test.com' },
-  });
+  // 1. Borramos PRIMERO la tabla intermedia para romper las relaciones.
+  await prisma.user_roles.deleteMany({});
 
-  await prisma.roles.deleteMany({
-    where: { name: 'administrator' },
-  });
+  // 2. Ahora sí podemos borrar los usuarios y roles sin problemas.
+  await prisma.users.deleteMany({});
+  await prisma.roles.deleteMany({});
 
+  // 3. Cerramos las conexiones.
   await prisma.$disconnect();
   await redisClient.disconnect();
-  consoleErrorSpy.mockRestore();
-});
 
+  // 4. Restauramos el spy de la consola (si está definido).
+  if (consoleErrorSpy) {
+    consoleErrorSpy.mockRestore();
+  }
+});
 
 
 describe('Auth Middleware y Staff Endpoints', () => {
