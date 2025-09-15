@@ -24,7 +24,6 @@ const resetDatabase = async () => {
 beforeAll(async () => {
   // consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   await resetDatabase();
-  print(resetDatabase)
 
   const adminRole = await prisma.roles.create({
     data: {
@@ -64,7 +63,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await resetDatabase();
-  print(resetDatabase)
   await prisma.$disconnect();
   await redisClient.disconnect();
 });

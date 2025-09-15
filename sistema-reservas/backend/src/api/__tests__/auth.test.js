@@ -23,7 +23,6 @@ const resetDatabase = async () => {
 beforeAll(async () => {
   // Ya no necesitamos espiar y ocultar errores. Queremos verlos si ocurren.
   await resetDatabase();
-  print(resetDatabase)
 
   // Creamos los datos necesarios para esta suite de pruebas
   const testRole = await prisma.roles.create({
@@ -56,7 +55,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await resetDatabase();
-  print(resetDatabase)
   await prisma.$disconnect();
   await redisClient.disconnect();
 });
