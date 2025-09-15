@@ -51,8 +51,17 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.users.deleteMany({
+    where: { email: 'test@example.com' },
+  });
+
+  await prisma.roles.deleteMany({
+    where: { name: 'administrator' },
+  });
+
   await prisma.$disconnect();
   await redisClient.disconnect();
+  consoleErrorSpy.mockRestore();
 });
 
 describe('Auth Endpoints - /api/v1/auth', () => {

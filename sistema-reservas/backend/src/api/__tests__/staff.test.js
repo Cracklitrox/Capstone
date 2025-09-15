@@ -54,13 +54,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.user_roles.deleteMany({});
-  await prisma.users.deleteMany({});
-  await prisma.roles.deleteMany({});
+  await prisma.users.deleteMany({
+    where: { email: 'admin.staff@test.com' },
+  });
+
+  await prisma.roles.deleteMany({
+    where: { name: 'administrator' },
+  });
 
   await prisma.$disconnect();
   await redisClient.disconnect();
-
   consoleErrorSpy.mockRestore();
 });
 
