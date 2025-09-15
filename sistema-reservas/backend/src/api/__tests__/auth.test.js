@@ -15,12 +15,20 @@ afterEach(() => {
 });
 
 beforeAll(async () => {
-  await prisma.reservations.deleteMany({});
   await prisma.user_roles.deleteMany({});
+  await prisma.reservations.deleteMany({});
   await prisma.users.deleteMany({});
+  await prisma.roles.deleteMany({});
+
+  const testRole = await prisma.roles.create({
+    data: {
+      name: 'administrator',
+      description: 'Rol de prueba para administradores',
+    },
+  });
 
   const passwordHash = await bcrypt.hash('ReservasDevPass_2025', 10);
-  await prisma.users.create({
+  const testUser = await prisma.users.create({
     data: {
       rut: '12345678',
       rut_dv: '9',
@@ -29,6 +37,13 @@ beforeAll(async () => {
       email: 'test@example.com',
       password_hash: passwordHash,
       status: 'active',
+    },
+  });
+
+  await prisma.user_roles.create({
+    data: {
+      user_id: testUser.id,
+      role_id: testRole.id,
     },
   });
 });
