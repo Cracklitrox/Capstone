@@ -6,25 +6,30 @@ import redisClient from '../../db/redis.client';
 
 const prisma = new PrismaClient();
 
-// LA SOLUCIÓN DEFINITIVA: Una función de limpieza robusta usando una transacción.
+// SOLUCIÓN DEFINITIVA: Limpiar la BD con un comando SQL directo y robusto.
 const resetDatabase = async () => {
-  const modelNames = Object.keys(prisma).filter(
-    (key) =>
-      !key.startsWith('_') &&
-      !key.startsWith('$') &&
-      typeof prisma[key] === 'object' &&
-      'deleteMany' in prisma[key]
+  // Obtenemos todos los nombres de las tablas del schema de Prisma
+  const tableNames = Object.keys(prisma).filter(
+    (key) => !key.startsWith('_') && !key.startsWith('$')
   );
 
-  const deletePromises = modelNames.map((model) => prisma[model].deleteMany());
-  await prisma.$transaction(deletePromises);
+  // Creamos un comando SQL para truncar todas las tablas
+  const truncateQuery = `TRUNCATE TABLE ${tableNames
+    .map((name) => `"${name}"`)
+    .join(', ')} RESTART IDENTITY CASCADE;`;
+
+  try {
+    // Usamos $executeRawUnsafe para ejecutar el comando de limpieza
+    await prisma.$executeRawUnsafe(truncateQuery);
+  } catch (error) {
+    console.error('Error al truncar la base de datos:', error);
+    throw error;
+  }
 };
 
 beforeAll(async () => {
-  // Ya no necesitamos espiar y ocultar errores. Queremos verlos si ocurren.
   await resetDatabase();
 
-  // Creamos los datos necesarios para esta suite de pruebas
   const testRole = await prisma.roles.create({
     data: {
       name: 'administrator',
