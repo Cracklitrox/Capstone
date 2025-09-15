@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "dev": "dotenv -e .env.development -- nodemon src/server.js",
     "test": "dotenv -e .env.test -- vitest",
-    "coverage": "dotenv -e .env.test -- vitest run --coverage --no-threads",
+    "coverage": "dotenv -e .env.test -- vitest run --coverage --threads=false",
     "migrate:dev": "dotenv -e .env.development -- npx prisma migrate dev",
     "prisma:dev": "dotenv -e .env.development -- npx prisma"
   },
