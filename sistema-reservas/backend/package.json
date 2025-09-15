@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "dev": "dotenv -e .env.development -- nodemon src/server.js",
     "test": "dotenv -e .env.test -- vitest",
-    "coverage": "dotenv -e .env.test -- vitest run --coverage",
+    "coverage": "dotenv -e .env.test -- vitest run --coverage --single-thread",
     "migrate:dev": "dotenv -e .env.development -- npx prisma migrate dev",
     "prisma:dev": "dotenv -e .env.development -- npx prisma"
   },
@@ -33,7 +33,7 @@
   "devDependencies": {
     "@faker-js/faker": "^10.0.0",
     "@vitest/coverage-v8": "^3.2.4",
-    "dotenv-cli": "^7.4.2",
+    "dotenv-cli": "^10.0.0",
     "nodemon": "^3.1.0",
     "prisma": "^5.15.0",
     "supertest": "^7.0.0"

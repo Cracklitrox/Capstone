@@ -20,8 +20,10 @@ beforeAll(async () => {
   await prisma.users.deleteMany({});
   await prisma.roles.deleteMany({});
 
-  const testRole = await prisma.roles.create({
-    data: {
+  const testRole = await prisma.roles.upsert({
+    where: { name: 'administrator' },
+    update: {},
+    create: {
       name: 'administrator',
       description: 'Rol de prueba para administradores',
     },
