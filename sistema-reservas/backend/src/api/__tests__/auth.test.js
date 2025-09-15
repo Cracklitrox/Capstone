@@ -9,34 +9,14 @@ const prisma = new PrismaClient();
 // SOLUCIÓN FINAL: Usar TRUNCATE CASCADE con los nombres de tabla correctos.
 const resetDatabase = async () => {
   const tableNames = [
-    'activity_logs',
-    'alert_read_status',
-    'alerts',
-    'cleaning_records',
-    'guest_details',
-    'maintenance_tasks',
-    'notification_read_status',
-    'notifications',
-    'payments',
-    'promotions',
-    'reservation_guests',
-    'reservation_promotions',
-    'reservation_rooms',
-    'reservation_services',
-    'reservations',
-    'roles',
-    'room_types',
-    'rooms',
-    'seasons',
-    'services',
-    'system_errors',
-    'user_roles',
-    'users',
+    'activity_logs', 'alert_read_status', 'alerts', 'cleaning_records', 'guest_details',
+    'maintenance_tasks', 'notification_read_status', 'notifications', 'payments', 'promotions',
+    'reservation_guests', 'reservation_promotions', 'reservation_rooms', 'reservation_services',
+    'reservations', 'roles', 'room_types', 'rooms', 'seasons', 'services',
+    'system_errors', 'user_roles', 'users'
   ];
 
-  const truncateQuery = `TRUNCATE TABLE ${tableNames
-    .map((name) => `"${name}"`)
-    .join(', ')} RESTART IDENTITY CASCADE;`;
+  const truncateQuery = `TRUNCATE TABLE ${tableNames.map(name => `"${name}"`).join(', ')} RESTART IDENTITY CASCADE;`;
 
   try {
     await prisma.$executeRawUnsafe(truncateQuery);

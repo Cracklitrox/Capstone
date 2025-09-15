@@ -8,35 +8,27 @@ import redisClient from '../../db/redis.client';
 const prisma = new PrismaClient();
 let adminToken;
 
+// LA FUNCIÓN DE LIMPIEZA CORRECTA
 const resetDatabase = async () => {
   const tableNames = [
-    'activity_logs',
-    'alert_read_status',
-    'alerts',
-    'cleaning_records',
-    'guest_details',
-    'maintenance_tasks',
-    'notification_read_status',
-    'notifications',
-    'payments',
-    'promotions',
-    'reservation_guests',
-    'reservation_promotions',
-    'reservation_rooms',
-    'reservation_services',
-    'reservations',
-    'roles',
-    'room_types',
-    'rooms',
-    'seasons',
-    'services',
-    'system_errors',
-    'user_roles',
-    'users',
+    'activity_logs', 'alert_read_status', 'alerts', 'cleaning_records', 'guest_details',
+    'maintenance_tasks', 'notification_read_status', 'notifications', 'payments', 'promotions',
+    'reservation_guests', 'reservation_promotions', 'reservation_rooms', 'reservation_services',
+    'reservations', 'roles', 'room_types', 'rooms', 'seasons', 'services',
+    'system_errors', 'user_roles', 'users'
   ];
 
+  const truncateQuery = `TRUNCATE TABLE ${tableNames.map(name => `"${name}"`).join(', ')} RESTART IDENTITY CASCADE;`;
+
+  try {
+    await prisma.$executeRawUnsafe(truncateQuery);
+  } catch (error) {
+    console.error('Error al truncar la base de datos:', error);
+    throw error;
+  }
+}; // <-- LA LLAVE DE CIERRE QUE FALTABA ESTÁ AQUÍ
+
 beforeAll(async () => {
-  // consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   await resetDatabase();
 
   const adminRole = await prisma.roles.create({
@@ -66,6 +58,7 @@ beforeAll(async () => {
     },
   });
 
+  // Hacemos login para obtener un token válido para las pruebas
   const response = await request(app)
     .post('/api/v1/auth/login')
     .send({
