@@ -1,0 +1,121 @@
+Capstone                                                                   
+├─ Fase 1                                                                  
+│  ├─ Evidencias Grupales                                                  
+│  │  ├─ 1.4_APT122_FormativaFase1.docx                                    
+│  │  ├─ 1.5_GuiaEstudiante_Fase 1_Definicion Proyecto APT (Español).docx  
+│  │  └─ Presentación Proyecto.pptx                                        
+│  └─ Evidencias Individuales                                              
+│     ├─ Ampuero_Juan_1.1_APT122_AutoevaluacionCompetenciasFase1.docx      
+│     ├─ Ampuero_Juan_1.2_APT122_DiarioReflexionFase1.docx                 
+│     ├─ Ampuero_Juan_1.3_APT122_AutoevaluacionFase1.docx                  
+│     ├─ Gacitúa_Carlos_1.1_APT122_AutoevaluacionCompetenciasFase1.docx    
+│     ├─ Gacitúa_Carlos_1.2_APT122_DiarioReflexionFase1.docx               
+│     ├─ Gacitúa_Carlos_1.3_APT122_AutoevaluacionFase1.docx                
+│     ├─ Ruminot_Diego_1.1_APT122_AutoevaluacionCompetenciasFase1.docx     
+│     ├─ Ruminot_Diego_1.2_APT122_DiarioReflexionFase1.docx                
+│     └─ Ruminot_Diego_1.3_APT122_AutoevaluacionFase1.docx                 
+├─ sistema-reservas                                                        
+│  ├─ backend                                                              
+│  │  ├─ prisma                                                            
+│  │  │  ├─ migrations                                                     
+│  │  │  │  ├─ 20250909200740_init                                         
+│  │  │  │  │  └─ migration.sql                                            
+│  │  │  │  └─ migration_lock.toml                                         
+│  │  │  ├─ check-seed.js                                                  
+│  │  │  ├─ schema.prisma                                                  
+│  │  │  └─ seed.js                                                        
+│  │  ├─ src                                                               
+│  │  │  ├─ api                                                            
+│  │  │  │  ├─ auth                                                        
+│  │  │  │  │  ├─ auth.controller.js                                       
+│  │  │  │  │  ├─ auth.routes.js                                           
+│  │  │  │  │  └─ auth.service.js                                          
+│  │  │  │  ├─ staff                                                       
+│  │  │  │  │  ├─ staff.controller.js                                      
+│  │  │  │  │  ├─ staff.routes.js                                          
+│  │  │  │  │  └─ staff.service.js                                         
+│  │  │  │  ├─ __tests__                                                   
+│  │  │  │  │  └─ api.test.js                                              
+│  │  │  │  └─ routes.js                                                   
+│  │  │  ├─ config                                                         
+│  │  │  │  └─ index.js                                                    
+│  │  │  ├─ db                                                             
+│  │  │  │  ├─ prisma.client.js                                            
+│  │  │  │  └─ redis.client.js                                             
+│  │  │  ├─ middleware                                                     
+│  │  │  │  ├─ auth.middleware.js                                          
+│  │  │  │  └─ authorize.middleware.js                                     
+│  │  │  ├─ utils                                                          
+│  │  │  │  └─ errorHandler.js                                             
+│  │  │  ├─ app.js                                                         
+│  │  │  └─ server.js                                                      
+│  │  ├─ docker-entrypoint.sh                                              
+│  │  ├─ Dockerfile                                                        
+│  │  ├─ jest.config.js                                                    
+│  │  ├─ jest.setup.js                                                     
+│  │  ├─ package-lock.json                                                 
+│  │  ├─ package.json                                                      
+│  │  ├─ pg_hba.conf                                                       
+│  │  └─ vitest.config.js                                                  
+│  ├─ frontend                                                             
+│  │  ├─ public                                                            
+│  │  │  ├─ favicon.ico                                                    
+│  │  │  ├─ index.html                                                     
+│  │  │  ├─ logo192.png                                                    
+│  │  │  ├─ logo512.png                                                    
+│  │  │  ├─ manifest.json                                                  
+│  │  │  ├─ robots.txt                                                     
+│  │  │  └─ vite.svg                                                       
+│  │  ├─ src                                                               
+│  │  │  ├─ components                                                     
+│  │  │  │  ├─ Footer.jsx                                                  
+│  │  │  │  ├─ layout.jsx                                                  
+│  │  │  │  ├─ Navbar.jsx                                                  
+│  │  │  │  ├─ ProtectedRoute.jsx                                          
+│  │  │  │  └─ Sidebar.jsx                                                 
+│  │  │  ├─ pages                                                          
+│  │  │  │  ├─ Admin                                                       
+│  │  │  │  │  └─ home.jsx                                                 
+│  │  │  │  ├─ Receptionist                                                
+│  │  │  │  │  └─ home.jsx                                                 
+│  │  │  │  └─ login.jsx                                                   
+│  │  │  ├─ services                                                       
+│  │  │  │  └─ services.jsx                                                
+│  │  │  ├─ __tests__                                                      
+│  │  │  │  ├─ Admin                                                       
+│  │  │  │  │  ├─ __snapshots__                                            
+│  │  │  │  │  │  └─ Home_Inicial.test.jsx.snap                            
+│  │  │  │  │  └─ Home_Inicial.test.jsx                                    
+│  │  │  │  ├─ Receptionist                                                
+│  │  │  │  │  ├─ __snapshots__                                            
+│  │  │  │  │  │  └─ Home_Inicial.test.jsx.snap                            
+│  │  │  │  │  └─ Home_Inicial.test.jsx                                    
+│  │  │  │  ├─ Footer.test.jsx                                             
+│  │  │  │  ├─ Layout.test.jsx                                             
+│  │  │  │  ├─ Login.test.jsx                                              
+│  │  │  │  ├─ Navbar.test.jsx                                             
+│  │  │  │  ├─ ProtectedRoute.test.jsx                                     
+│  │  │  │  ├─ services.test.jsx                                           
+│  │  │  │  └─ Sidebar.test.jsx                                            
+│  │  │  ├─ App.jsx                                                        
+│  │  │  ├─ index.css                                                      
+│  │  │  ├─ index.jsx                                                      
+│  │  │  ├─ logo.svg                                                       
+│  │  │  └─ setupTests.js                                                  
+│  │  ├─ tests                                                             
+│  │  │  └─ administrador_login.spec.js                                    
+│  │  ├─ Dockerfile                                                        
+│  │  ├─ Dockerfile.dev                                                    
+│  │  ├─ eslint.config.js                                                  
+│  │  ├─ index.html                                                        
+│  │  ├─ nginx.conf                                                        
+│  │  ├─ package-lock.json                                                 
+│  │  ├─ package.json                                                      
+│  │  ├─ playwright.config.js                                              
+│  │  ├─ README.md                                                         
+│  │  ├─ tailwind.config.js                                                
+│  │  └─ vite.config.js                                                    
+│  ├─ build_log.txt                                                        
+│  └─ docker-compose.yml                                                   
+├─ CODEOWNERS                                                              
+└─ README.md                                                               
