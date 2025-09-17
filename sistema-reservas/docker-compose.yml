@@ -35,6 +35,10 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+    environment:
+      POSTGRES_USER: reservas_user
+      POSTGRES_PASSWORD: ReservasDevPass_2025
+      POSTGRES_DB: reservas_db
     env_file:
       - ./backend/.env
     depends_on:
