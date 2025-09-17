@@ -1,0 +1,12 @@
+# Tratar la mayoría de los archivos de texto automáticamente
+* text=auto
+
+# Forzar el uso de LF para archivos de script y configuración comunes
+*.sh      text eol=lf
+*.js      text eol=lf
+*.jsx     text eol=lf
+*.json    text eol=lf
+*.css     text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.md      text eol=lf
