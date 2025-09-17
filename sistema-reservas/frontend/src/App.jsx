@@ -19,9 +19,9 @@ function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute>
+              
                 <AdminHome />
-              </ProtectedRoute>
+              
             }
           />
 
@@ -29,9 +29,9 @@ function App() {
           <Route
             path="/receptionist"
             element={
-              <ProtectedRoute>
+            
                 <ReceptionistHome />
-              </ProtectedRoute>
+           
             }
           />
         </Routes>
