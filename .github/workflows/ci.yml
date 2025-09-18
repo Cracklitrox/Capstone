@@ -63,7 +63,7 @@ jobs:
         run: |
           npx prisma generate
           npx prisma migrate deploy
-          npm run coverage
+          npm run coverage -- --threads=false
 
       - name: ⬆️ Upload Backend Coverage to Codecov
         uses: codecov/codecov-action@v4
