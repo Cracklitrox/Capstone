@@ -8,9 +8,11 @@ services:
       POSTGRES_PASSWORD: ReservasDevPass_2025
       POSTGRES_DB: reservas_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./backend/pg_hba.conf:/etc/postgresql_custom/pg_hba.conf
+    command: postgres -c 'hba_file=/etc/postgresql_custom/pg_hba.conf'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U reservas_user -d reservas_db"]
       interval: 10s
