@@ -6,22 +6,72 @@ const bcrypt = require('bcryptjs');
  * @param {object} userData
  */
 const createUser = async (userData) => {
-  const { password_hash, ...restOfUserData } = userData;
+  try {
+    const { password_hash, ...restOfUserData } = userData;
 
-  const hashedPassword = await bcrypt.hash(password_hash, 10);
+    // Verificar si el email ya existe
+    const existingUserByEmail = await prisma.users.findUnique({
+      where: { email: restOfUserData.email }
+    });
 
-  // Creamos el usuario en la base de datos
-  const user = await prisma.users.create({
-    data: {
-      ...restOfUserData,
-      password_hash: hashedPassword,
-    },
-  });
+    if (existingUserByEmail) {
+      const error = new Error('El email ya está registrado');
+      error.code = 'DUPLICATE_EMAIL';
+      throw error;
+    }
 
-  const { password_hash: _, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+    // Verificar si el RUT ya existe
+    const existingUserByRut = await prisma.users.findUnique({
+      where: { rut: restOfUserData.rut }
+    });
+
+    if (existingUserByRut) {
+      const error = new Error('El RUT ya está registrado');
+      error.code = 'DUPLICATE_RUT';
+      throw error;
+    }
+
+    const hashedPassword = await bcrypt.hash(password_hash, 10);
+
+    // Creamos el usuario en la base de datos
+    const user = await prisma.users.create({
+      data: {
+        ...restOfUserData,
+        password_hash: hashedPassword,
+      },
+    });
+
+    const { password_hash: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+    
+  } catch (error) {
+    // Re-lanzar errores personalizados
+    if (error.code === 'DUPLICATE_EMAIL' || error.code === 'DUPLICATE_RUT') {
+      throw error;
+    }
+    
+    // Manejar errores de Prisma
+    if (error.code === 'P2002') {
+      // P2002 es el código de Prisma para violación de unique constraint
+      const target = error.meta?.target;
+      if (target?.includes('email')) {
+        const customError = new Error('El email ya está registrado');
+        customError.code = 'DUPLICATE_EMAIL';
+        throw customError;
+      }
+      if (target?.includes('rut')) {
+        const customError = new Error('El RUT ya está registrado');
+        customError.code = 'DUPLICATE_RUT';
+        throw customError;
+      }
+    }
+    
+    console.error('Error en createUser:', error);
+    
+    // Para otros errores, re-lanzar
+    throw error;
+  }
 };
-
 
 /**
  * Obtiene una lista de todos los usuarios con su información básica y roles.
@@ -79,15 +129,57 @@ const getUserById = (userId) => {
  * @param {object} userData
  * @returns {Promise<object>}
  */
-const updateUser = (userId, userData) => {
-  return prisma.users.update({
-    where: {
-      id: userId,
-    },
-    data: userData,
-  });
-};
+const updateUser = async (userId, userData) => {
+  try {
+    // Verificar si el usuario existe
+    const existingUser = await prisma.users.findUnique({
+      where: { id: userId }
+    });
 
+    if (!existingUser) {
+      const error = new Error('Usuario no encontrado');
+      error.code = 'USER_NOT_FOUND';
+      throw error;
+    }
+
+    return await prisma.users.update({
+      where: {
+        id: userId,
+      },
+      data: userData,
+    });
+  } catch (error) {
+    // Re-lanzar errores personalizados
+    if (error.code === 'USER_NOT_FOUND') {
+      throw error;
+    }
+    
+    // Manejar errores de Prisma
+    if (error.code === 'P2002') {
+      const target = error.meta?.target;
+      if (target?.includes('email')) {
+        const customError = new Error('El email ya está registrado');
+        customError.code = 'DUPLICATE_EMAIL';
+        throw customError;
+      }
+      if (target?.includes('rut')) {
+        const customError = new Error('El RUT ya está registrado');
+        customError.code = 'DUPLICATE_RUT';
+        throw customError;
+      }
+    }
+    
+    if (error.code === 'P2025') {
+      // P2025 es el código de Prisma para registro no encontrado
+      const customError = new Error('Usuario no encontrado');
+      customError.code = 'USER_NOT_FOUND';
+      throw customError;
+    }
+    
+    // Para otros errores, re-lanzar
+    throw error;
+  }
+};
 
 module.exports = {
   createUser,
