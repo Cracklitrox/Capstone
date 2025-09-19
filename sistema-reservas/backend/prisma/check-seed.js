@@ -15,8 +15,9 @@ async function checkAndSeed() {
 }
 
 checkAndSeed()
-  .catch(e => {
+  .catch(async (e) => {
     console.error('❌ Error durante el check-and-seed:', e);
+    await prisma.$disconnect();
     process.exit(1);
   })
   .finally(async () => {

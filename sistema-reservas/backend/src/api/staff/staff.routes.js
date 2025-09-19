@@ -3,7 +3,19 @@ const staffController = require('./staff.controller');
 const authenticate = require('../../middleware/auth.middleware');
 const authorize = require('../../middleware/authorize.middleware');
 
+const RateLimit = require('express-rate-limit');
 const router = express.Router();
+
+// Configuración de rate limiter: máximo 100 solicitudes por 15 minutos por IP
+const limiter = RateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // máximo 100 solicitudes por ventana
+  standardHeaders: true, // devuelve información de rate limit en los headers
+  legacyHeaders: false, // desactiva los headers x-rate-limit obsoletos
+});
+
+// Aplica el rate limiter a todas las rutas de este router
+router.use(limiter);
 
 // --- Definición de Rutas con Capas de Seguridad ---
 
