@@ -5,6 +5,10 @@ const redisClient = require('../../db/redis.client')
 
 const login = async (email, password) => {
   try {
+    if (!email || !password) {
+      throw new Error('Credenciales inválidas');
+    }
+
     const user = await prisma.users.findUnique({
       where: { email },
       include: {
