@@ -19,22 +19,16 @@ router.use(limiter);
 
 // --- Definición de Rutas con Capas de Seguridad ---
 
-// POST /: Crear un nuevo usuario del personal (ej. un recepcionista)
-// 1. `authenticate`: Verifica que el token es válido y el usuario existe.
-// 2. `authorize(['administrator'])`: Verifica que el usuario tenga el rol de administrador.
+// POST /: Solo administradores pueden crear personal
 router.post('/', authenticate, authorize(['administrator']), staffController.createNewUser);
 
-// GET /: Listar todos los usuarios del personal
-// 1. `authenticate`: Verifica que el token es válido.
-// 2. `authorize(...)`: Verifica que el usuario sea administrador O recepcionista.
-router.get('/', authenticate, authorize(['administrator', 'receptionist']), staffController.listAllUsers);
+// GET /: Solo administradores pueden listar personal  
+router.get('/', authenticate, authorize(['administrator']), staffController.listAllUsers);
 
-// GET /:id: Ver el detalle de un usuario específico
-// Mismas reglas que para listar a todos.
-router.get('/:id', authenticate, authorize(['administrator', 'receptionist']), staffController.getUserDetails);
+// GET /:id: Solo administradores pueden ver detalles del personal
+router.get('/:id', authenticate, authorize(['administrator']), staffController.getUserDetails);
 
-// PUT /:id: Actualizar la información de un usuario
-// Por seguridad, solo los administradores pueden modificar datos del personal.
+// PUT /:id: Solo administradores pueden actualizar personal
 router.put('/:id', authenticate, authorize(['administrator']), staffController.updateUserInfo);
 
 // Un apunte sobre la ruta para Eliminar:

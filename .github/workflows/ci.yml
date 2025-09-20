@@ -60,6 +60,7 @@ jobs:
           DATABASE_URL: "postgresql://postgres:ReservasDevPass_2025@localhost:5432/reservas_db_ci"
           REDIS_URL: "redis://localhost:6379"
           JWT_SECRET: "test-secret-key-for-ci"
+          NODE_ENV: "test"
         run: |
           npx prisma generate
           npx prisma migrate deploy
