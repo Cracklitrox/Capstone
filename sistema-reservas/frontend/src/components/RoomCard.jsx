@@ -13,14 +13,17 @@ const statusColors = {
  * Solo muestra número, tipo y piso. No muestra info dinámica (huésped, fechas, etc).
  * El contenido se actualizará cuando se integre el CRUD.
  */
+
 function RoomCard({ room }) {
   const color = statusColors[room.status] || "bg-gray-100 border-gray-300 text-gray-800";
+  // Si room_types está presente, mostrar el nombre, si no, mostrar el id
+  const typeName = room.room_types?.name || room.type || room.room_type_id || "";
   return (
     <div
       className={`border-2 rounded-lg p-4 min-w-[180px] min-h-[110px] shadow-sm flex flex-col justify-between ${color}`}
     >
       <div className="flex justify-between items-center">
-        <span className="font-bold text-lg">{room.number} - {room.type}</span>
+        <span className="font-bold text-lg">{room.number} - {typeName}</span>
         <span className="text-xs text-gray-500">Piso {room.floor}</span>
       </div>
       {/* Aquí se mostrará información dinámica cuando se integre el CRUD */}

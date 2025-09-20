@@ -5,12 +5,10 @@ const roomsController = require('./rooms.controller');
 
 /**
  * @route GET /api/rooms
- * @desc Lista todas las habitaciones, permite filtrar por estado y tipo de habitación
- * @queryParam {string} status - Estado de la habitación (opcional)
- * @queryParam {number} room_type_id - ID del tipo de habitación (opcional)
+ * @desc Lista todas las habitaciones
  * @returns {Array} Lista de habitaciones
  */
-router.get('/', roomsController.getRooms);
+router.get('/', roomsController.getAllRooms);
 
 // Exporta el router para ser usado en el archivo principal de rutas
 module.exports = router;

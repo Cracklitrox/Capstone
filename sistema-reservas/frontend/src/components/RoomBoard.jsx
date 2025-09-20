@@ -1,28 +1,38 @@
-import React, { useState } from "react";
-import RoomCard from "./RoomCard";
 
-// Datos mock mínimos para mostrar tarjetas vacías (sin info específica)
-const mockRooms = [
-  { number: "101", type: "Simple", floor: 1, status: "disponible" },
-  { number: "102", type: "Doble", floor: 1, status: "ocupado" },
-  { number: "105", type: "Suite", floor: 1, status: "ocupado" },
-  { number: "106", type: "King", floor: 2, status: "reservado" },
-  { number: "201", type: "Doble", floor: 2, status: "disponible" },
-  { number: "202", type: "Simple", floor: 2, status: "mantenimiento" },
-  { number: "301", type: "Suite", floor: 3, status: "ocupado" },
-  { number: "302", type: "Simple", floor: 3, status: "disponible" },
-];
+import React, { useEffect, useState } from "react";
+import RoomCard from "./RoomCard";
+import { fetchRooms } from "../services/rooms";
 
 const floors = ["Todos los pisos", 1, 2, 3];
 
-function RoomBoard({ rooms = mockRooms }) {
+function RoomBoard() {
+  const [rooms, setRooms] = useState([]);
   const [selectedFloor, setSelectedFloor] = useState("Todos los pisos");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Filtrado de habitaciones por piso
+  useEffect(() => {
+    fetchRooms()
+      .then((data) => setRooms(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Adaptar los datos del backend al formato esperado por RoomCard
+  const mappedRooms = rooms.map((room) => ({
+    number: room.room_number,
+    type: room.room_type_id, // Puedes mapear a nombre si tienes la relación
+    floor: room.floor,
+    status: room.status,
+  }));
+
   const filteredRooms =
     selectedFloor === "Todos los pisos"
-      ? rooms
-      : rooms.filter((r) => r.floor === selectedFloor);
+      ? mappedRooms
+      : mappedRooms.filter((r) => r.floor === selectedFloor);
+
+  if (loading) return <div>Cargando habitaciones...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <div>
@@ -45,7 +55,7 @@ function RoomBoard({ rooms = mockRooms }) {
         </select>
       </div>
 
-      {/* Grid de habitaciones (sin info específica) */}
+      {/* Grid de habitaciones */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredRooms.map((room) => (
           <RoomCard key={room.number} room={room} />
