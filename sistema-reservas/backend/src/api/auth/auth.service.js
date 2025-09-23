@@ -34,18 +34,31 @@ const login = async (email, password) => {
       throw new Error('Credenciales inválidas');
     }
 
+    const role = user.user_roles[0]?.roles?.name;
+
+    if (!role) {
+      console.error(`💥 Intento de login fallido: El usuario ${email} no tiene un rol asignado.`);
+      throw new Error('El usuario no tiene permisos para acceder.');
+    }
+
+    const tokenPayload = {
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name,
+      role: role,
+    };
+
     const token = jwt.sign(
-      { id: user.id },
+      tokenPayload,
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    const { password_hash, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, token };
+    return { token };
 
   } catch (error) {
-    console.error("💥 Error en el servicio de login:", error);
-    throw new Error('Credenciales inválidas');
+    console.error("💥 Error en el servicio de login:", error.message);
+    throw new Error('Credenciales inválidas o error de servidor.');
   }
 };
 

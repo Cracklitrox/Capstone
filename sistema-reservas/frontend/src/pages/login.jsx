@@ -1,41 +1,32 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { authService } from "../services/services";
+import { useAuth } from "../services/authContext.jsx"; // 1. Importamos el hook useAuth
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  const navigate = useNavigate();
+  // 2. Obtenemos la función 'login' de nuestro contexto
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
 
     try {
-      const { user, token } = await authService.login({ email, password });
+      // 3. Llamamos a la API. Ahora solo nos interesa el 'token'.
+      const { token } = await authService.login({ email, password });
 
-      localStorage.setItem("token", token);
-      setSuccess("Login exitoso ✅");
-
-      const userRole = user?.user_roles?.[0]?.roles?.name;
-
-      if (userRole === 'administrator') {
-        navigate("/admin");
-      } else if (userRole === 'receptionist') {
-        navigate("/receptionist");
-      } else {
-        setError("Rol de usuario no reconocido.");
-        localStorage.removeItem("token");
-      }
+      // 4. Le entregamos el token a nuestro 'cerebro' (el contexto).
+      // ¡Y listo! El contexto se encargará de decodificar, guardar al usuario y redirigir.
+      login(token);
 
     } catch (err) {
-      const errorMessage = err.response?.data?.message || "Credenciales incorrectas ❌";
+      const errorMessage =
+        err.response?.data?.message || "Credenciales incorrectas ❌";
       setError(errorMessage);
     }
   };
@@ -103,7 +94,6 @@ const Login = () => {
             </div>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}
-          {success && <div className="text-sm text-green-600">{success}</div>}
           <button
             type="submit"
             className="w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700"
