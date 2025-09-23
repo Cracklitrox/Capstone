@@ -13,6 +13,23 @@ async function getAllRooms(req, res, next) {
   }
 }
 
+/**
+ * Controlador para obtener los detalles de una habitación por ID
+ */
+async function getRoomDetails(req, res, next) {
+  try {
+    const { id } = req.params;
+    const room = await roomsService.getRoomById(id);
+    if (!room) {
+      return res.status(404).json({ message: 'Habitación no encontrada' });
+    }
+    res.json(room);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getAllRooms,
+  getRoomDetails,
 };
