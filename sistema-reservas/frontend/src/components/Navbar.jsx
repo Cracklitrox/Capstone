@@ -1,20 +1,17 @@
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { authService } from '../services/services';
+import { Link } from "react-router-dom";
+// 1. Importamos el hook 'useAuth' para acceder a nuestro contexto
+import { useAuth } from '../services/authContext.jsx';
 import { ArrowLeftOnRectangleIcon } from '@heroicons/react/24/outline';
 
 const Navbar = ({ setSidebarOpen }) => {
-    const navigate = useNavigate();
+    // 2. Obtenemos la función 'logout' de nuestro cerebro central (el contexto)
+    const { logout } = useAuth();
 
-    const handleLogout = async () => {
-        try {
-            await authService.logout();
-        } catch (error) {
-            console.error("Error al cerrar sesión en el servidor:", error);
-        } finally {
-            localStorage.removeItem('token');
-            navigate('/');
-        }
+    const handleLogout = () => {
+        // 3. ¡Y eso es todo! Simplemente llamamos a la función centralizada.
+        // authContext se encargará de limpiar el token, el estado y redirigir.
+        logout();
     };
 
     return (
@@ -34,9 +31,9 @@ const Navbar = ({ setSidebarOpen }) => {
 
             {/* --- Sección Central: Links de Navegación (visible en desktop) --- */}
             <div className="hidden md:flex items-center">
-                <Link to="/admin" className="mx-2 hover:underline">Inicio</Link>
-                <Link to="/admin" className="mx-2 hover:underline">Reservas</Link>
-                <Link to="/admin" className="mx-2 hover:underline">Usuarios</Link>
+                <Link to="/" className="mx-2 hover:underline">Inicio</Link>
+                <Link to="/reservas" className="mx-2 hover:underline">Reservas</Link>
+                <Link to="/usuarios" className="mx-2 hover:underline">Usuarios</Link>
             </div>
 
             {/* --- Sección Derecha: Botón de Cerrar Sesión --- */}
