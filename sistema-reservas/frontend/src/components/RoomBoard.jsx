@@ -4,52 +4,87 @@ import { fetchRooms } from "../services/rooms";
 import { fetchRoomDetails } from "../services/roomDetails";
 
 const FLOORS = ["Todos los pisos", 1, 2, 3];
+const STATUS_OPTIONS = [
+  "Todos los estados",
+  "Disponible",
+  "Ocupado",
+  "Limpieza",
+  "Mantenimiento",
+  "Pendiente"
+];
 
-function RoomBoard() {
-  const [rooms, setRooms] = useState([]);
+function RoomBoard({ rooms: roomsProp }) {
+  const [rooms, setRooms] = useState(roomsProp ?? []);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomDetails, setRoomDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
 
   const [selectedFloor, setSelectedFloor] = useState("Todos los pisos");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(roomsProp ? false : true);
   const [error, setError] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState("Todos los estados");
+  const [page, setPage] = useState(1);
+  const CARDS_PER_PAGE = 8;
 
-  // Carga inicial
+  // Carga inicial solo si no hay roomsProp
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const data = await fetchRooms();
-        if (!mounted) return;
-        setRooms(Array.isArray(data) ? data : []);
-      } catch (err) {
-        if (!mounted) return;
-        setError(err?.message || "Error al cargar habitaciones");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+    if (!roomsProp) {
+      let mounted = true;
+      (async () => {
+        try {
+          const data = await fetchRooms();
+          if (!mounted) return;
+          setRooms(Array.isArray(data) ? data : []);
+        } catch (err) {
+          if (!mounted) return;
+          setError(err?.message || "Error al cargar habitaciones");
+        } finally {
+          if (mounted) setLoading(false);
+        }
+      })();
+      return () => { mounted = false; };
+    }
+  }, [roomsProp]);
 
-  // Filtro por piso usando solo los datos directos del backend
+  // Filtro por piso y estado
   const filteredRooms = useMemo(() => {
     if (!Array.isArray(rooms)) return [];
-    if (selectedFloor === "Todos los pisos") return rooms;
-    return rooms.filter((r) => Number(r.floor) === Number(selectedFloor));
-  }, [rooms, selectedFloor]);
+    let result = rooms;
+    if (selectedFloor !== "Todos los pisos") {
+      result = result.filter((r) => Number(r.floor) === Number(selectedFloor));
+    }
+    if (selectedStatus !== "Todos los estados") {
+      const statusMap = {
+        "Disponible": ["available"],
+        "Ocupado": ["occupied"],
+        "Limpieza": ["cleaning"],
+        "Mantenimiento": ["maintenance"],
+        "Pendiente": ["pending", "pendiente"]
+      };
+      const validStates = statusMap[selectedStatus] || [];
+      result = result.filter((r) => validStates.includes(String(r.status).toLowerCase()));
+    }
+    return result;
+  }, [rooms, selectedFloor, selectedStatus]);
+
+  // Paginación
+  const pagedRooms = useMemo(() => {
+    const start = (page - 1) * CARDS_PER_PAGE;
+    return filteredRooms.slice(start, start + CARDS_PER_PAGE);
+  }, [filteredRooms, page]);
 
   const statusBadge = (status) => {
     const s = String(status || "").toLowerCase();
     const isReserved = s === "reserved" || s === "reservado";
+    const isPending = s === "pending" || s === "pendiente";
     const cls =
       s === "available" ? "bg-green-500 text-white" :
       s === "occupied" ? "bg-red-500 text-white" :
       s === "cleaning" ? "bg-blue-500 text-white" :
       s === "maintenance" ? "bg-gray-800 text-white" :
       isReserved ? "bg-orange-500 text-white" :
+      isPending ? "bg-orange-500 text-white" :
       "bg-gray-300 text-gray-800";
     const label =
       s === "available" ? "Disponible" :
@@ -57,6 +92,7 @@ function RoomBoard() {
       s === "cleaning" ? "Limpieza" :
       s === "maintenance" ? "Mantenimiento" :
       isReserved ? "Reservado" :
+      isPending ? "Pendiente" :
       status ?? "Desconocido";
     return <span className={`px-2 py-1 rounded ${cls}`}>{label}</span>;
   };
@@ -98,14 +134,15 @@ function RoomBoard() {
         </div>
       </div>
 
-      {/* Filtro de pisos */}
-      <div className="flex justify-end items-center">
+      {/* Filtros de piso y estado */}
+      <div className="flex flex-wrap justify-end items-center gap-4">
         <select
           className="border rounded px-2 py-1"
           value={selectedFloor}
           onChange={(e) => {
             const v = e.target.value;
             setSelectedFloor(v === "Todos los pisos" ? "Todos los pisos" : Number(v));
+            setPage(1);
           }}
         >
           {FLOORS.map((f) => (
@@ -114,18 +151,54 @@ function RoomBoard() {
             </option>
           ))}
         </select>
+        <select
+          className="border rounded px-2 py-1"
+          value={selectedStatus}
+          onChange={(e) => {
+            setSelectedStatus(e.target.value);
+            setPage(1);
+          }}
+        >
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Grid de habitaciones */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {Array.isArray(filteredRooms) && filteredRooms.length > 0 && filteredRooms.map((room) => (
-          <RoomCard
-            key={room.id}
-            room={room}
-            onDetails={openDetails}
-          />
-        ))}
+      {/* Grid de habitaciones compactas y paginadas */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 justify-center min-h-[320px]">
+        {Array.isArray(pagedRooms) && pagedRooms.length > 0 ? (
+          pagedRooms.map((room) => (
+            <div className="p-2 h-auto">
+              <RoomCard
+                key={room.id}
+                room={room}
+                onDetails={openDetails}
+                compact
+              />
+            </div>
+          ))
+        ) : (
+          <div className="col-span-4 text-center text-gray-500 py-8">No hay habitaciones para mostrar.</div>
+        )}
       </div>
+
+      {/* Paginación */}
+      {filteredRooms.length > CARDS_PER_PAGE && (
+        <div className="flex justify-center items-center gap-2 mt-2">
+          <button
+            className="px-3 py-1 rounded bg-gray-200 hover:bg-blue-200 text-gray-700 font-bold"
+            disabled={page === 1}
+            onClick={() => setPage(page - 1)}
+          >Anterior</button>
+          <span className="mx-2 text-blue-700 font-bold">Página {page} de {Math.ceil(filteredRooms.length / CARDS_PER_PAGE)}</span>
+          <button
+            className="px-3 py-1 rounded bg-gray-200 hover:bg-blue-200 text-gray-700 font-bold"
+            disabled={page === Math.ceil(filteredRooms.length / CARDS_PER_PAGE)}
+            onClick={() => setPage(page + 1)}
+          >Siguiente</button>
+        </div>
+      )}
 
       {/* Modal de Detalles */}
       {selectedRoom && (
@@ -152,8 +225,8 @@ function RoomBoard() {
                   <div><span className="font-bold text-gray-700">Tipo:</span> <span className="text-blue-800">{roomDetails.room_types?.name}</span></div>
                   <div><span className="font-bold text-gray-700">Estado:</span> {statusBadge(roomDetails.status)}</div>
                 </div>
-                {/* Caso reservado u ocupado */}
-                {["reserved", "reservado", "occupied", "ocupado"].includes(String(roomDetails.status).toLowerCase()) ? (
+                {/* Caso reservado, ocupado, pendiente */}
+                {["reserved", "reservado", "occupied", "ocupado", "pending", "pendiente"].includes(String(roomDetails.status).toLowerCase()) ? (
                   <>
                     <div className="mt-2 font-bold text-blue-700 text-lg flex items-center gap-2">
                       <span role="img" aria-label="calendar">📅</span> Datos de la última reserva
@@ -172,8 +245,47 @@ function RoomBoard() {
                       <div><b className="text-gray-700">Pendiente de pago:</b> <span className="text-red-700 font-bold">${(roomDetails.reservation_rooms[0]?.reservations?.total_amount || 0) - (roomDetails.reservation_rooms[0]?.reservations?.paid_amount || 0)}</span></div>
                     </div>
                   </>
+                ) : String(roomDetails.status).toLowerCase() === "cleaning" ? (
+                  // Caso limpieza
+                  <>
+                    <div className="mt-2 font-bold text-blue-700 text-lg flex items-center gap-2">
+                      <span role="img" aria-label="broom">🧹</span> Detalle de limpieza
+                    </div>
+                    <div className="ml-2 text-base bg-blue-50 rounded-lg p-3 border border-blue-200">
+                      {roomDetails.cleaning ? (
+                        <>
+                          <div><b className="text-gray-700">Hora de inicio:</b> <span className="text-blue-900">{roomDetails.cleaning.start_time ? new Date(roomDetails.cleaning.start_time).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'No registrada'}</span></div>
+                          <div><b className="text-gray-700">Hora de término:</b> <span className="text-blue-900">{roomDetails.cleaning.end_time ? new Date(roomDetails.cleaning.end_time).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'En proceso'}</span></div>
+                          <div><b className="text-gray-700">Observación:</b> <span className="text-gray-800">{roomDetails.cleaning.notes || 'Sin observación'}</span></div>
+                        </>
+                      ) : (
+                        <div className="text-blue-700 font-semibold">Esta habitación está siendo limpiada por el personal.</div>
+                      )}
+                    </div>
+                  </>
+                ) : String(roomDetails.status).toLowerCase() === "maintenance" ? (
+                  // Caso mantenimiento
+                  <>
+                    <div className="mt-2 font-bold text-gray-800 text-lg flex items-center gap-2">
+                      <span role="img" aria-label="tools">🛠️</span> Detalle de mantenimiento
+                    </div>
+                    <div className="ml-2 text-base bg-gray-100 rounded-lg p-3 border border-gray-400">
+                      {roomDetails.maintenance ? (
+                        <>
+                          <div><b className="text-gray-700">Categoría:</b> <span className="text-blue-900">{roomDetails.maintenance.category || 'Sin categoría'}</span></div>
+                          <div><b className="text-gray-700">Descripción:</b> <span className="text-gray-800">{roomDetails.maintenance.description || 'Sin descripción'}</span></div>
+                          <div><b className="text-gray-700">Fecha de comienzo:</b> <span className="text-blue-900">{roomDetails.maintenance.start_date ? new Date(roomDetails.maintenance.start_date).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No registrada'}</span></div>
+                          <div><b className="text-gray-700">Fecha de término:</b> <span className="text-blue-900">{roomDetails.maintenance.end_date ? new Date(roomDetails.maintenance.end_date).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'En proceso'}</span></div>
+                          <div><b className="text-gray-700">Prioridad:</b> <span className="text-red-700 font-bold">{roomDetails.maintenance.priority || 'Sin prioridad'}</span></div>
+                          <div><b className="text-gray-700">Estado:</b> <span className="text-gray-800">{roomDetails.maintenance.status || 'Sin estado'}</span></div>
+                        </>
+                      ) : (
+                        <div className="text-gray-700 font-semibold">Esta habitación está en mantenimiento.</div>
+                      )}
+                    </div>
+                  </>
                 ) : (
-                  // Caso NO reservado
+                  // Caso disponible
                   <>
                     <div className="mt-2 font-bold text-blue-700 text-lg flex items-center gap-2">
                       <span role="img" aria-label="info">ℹ️</span> Información de la habitación

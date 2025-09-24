@@ -34,14 +34,17 @@ function RoomCard({ room, onDetails }) {
     stateTitle = "En limpieza";
   } else if (normalizedStatus === "maintenance") {
     stateTitle = "En mantenimiento";
-  } else if (normalizedStatus === "reserved") {
+  } else if (normalizedStatus === "reserved" || normalizedStatus === "reservada") {
     stateTitle = "Reservada";
+  } else if (normalizedStatus === "pending" || normalizedStatus === "pendiente") {
+    stateTitle = "Pendiente";
   }
 
-  // Mostrar datos de reserva si está ocupada y el backend ya entrega reservation
+  // Mostrar datos de reserva si está ocupada, pendiente o reservada y el backend ya entrega reservation
   let guestName = null;
   let dateRange = null;
-  if (normalizedStatus === "occupied" && room.reservation && room.reservation.guest) {
+  const showReservation = ["occupied", "pending", "pendiente", "reserved", "reservada"].includes(normalizedStatus);
+  if (showReservation && room.reservation && room.reservation.guest) {
     const guest = room.reservation.guest;
     guestName = `${guest.first_name || ''} ${guest.paternal_last_name || ''}`.trim();
     // Fechas formato corto (ej: 20-21 Oct)
@@ -57,23 +60,23 @@ function RoomCard({ room, onDetails }) {
 
   return (
     <div
-      className={`cursor-pointer border rounded-lg p-4 min-w-[180px] min-h-[110px] shadow-sm flex flex-col justify-between ${borderColor}`}
+      className={`cursor-pointer border rounded-lg p-1 min-w-[180px] h-28 max-h-28 shadow-sm flex flex-col justify-between ${borderColor}`}
       onClick={() => onDetails?.(room)}
       tabIndex={0}
       role="button"
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onDetails?.(room); }}
       title="Ver detalles de la habitación"
     >
-      <div>
-        <div className="flex justify-between items-center mb-1">
-          <span className="font-bold text-lg">{room.number} - {typeName}</span>
+      <div className="space-y-1">
+        <div className="flex justify-between items-center">
+          <span className="font-bold text-base leading-tight">{room.number} - {typeName}</span>
           <span className="text-xs text-gray-500">Piso {room.floor}</span>
         </div>
-        {/* Mostrar datos de reserva si está ocupada */}
-        {!isAvailable && normalizedStatus === "occupied" && guestName && dateRange && (
+        {/* Mostrar datos de reserva si está ocupada, pendiente o reservada */}
+        {showReservation && guestName && dateRange && (
           <>
-            <div className="flex items-center gap-1 text-sm text-gray-700 mt-1">
-              <span role="img" aria-label="user">👤</span> {guestName}
+            <div className="flex items-center gap-1 text-sm text-gray-700">
+              <span role="img" aria-label="user">👤</span> <span className="truncate max-w-[120px]">{guestName}</span>
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-700">
               <span role="img" aria-label="calendar">📅</span> {dateRange}
@@ -84,12 +87,13 @@ function RoomCard({ room, onDetails }) {
       {/* Título de estado sutil abajo */}
       {stateTitle && (
         <div
-          className={`mt-2 text-sm font-medium text-left
+          className={`text-sm font-medium text-left
             ${isAvailable ? 'text-green-700' : ''}
             ${normalizedStatus === 'occupied' ? 'text-red-700' : ''}
             ${normalizedStatus === 'cleaning' ? 'text-blue-700' : ''}
             ${normalizedStatus === 'maintenance' ? 'text-gray-700' : ''}
-            ${normalizedStatus === 'reserved' ? 'text-orange-700' : ''}
+            ${['reserved','reservada'].includes(normalizedStatus) ? 'text-orange-700' : ''}
+            ${['pending','pendiente'].includes(normalizedStatus) ? 'text-orange-700' : ''}
           `}
         >
           {stateTitle}
