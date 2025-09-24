@@ -1,65 +1,49 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import { useAuth } from "./services/authContext";
-
-// Páginas y componentes principales
-import Login from "./pages/Login";
-import Layout from "./components/Layout";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import Login from "./pages/login";
-import AdminHome from "./pages/Admin/home";
+import { useAuth } from "./services/authContext.jsx";
+import Layout from "./components/Layout.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Profile from "./components/Profile";
-import ReceptionistHome from "./pages/Receptionist/home";
-import ProtectedRoute from "./components/ProtectedRoute";
 
-// Dashboards específicos por rol
-import AdminDashboard from "./pages/Admin/Dashboard";
-import ReceptionistDashboard from "./pages/Receptionist/Dashboard";
+// --- Páginas Principales ---
+import Login from "./pages/Login.jsx";
+import AdminDashboard from "./pages/Admin/Dashboard.jsx";
+import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
 
 import "./index.css";
 
-// --- Componente Inteligente ---
-// Decide qué Dashboard mostrar basado en el rol del usuario en el contexto.
+// --- Páginas de Contenido (Placeholder) ---
+const ReservationsPage = () => <h1 className="text-3xl font-bold">Gestionar Reservas</h1>;
+const UsersPage = () => <h1 className="text-3xl font-bold">Gestionar Usuarios</h1>;
+const SettingsPage = () => <h1 className="text-3xl font-bold">Configuración</h1>;
+const NotFoundPage = () => <h1 className="text-3xl font-bold text-center mt-10">404 - Página no encontrada</h1>;
+
+// --- Componente Inteligente para el Dashboard ---
 const DashboardSelector = () => {
   const { user } = useAuth();
+  if (!user) return <div>Cargando...</div>;
 
-  if (!user) {
-    return <div>Cargando...</div>;
-  }
-
-  console.log("Rol recibido del contexto:", user.role);
-
-  // Comparamos con los nombres de rol exactos de tu base de datos
   switch (user.role) {
     case 'administrator':
       return <AdminDashboard />;
     case 'receptionist':
       return <ReceptionistDashboard />;
     default:
-      return <div>Rol de usuario '{user.role}' no reconocido. Contacte al soporte.</div>;
+      return <div>Rol de usuario no reconocido.</div>;
   }
 };
 
 // --- Definición de Rutas ---
-// Separamos las rutas en su propio componente para mayor claridad.
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Rutas Públicas */}
       <Route path="/login" element={<Login />} />
-
-      {/* Rutas Protegidas */}
-      {/* Todas las rutas dentro de este elemento usarán el Layout y estarán protegidas */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        {/* La ruta "index" es la página por defecto al entrar a "/" */}
+      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<DashboardSelector />} />
+        <Route path="reservations" element={<ReservationsPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="settings" element={<SettingsPage />} />
 
         <Route
             path="/profile"
@@ -70,16 +54,12 @@ const AppRoutes = () => {
             }
           />
       </Route>
-
-      {/* Puedes agregar una ruta para páginas no encontradas */}
-      <Route path="*" element={<div>Página no encontrada</div>} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 };
 
-
-// --- Componente Principal App ---
-// Su única responsabilidad ahora es proveer el contexto de autenticación.
+// --- Componente Principal ---
 function App() {
   return <AppRoutes />;
 }
