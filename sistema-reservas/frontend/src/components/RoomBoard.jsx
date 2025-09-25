@@ -13,13 +13,13 @@ const STATUS_OPTIONS = [
   "Pendiente"
 ];
 
-function RoomBoard({ rooms: roomsProp }) {
+  function RoomBoard({ rooms: roomsProp, loading: propLoading, error: propError }) {
+  // HOOKS SIEMPRE AL INICIO
   const [rooms, setRooms] = useState(roomsProp ?? []);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomDetails, setRoomDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
-
   const [selectedFloor, setSelectedFloor] = useState("Todos los pisos");
   const [loading, setLoading] = useState(roomsProp ? false : true);
   const [error, setError] = useState(null);
@@ -27,52 +27,60 @@ function RoomBoard({ rooms: roomsProp }) {
   const [page, setPage] = useState(1);
   const CARDS_PER_PAGE = 8;
 
-  // Carga inicial solo si no hay roomsProp
-  useEffect(() => {
-    if (!roomsProp) {
-      let mounted = true;
-      (async () => {
-        try {
-          const data = await fetchRooms();
-          if (!mounted) return;
-          setRooms(Array.isArray(data) ? data : []);
-        } catch (err) {
-          if (!mounted) return;
-          setError(err?.message || "Error al cargar habitaciones");
-        } finally {
-          if (mounted) setLoading(false);
-        }
-      })();
-      return () => { mounted = false; };
-    }
-  }, [roomsProp]);
+    // Carga inicial solo si no hay roomsProp
+    useEffect(() => {
+      if (!roomsProp) {
+        let mounted = true;
+        (async () => {
+          try {
+            const data = await fetchRooms();
+            if (mounted) setRooms(Array.isArray(data) ? data : []);
+          } catch (err) {
+            if (mounted) setError(err?.message || "Error al cargar habitaciones");
+          } finally {
+            if (mounted) setLoading(false);
+          }
+        })();
+        return () => { mounted = false; };
+      }
+    }, [roomsProp]);
 
-  // Filtro por piso y estado
-  const filteredRooms = useMemo(() => {
-    if (!Array.isArray(rooms)) return [];
-    let result = rooms;
-    if (selectedFloor !== "Todos los pisos") {
-      result = result.filter((r) => Number(r.floor) === Number(selectedFloor));
-    }
-    if (selectedStatus !== "Todos los estados") {
-      const statusMap = {
-        "Disponible": ["available"],
-        "Ocupado": ["occupied"],
-        "Limpieza": ["cleaning"],
-        "Mantenimiento": ["maintenance"],
-        "Pendiente": ["pending", "pendiente"]
-      };
-      const validStates = statusMap[selectedStatus] || [];
-      result = result.filter((r) => validStates.includes(String(r.status).toLowerCase()));
-    }
-    return result;
-  }, [rooms, selectedFloor, selectedStatus]);
+    // Filtro por piso y estado
+    const filteredRooms = useMemo(() => {
+      if (!Array.isArray(rooms)) return [];
+      let result = rooms;
+      if (selectedFloor !== "Todos los pisos") {
+        result = result.filter((r) => Number(r.floor) === Number(selectedFloor));
+      }
+      if (selectedStatus !== "Todos los estados") {
+        const statusMap = {
+          "Disponible": ["available"],
+          "Ocupado": ["occupied"],
+          "Limpieza": ["cleaning"],
+          "Mantenimiento": ["maintenance"],
+          "Pendiente": ["pending", "pendiente"]
+        };
+        const validStates = statusMap[selectedStatus] || [];
+        result = result.filter((r) => validStates.includes(String(r.status).toLowerCase()));
+      }
+      return result;
+    }, [rooms, selectedFloor, selectedStatus]);
 
-  // Paginación
-  const pagedRooms = useMemo(() => {
-    const start = (page - 1) * CARDS_PER_PAGE;
-    return filteredRooms.slice(start, start + CARDS_PER_PAGE);
-  }, [filteredRooms, page]);
+    // Paginación
+    const pagedRooms = useMemo(() => {
+      const start = (page - 1) * CARDS_PER_PAGE;
+      return filteredRooms.slice(start, start + CARDS_PER_PAGE);
+    }, [filteredRooms, page]);
+
+    // Mostrar mensaje de loading global si la prop loading está presente
+    if (propLoading || loading) {
+      return <div className="p-6 text-blue-600 font-semibold">Cargando habitaciones...</div>;
+    }
+
+    // Mostrar mensaje de error global si la prop error está presente
+    if (propError || error) {
+      return <div className="p-6 text-red-600 font-semibold">Error: {propError || error}</div>;
+    }
 
   const statusBadge = (status) => {
     const s = String(status || "").toLowerCase();
@@ -177,9 +185,8 @@ function RoomBoard({ rooms: roomsProp }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 justify-center min-h-[320px]">
         {Array.isArray(pagedRooms) && pagedRooms.length > 0 ? (
           pagedRooms.map((room) => (
-            <div className="p-2 h-auto">
+            <div className="p-2 h-auto" key={room.id}>
               <RoomCard
-                key={room.id}
                 room={room}
                 onDetails={openDetails}
                 compact
