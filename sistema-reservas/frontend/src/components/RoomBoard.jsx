@@ -136,33 +136,41 @@ function RoomBoard({ rooms: roomsProp }) {
 
       {/* Filtros de piso y estado */}
       <div className="flex flex-wrap justify-end items-center gap-4">
-        <select
-          className="border rounded px-2 py-1"
-          value={selectedFloor}
-          onChange={(e) => {
-            const v = e.target.value;
-            setSelectedFloor(v === "Todos los pisos" ? "Todos los pisos" : Number(v));
-            setPage(1);
-          }}
-        >
-          {FLOORS.map((f) => (
-            <option key={String(f)} value={f}>
-              {f === "Todos los pisos" ? f : `Piso ${f}`}
-            </option>
-          ))}
-        </select>
-        <select
-          className="border rounded px-2 py-1"
-          value={selectedStatus}
-          onChange={(e) => {
-            setSelectedStatus(e.target.value);
-            setPage(1);
-          }}
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+        <div className="flex flex-col">
+          <label htmlFor="filtro-piso" className="text-xs font-semibold mb-1">Piso</label>
+          <select
+            id="filtro-piso"
+            className="border rounded px-2 py-1"
+            value={selectedFloor}
+            onChange={(e) => {
+              const v = e.target.value;
+              setSelectedFloor(v === "Todos los pisos" ? "Todos los pisos" : Number(v));
+              setPage(1);
+            }}
+          >
+            {FLOORS.map((f) => (
+              <option key={String(f)} value={f}>
+                {f === "Todos los pisos" ? f : `Piso ${f}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col">
+          <label htmlFor="filtro-estado" className="text-xs font-semibold mb-1">Estado</label>
+          <select
+            id="filtro-estado"
+            className="border rounded px-2 py-1"
+            value={selectedStatus}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              setPage(1);
+            }}
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Grid de habitaciones compactas y paginadas */}
