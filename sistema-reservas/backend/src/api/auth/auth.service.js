@@ -54,10 +54,24 @@ const login = async (email, password) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    return { token };
+    return { 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        role: role
+      }
+    };
 
   } catch (error) {
     console.error("💥 Error en el servicio de login:", error.message);
+    
+    if (error.message === 'Credenciales inválidas' || 
+        error.message === 'El usuario no tiene permisos para acceder.') {
+      throw error;
+    }
+    
     throw new Error('Credenciales inválidas o error de servidor.');
   }
 };
