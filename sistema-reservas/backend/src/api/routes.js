@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 
 const staffRoutes = require('./staff/staff.routes');
 const authRoutes = require('./auth/auth.routes');
+const roomsRoutes = require('./rooms/rooms.routes');
 
 // Define specific rate limiter for staff routes
 const staffLimiter = rateLimit({
@@ -21,8 +22,9 @@ router.get('/', (req, res) => {
   res.status(200).json({ message: 'Bienvenido a la API v1 del Hotel Don Teo' });
 });
 
-router.use('/auth', authRoutes);
 
+router.use('/auth', authRoutes);
+router.use('/rooms', roomsRoutes);
 router.use('/staff', staffLimiter, authenticate, staffRoutes);
 
 module.exports = router;

@@ -167,18 +167,24 @@ async function createUsers(faker, roles) {
 async function createRooms(faker, roomTypes) {
     console.log('🚪 Creando habitaciones...');
     const roomsData = [];
+    // Estados distribuidos por rango solicitado
     for (let i = 1; i <= 30; i++) {
       const floor = Math.ceil(i / 10);
       const roomNumber = `${floor}0${i % 10}`;
       const roomType = faker.helpers.arrayElement(roomTypes);
+      let status;
+      if (i >= 1 && i <= 7) status = 'occupied';
+      else if (i >= 8 && i <= 12) status = 'pending';
+      else if (i >= 13 && i <= 24) status = 'available';
+      else if (i >= 25 && i <= 27) status = 'cleaning';
+      else status = 'maintenance';
       roomsData.push({
         room_number: roomNumber,
         floor: floor,
         room_type_id: roomType.id,
         capacity: roomType.base_capacity + faker.number.int({ min: 0, max: 1 }),
         base_price: faker.number.int({ min: 50000, max: 250000 }),
-        // Asignamos diferentes estados para simular un hotel real
-        status: i > 25 ? 'maintenance' : (i > 20 ? 'cleaning' : 'available'),
+        status,
       });
     }
     const rooms = await prisma.rooms.createManyAndReturn({ data: roomsData });
@@ -222,15 +228,34 @@ async function createComplexScenarios(faker, { users, rooms, services, reception
     });
     console.log("✅ Creada reserva con alerta de pago.");
 
-    // Escenario 3: Tarea de mantenimiento para una habitación.
-    const roomInMaintenance = rooms.find(r => r.status === 'maintenance');
+  // Tareas de mantenimiento para todas las habitaciones en estado 'maintenance'
+  const maintenanceDescriptions = [
+    'Fuga de agua en el lavamanos.',
+    'Problema eléctrico en la lámpara principal.',
+    'Puerta del baño no cierra correctamente.',
+    'Aire acondicionado no funciona.',
+    'Mancha de humedad en la pared.',
+    'Grieta en el techo.',
+    'Ventana rota.',
+    'Insectos encontrados en la habitación.',
+    'Pintura descascarada en la pared.',
+    'Cerradura de puerta dañada.'
+  ];
+  const maintenanceRooms = rooms.filter(r => r.status === 'maintenance');
+  for (const room of maintenanceRooms) {
     await prisma.maintenance_tasks.create({
-        data: {
-            room_id: roomInMaintenance.id, category: 'room', description: 'Fuga de agua en el lavamanos.',
-            start_date: new Date(), status: 'in_progress', priority: 'high', created_by_id: users.receptionists[0].id,
-        }
+      data: {
+        room_id: room.id,
+        category: 'room',
+        description: faker.helpers.arrayElement(maintenanceDescriptions),
+        start_date: faker.date.recent({ days: 15 }),
+        status: faker.helpers.arrayElement(['in_progress', 'pending', 'delayed']),
+        priority: faker.helpers.arrayElement(['high', 'medium', 'critical']),
+        created_by_id: faker.helpers.arrayElement(receptionists).id,
+      }
     });
-    console.log("✅ Creada tarea de mantenimiento.");
+  }
+  console.log(`✅ Tareas de mantenimiento creadas para habitaciones en mantenimiento (${maintenanceRooms.length}).`);
 
     // Escenario 4: Notificación del administrador a los recepcionistas.
     const notification = await prisma.notifications.create({
@@ -249,13 +274,14 @@ async function createComplexScenarios(faker, { users, rooms, services, reception
 
 
     // Creación Masiva de Reservas Variadas
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 50; i++) {
         const mainGuest = faker.helpers.arrayElement(users.guests);
         const receptionist = faker.helpers.arrayElement(users.receptionists);
         const checkIn = faker.date.between({ from: '2025-09-01T00:00:00.000Z', to: '2026-03-01T00:00:00.000Z' });
         const checkOut = new Date(checkIn.getTime() + faker.number.int({ min: 1, max: 7 }) * 24 * 60 * 60 * 1000);
-        const availableRooms = rooms.filter(r => r.status === 'available');
-        const reservedRoom = faker.helpers.arrayElement(availableRooms);
+        // Permitir habitaciones en estado available, pending y occupied para simular reservas en curso
+        const reservables = rooms.filter(r => ['available', 'pending', 'occupied'].includes(r.status));
+        const reservedRoom = faker.helpers.arrayElement(reservables);
         const subtotalRoom = reservedRoom.base_price * ( (checkOut - checkIn) / (1000 * 60 * 60 * 24) );
         const service = faker.helpers.arrayElement(services);
         const subtotalService = service.price * faker.number.int({ min: 1, max: 2 });
@@ -265,8 +291,8 @@ async function createComplexScenarios(faker, { users, rooms, services, reception
           data: {
             code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
             main_guest_id: mainGuest.id, receptionist_id: receptionist.id,
-            channel: faker.helpers.arrayElement(['web', 'reception', 'chatbot', 'walk_in']),
-            status: faker.helpers.arrayElement(['confirmed', 'pending', 'completed', 'canceled']),
+            channel: faker.helpers.arrayElement(['reception', 'chatbot']),
+            status: faker.helpers.arrayElement(['pending', 'completed', 'canceled']),
             check_in_date: checkIn, check_out_date: checkOut,
             guest_count: faker.number.int({ min: 1, max: reservedRoom.capacity }),
             total_amount: totalAmount, paid_amount: faker.helpers.arrayElement([0, totalAmount / 2, totalAmount]),
@@ -276,8 +302,32 @@ async function createComplexScenarios(faker, { users, rooms, services, reception
             reservation_guests: { create: { guest_id: faker.helpers.arrayElement(users.guests.filter(g => g.id !== mainGuest.id)).id } } // Agrega un acompañante
           },
         });
+    }
+    console.log('✅ 50 Reservaciones adicionales creadas.');
+  // Creación de registros de limpieza realistas para habitaciones en estado 'cleaning'
+  const cleaningRooms = rooms.filter(r => r.status === 'cleaning');
+  for (const room of cleaningRooms) {
+    await prisma.cleaning_records.create({
+      data: {
+        room_id: room.id,
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        record_date: faker.date.recent({ days: 10 }),
+        observations: faker.helpers.arrayElement([
+          'Limpieza profunda realizada, sin observaciones.',
+          'Se encontró polvo bajo la cama, se limpió.',
+          'Toallas y sábanas cambiadas.',
+          'Baño desinfectado, sin anomalías.',
+          'Se detectó olor a humedad, se ventiló la habitación.',
+          'Se retiró basura acumulada en el escritorio.',
+          'Manchas en alfombra tratadas con producto especial.',
+          'Ventanas limpiadas y cortinas revisadas.'
+        ]),
+        is_completed: faker.datatype.boolean(),
+        completed_at: faker.datatype.boolean() ? new Date() : null
       }
-      console.log('✅ 25 Reservaciones adicionales creadas.');
+    });
+  }
+  console.log('✅ Registros de limpieza creados para habitaciones en limpieza.');
 }
 
 
