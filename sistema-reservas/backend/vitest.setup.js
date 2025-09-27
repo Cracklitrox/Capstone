@@ -1,5 +1,7 @@
 import { beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.test' });
 
 let prisma;
 
