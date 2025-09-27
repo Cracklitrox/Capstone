@@ -44,8 +44,35 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+// Actualizar perfil de usuario
+const updateProfile = async (req, res) => {
+  try {
+    // 1. El controlador extrae los datos de la petición (request).
+    const userId = req.user.id;
+    const profileData = req.body;
+
+    // 2. Llama al servicio para que haga todo el trabajo pesado.
+    const updatedProfile = await authService.updateProfile(userId, profileData);
+    
+    // 3. Si todo va bien, responde al cliente con los datos actualizados.
+    res.status(200).json(updatedProfile);
+
+  } catch (error) {
+    // 4. Si el servicio lanza un error, el controlador lo atrapa.
+    console.error('Error al actualizar el perfil:', error.message);
+    
+    // Y responde con el código de error adecuado.
+    if (error.message.includes('obligatorio') || error.message.includes('inválido') || error.message.includes('en uso')) {
+      return res.status(400).json({ message: error.message });
+    }
+    
+    res.status(500).json({ message: 'Error interno al actualizar el perfil.' });
+  }
+};
+
 module.exports = {
   loginUser,
   logoutUser,
   getUserProfile,
+  updateProfile, 
 };

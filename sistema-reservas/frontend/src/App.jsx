@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Login from "./pages/login";
 import AdminHome from "./pages/Admin/home";
+import Profile from "./components/Profile";
 import ReceptionistHome from "./pages/Receptionist/home";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -21,6 +22,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminHome />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

@@ -46,6 +46,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                                 Configuración
                             </Link>
                         </li>
+                        <li className="py-2">
+                            <Link to="/profile" className="hover:text-blue-400" onClick={() => setSidebarOpen(false)}>
+                                Mi Perfil
+                            </Link>
+                        </li>
                     </ul>
                 </nav>
             </aside>
