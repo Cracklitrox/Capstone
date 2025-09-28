@@ -25,7 +25,6 @@ const Profile = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   
-  // Efecto para obtener el perfil del usuario
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -38,7 +37,6 @@ const Profile = () => {
         const data = response.data;
         setProfile(data);
         
-        // Guardamos los nombres, pero también buscamos los isoCodes para el estado del form
         const countryData = Country.getAllCountries().find(c => c.name === data.country);
         const stateData = countryData ? State.getStatesOfCountry(countryData.isoCode).find(s => s.name === data.region) : null;
         
@@ -46,8 +44,8 @@ const Profile = () => {
           first_name: data.first_name || "", paternal_last_name: data.paternal_last_name || "",
           maternal_last_name: data.maternal_last_name || "", email: data.email || "",
           phone_number: data.phone_number || "", gender: data.gender || "",
-          country: countryData?.isoCode || "", // Usamos isoCode para el estado
-          region: stateData?.isoCode || "", // Usamos isoCode para el estado
+          country: countryData?.isoCode || "",
+          region: stateData?.isoCode || "",
           city: data.city || "",
         });
       } catch (err) {
@@ -73,7 +71,6 @@ const Profile = () => {
       const token = localStorage.getItem("token");
       const countryName = countries.find(c => c.value === formData.country)?.label || "";
       const stateName = states.find(s => s.value === formData.region)?.label || "";
-      
       const payload = { ...formData, country: countryName, region: stateName };
 
       const response = await axios.put("http://localhost:3001/api/v1/auth/profile", payload, {
@@ -100,7 +97,6 @@ const Profile = () => {
     <main className="flex flex-1 flex-col items-center p-4 sm:p-6 lg:p-8">
       {successMessage && <div className="absolute top-20 right-5 z-50 bg-green-600 text-white text-sm font-bold px-4 py-3 rounded-md shadow-lg animate-fade-in">{successMessage}</div>}
       
-      {/* --- 2. Envolvemos todo en el componente Tabs --- */}
       <Tabs defaultValue="personal" className="w-full max-w-2xl">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
           <TabsTrigger value="personal">Info. Personal</TabsTrigger>
@@ -109,7 +105,6 @@ const Profile = () => {
           <TabsTrigger value="preferences">Preferencias</TabsTrigger>
         </TabsList>
 
-        {/* --- 3. Contenido de la primera pestaña (tu componente actual) --- */}
         <TabsContent value="personal">
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <Card className="animate-fade-in">
@@ -134,41 +129,37 @@ const Profile = () => {
             <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Editar Perfil</DialogTitle><DialogDescription>Realiza los cambios en tu información personal.</DialogDescription></DialogHeader>
               <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-                {/* ... El contenido del formulario no cambia ... */}
+                <div className="space-y-2"><Label htmlFor="first_name">Nombre</Label><Input id="first_name" name="first_name" value={formData.first_name} onChange={handleFormChange} /></div>
+                <div className="space-y-2"><Label htmlFor="paternal_last_name">Apellido Paterno</Label><Input id="paternal_last_name" name="paternal_last_name" value={formData.paternal_last_name} onChange={handleFormChange} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label htmlFor="maternal_last_name">Apellido Materno (Opcional)</Label><Input id="maternal_last_name" name="maternal_last_name" value={formData.maternal_last_name} onChange={handleFormChange} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label htmlFor="email">Correo Electrónico</Label><Input id="email" type="email" name="email" value={formData.email} onChange={handleFormChange} /></div>
+                <div className="space-y-2"><Label htmlFor="phone_number">Teléfono (Opcional)</Label><Input id="phone_number" name="phone_number" value={formData.phone_number} onChange={handleFormChange} /></div>
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Género</Label>
+                  <Select name="gender" onValueChange={(value) => handleFormChange({ target: { name: 'gender', value } })} value={formData.gender}>
+                    <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                    <SelectContent><SelectItem value="male">Hombre</SelectItem><SelectItem value="female">Mujer</SelectItem><SelectItem value="other">Otro</SelectItem></SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 sm:col-span-2"><Label>País</Label><LocationCombobox options={countries} value={formData.country} onChange={(value) => setFormData(p => ({ ...p, country: value, region: '', city: '' }))} placeholder="País" /></div>
+                {formData.country && <div className="space-y-2 sm:col-span-2 animate-fade-in"><Label>Región</Label><LocationCombobox options={states} value={formData.region} onChange={(value) => setFormData(p => ({ ...p, region: value, city: '' }))} placeholder="Región" /></div>}
+                {formData.region && <div className="space-y-2 sm:col-span-2 animate-fade-in"><Label>Ciudad</Label><LocationCombobox options={cities} value={formData.city} onChange={(value) => setFormData(p => ({ ...p, city: value }))} placeholder="Ciudad" /></div>}
+                {formErrors.general && <p className="text-red-500 text-sm sm:col-span-2">{formErrors.general}</p>}
+                <DialogFooter className="sm:col-span-2 pt-4"><Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button><Button type="submit">Guardar cambios</Button></DialogFooter>
               </form>
             </DialogContent>
+            
           </Dialog>
         </TabsContent>
 
-        {/* --- 4. Pestañas con contenido de marcador de posición (placeholder) --- */}
         <TabsContent value="activity">
-          <Card>
-            <CardHeader><CardTitle>Actividad y Estadísticas</CardTitle><CardDescription>Un resumen de tu actividad reciente en el hotel.</CardDescription></CardHeader>
-            <CardContent className="flex flex-col items-center justify-center text-center h-48">
-              <ChartBarIcon className="h-12 w-12 text-muted-foreground mb-4"/>
-              <p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p>
-            </CardContent>
-          </Card>
+          <Card><CardHeader><CardTitle>Actividad y Estadísticas</CardTitle><CardDescription>Un resumen de tu actividad reciente en el hotel.</CardDescription></CardHeader><CardContent className="flex flex-col items-center justify-center text-center h-48"><ChartBarIcon className="h-12 w-12 text-muted-foreground mb-4"/><p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p></CardContent></Card>
         </TabsContent>
-
         <TabsContent value="security">
-          <Card>
-            <CardHeader><CardTitle>Seguridad</CardTitle><CardDescription>Gestiona tu contraseña y la seguridad de tu cuenta.</CardDescription></CardHeader>
-            <CardContent className="flex flex-col items-center justify-center text-center h-48">
-              <ShieldCheckIcon className="h-12 w-12 text-muted-foreground mb-4"/>
-              <p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p>
-            </CardContent>
-          </Card>
+          <Card><CardHeader><CardTitle>Seguridad</CardTitle><CardDescription>Gestiona tu contraseña y la seguridad de tu cuenta.</CardDescription></CardHeader><CardContent className="flex flex-col items-center justify-center text-center h-48"><ShieldCheckIcon className="h-12 w-12 text-muted-foreground mb-4"/><p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p></CardContent></Card>
         </TabsContent>
-
         <TabsContent value="preferences">
-          <Card>
-            <CardHeader><CardTitle>Preferencias</CardTitle><CardDescription>Personaliza la apariencia y las notificaciones de la aplicación.</CardDescription></CardHeader>
-            <CardContent className="flex flex-col items-center justify-center text-center h-48">
-              <AdjustmentsHorizontalIcon className="h-12 w-12 text-muted-foreground mb-4"/>
-              <p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p>
-            </CardContent>
-          </Card>
+          <Card><CardHeader><CardTitle>Preferencias</CardTitle><CardDescription>Personaliza la apariencia y las notificaciones de la aplicación.</CardDescription></CardHeader><CardContent className="flex flex-col items-center justify-center text-center h-48"><AdjustmentsHorizontalIcon className="h-12 w-12 text-muted-foreground mb-4"/><p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p></CardContent></Card>
         </TabsContent>
       </Tabs>
     </main>
