@@ -1,43 +1,65 @@
 import React from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import Login from "./pages/login";
-import AdminHome from "./pages/Admin/home";
-import ReceptionistHome from "./pages/Receptionist/home";
-import ProtectedRoute from "./components/ProtectedRoute";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { useAuth } from "./services/authContext.jsx";
+import Layout from "./components/Layout.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import Profile from "./components/Profile";
+
+// --- Páginas Principales ---
+import Login from "./pages/Login.jsx";
+import AdminDashboard from "./pages/Admin/Dashboard.jsx";
+import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
+import TapeChart from "./pages/Receptionist/TapeChart.jsx";
 
 import "./index.css";
 
-function App() {
+// --- Páginas de Contenido (Placeholder) ---
+const ReservationsPage = () => <h1 className="text-3xl font-bold">Gestionar Reservas</h1>;
+const UsersPage = () => <h1 className="text-3xl font-bold">Gestionar Usuarios</h1>;
+const SettingsPage = () => <h1 className="text-3xl font-bold">Configuración</h1>;
+const NotFoundPage = () => <h1 className="text-3xl font-bold text-center mt-10">404 - Página no encontrada</h1>;
+
+// --- Componente Inteligente para el Dashboard ---
+const DashboardSelector = () => {
+  const { user } = useAuth();
+  if (!user) return <div>Cargando...</div>;
+
+  switch (user.role) {
+    case 'administrator':
+      return <AdminDashboard />;
+    case 'receptionist':
+      return <ReceptionistDashboard />;
+    default:
+      return <div>Rol de usuario no reconocido.</div>;
+  }
+};
+
+// --- Definición de Rutas ---
+const AppRoutes = () => {
   return (
-    <Router>
-      <div className="min-h-screen">
-        <Routes>
-          {/* Ruta de Login: Es pública, no necesita protección */}
-          <Route path="/" element={<Login />} />
+    <Routes>
+      <Route path="/login" element={<Login />} />
 
-          {/* Ruta de Admin: Ahora está protegida */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <AdminHome />
-              </ProtectedRoute>
-            }
-          />
+      {/* Rutas Protegidas que usan el Layout principal (Sidebar y Navbar) */}
+      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route index element={<DashboardSelector />} />
+        <Route path="planning" element={<TapeChart />} />
+        <Route path="reservations" element={<ReservationsPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        {/* Pequeño ajuste: La ruta a Profile ya está protegida por la ruta padre "/" */}
+        <Route path="profile" element={<Profile />} />
+      </Route>
 
-          {/* Ruta de Recepcionista: También protegida */}
-          <Route
-            path="/receptionist"
-            element={
-              <ProtectedRoute>
-                <ReceptionistHome />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </div>
-    </Router>
+      {/* Ruta para páginas no encontradas */}
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
   );
+};
+
+// --- Componente Principal ---
+function App() {
+  return <AppRoutes />;
 }
 
 export default App;

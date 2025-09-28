@@ -1,117 +1,233 @@
-import React, { useEffect, useState, useMemo } from "react";
-import RoomCard from "./RoomCard";
-import { fetchRooms } from "../services/rooms";
-import { fetchRoomDetails } from "../services/roomDetails";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import RoomCard from "./RoomCard.jsx";
+import {
+  fetchRooms,
+  fetchRoomTypes,
+  updateRoomStatus,
+} from "../services/rooms.js";
+import { fetchRoomDetails } from "../services/roomDetails.js";
+import { useAuth } from "../services/authContext.jsx";
+import { Button } from "@/components/ui/Button.jsx";
+import { Card, CardContent } from "@/components/ui/Card.jsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/Dialog.jsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select.jsx";
+import { Input } from "@/components/ui/Input.jsx";
+import { Label } from "@/components/ui/Label.jsx";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import RoomHistory from "./RoomHistory.jsx";
+import {
+  MaintenanceDetailView,
+  CleaningDetailView,
+  ReservationDetailView,
+} from "./HistoryDetailViews.jsx";
 
-const FLOORS = ["Todos los pisos", 1, 2, 3];
-const STATUS_OPTIONS = [
-  "Todos los estados",
-  "Disponible",
-  "Ocupado",
-  "Limpieza",
-  "Mantenimiento",
-  "Pendiente"
-];
+const StatusSummary = ({ rooms }) => {
+  const statusCounts = useMemo(
+    () =>
+      rooms.reduce((acc, room) => {
+        const status = room.status || "unknown";
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {}),
+    [rooms]
+  );
+  const summaryItems = [
+    {
+      label: "Disponibles",
+      count: statusCounts.available,
+      color: "text-green-500",
+    },
+    { label: "Ocupadas", count: statusCounts.occupied, color: "text-red-500" },
+    {
+      label: "Pendientes",
+      count: statusCounts.pending,
+      color: "text-orange-500",
+    },
+    { label: "Limpieza", count: statusCounts.cleaning, color: "text-blue-500" },
+    {
+      label: "Mantenimiento",
+      count: statusCounts.maintenance,
+      color: "text-slate-500",
+    },
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <Card>
+        <CardContent className="pt-6 text-center">
+          <p className="text-sm font-medium text-muted-foreground mb-1">
+            Total
+          </p>
+          <p className="text-2xl font-bold text-primary">{rooms.length}</p>
+        </CardContent>
+      </Card>
+      {summaryItems.map((item) => (
+        <Card key={item.label}>
+          <CardContent className="pt-6 text-center">
+            <p className="text-sm font-medium text-muted-foreground mb-1">
+              {item.label}
+            </p>
+            <p className={`text-2xl font-bold ${item.color}`}>
+              {item.count || 0}
+            </p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};
 
-  function RoomBoard({ rooms: roomsProp, loading: propLoading, error: propError }) {
-  // HOOKS SIEMPRE AL INICIO
-  const [rooms, setRooms] = useState(roomsProp ?? []);
+function RoomBoard() {
+  const { token } = useAuth();
+  const navigate = useNavigate();
+  const [rooms, setRooms] = useState([]);
+  const [roomTypes, setRoomTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [filters, setFilters] = useState({
+    searchTerm: "",
+    selectedType: "Todos los tipos",
+    selectedCapacity: "Cualquier capacidad",
+    selectedFloor: "Todos los pisos",
+    selectedStatus: "Todos los estados",
+  });
+
+  const [page, setPage] = useState(1);
+  const CARDS_PER_PAGE = 12;
+
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomDetails, setRoomDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
-  const [selectedFloor, setSelectedFloor] = useState("Todos los pisos");
-  const [loading, setLoading] = useState(roomsProp ? false : true);
-  const [error, setError] = useState(null);
-  const [selectedStatus, setSelectedStatus] = useState("Todos los estados");
-  const [page, setPage] = useState(1);
-  const CARDS_PER_PAGE = 8;
 
-    // Carga inicial solo si no hay roomsProp
-    useEffect(() => {
-      if (!roomsProp) {
-        let mounted = true;
-        (async () => {
-          try {
-            const data = await fetchRooms();
-            if (mounted) setRooms(Array.isArray(data) ? data : []);
-          } catch (err) {
-            if (mounted) setError(err?.message || "Error al cargar habitaciones");
-          } finally {
-            if (mounted) setLoading(false);
-          }
-        })();
-        return () => { mounted = false; };
+  const [historyDetail, setHistoryDetail] = useState(null);
+
+  const loadData = useCallback(
+    async (isInitialLoad = false) => {
+      if (!token) {
+        setLoading(false);
+        return;
       }
-    }, [roomsProp]);
-
-    // Filtro por piso y estado
-    const filteredRooms = useMemo(() => {
-      if (!Array.isArray(rooms)) return [];
-      let result = rooms;
-      if (selectedFloor !== "Todos los pisos") {
-        result = result.filter((r) => Number(r.floor) === Number(selectedFloor));
+      if (isInitialLoad) setLoading(true);
+      try {
+        const [roomsData, typesData] = await Promise.all([
+          fetchRooms(token),
+          fetchRoomTypes(token),
+        ]);
+        setRooms(Array.isArray(roomsData) ? roomsData : []);
+        setRoomTypes(Array.isArray(typesData) ? typesData : []);
+      } catch (err) {
+        setError(err?.message || "Error al cargar datos");
+      } finally {
+        if (isInitialLoad) setLoading(false);
       }
-      if (selectedStatus !== "Todos los estados") {
-        const statusMap = {
-          "Disponible": ["available"],
-          "Ocupado": ["occupied"],
-          "Limpieza": ["cleaning"],
-          "Mantenimiento": ["maintenance"],
-          "Pendiente": ["pending", "pendiente"]
-        };
-        const validStates = statusMap[selectedStatus] || [];
-        result = result.filter((r) => validStates.includes(String(r.status).toLowerCase()));
-      }
-      return result;
-    }, [rooms, selectedFloor, selectedStatus]);
+    },
+    [token]
+  );
 
-    // Paginación
-    const pagedRooms = useMemo(() => {
-      const start = (page - 1) * CARDS_PER_PAGE;
-      return filteredRooms.slice(start, start + CARDS_PER_PAGE);
-    }, [filteredRooms, page]);
+  useEffect(() => {
+    loadData(true);
+  }, [loadData]);
 
-    // Mostrar mensaje de loading global si la prop loading está presente
-    if (propLoading || loading) {
-      return <div className="p-6 text-blue-600 font-semibold">Cargando habitaciones...</div>;
-    }
+  const filteredRooms = useMemo(() => {
+    return rooms.filter((r) => {
+      const {
+        searchTerm,
+        selectedType,
+        selectedCapacity,
+        selectedFloor,
+        selectedStatus,
+      } = filters;
+      const searchMatch = searchTerm ? r.number.includes(searchTerm) : true;
+      const typeMatch =
+        selectedType !== "Todos los tipos" ? r.type === selectedType : true;
+      const capacityMatch =
+        selectedCapacity !== "Cualquier capacidad"
+          ? r.capacity >= parseInt(selectedCapacity)
+          : true;
+      const floorMatch =
+        selectedFloor !== "Todos los pisos"
+          ? String(r.floor) === selectedFloor
+          : true;
+      const statusMap = {
+        Disponible: "available",
+        Ocupado: "occupied",
+        Limpieza: "cleaning",
+        Mantenimiento: "maintenance",
+        Pendiente: "pending",
+      };
+      const statusMatch =
+        selectedStatus !== "Todos los estados"
+          ? r.status === statusMap[selectedStatus]
+          : true;
+      return (
+        searchMatch && typeMatch && capacityMatch && floorMatch && statusMatch
+      );
+    });
+  }, [rooms, filters]);
 
-    // Mostrar mensaje de error global si la prop error está presente
-    if (propError || error) {
-      return <div className="p-6 text-red-600 font-semibold">Error: {propError || error}</div>;
-    }
+  const pagedRooms = useMemo(() => {
+    const start = (page - 1) * CARDS_PER_PAGE;
+    return filteredRooms.slice(start, start + CARDS_PER_PAGE);
+  }, [filteredRooms, page]);
 
-  const statusBadge = (status) => {
-    const s = String(status || "").toLowerCase();
-    const isReserved = s === "reserved" || s === "reservado";
-    const isPending = s === "pending" || s === "pendiente";
-    const cls =
-      s === "available" ? "bg-green-500 text-white" :
-      s === "occupied" ? "bg-red-500 text-white" :
-      s === "cleaning" ? "bg-blue-500 text-white" :
-      s === "maintenance" ? "bg-gray-800 text-white" :
-      isReserved ? "bg-orange-500 text-white" :
-      isPending ? "bg-orange-500 text-white" :
-      "bg-gray-300 text-gray-800";
-    const label =
-      s === "available" ? "Disponible" :
-      s === "occupied" ? "Ocupado" :
-      s === "cleaning" ? "Limpieza" :
-      s === "maintenance" ? "Mantenimiento" :
-      isReserved ? "Reservado" :
-      isPending ? "Pendiente" :
-      status ?? "Desconocido";
-    return <span className={`px-2 py-1 rounded ${cls}`}>{label}</span>;
+  const totalPages = Math.ceil(filteredRooms.length / CARDS_PER_PAGE);
+
+  const handleFilterChange = (filterName, value) => {
+    setFilters((prev) => ({ ...prev, [filterName]: value }));
+    setPage(1);
   };
 
-  const openDetails = async (r) => {
-    setSelectedRoom(r);
+  const handleStatusChange = async (roomId, newStatus) => {
+    const originalRooms = [...rooms];
+    setRooms((currentRooms) =>
+      currentRooms.map((r) =>
+        r.id === roomId ? { ...r, status: newStatus } : r
+      )
+    );
+    try {
+      await updateRoomStatus(roomId, newStatus, token);
+    } catch (error) {
+      console.error("Fallo al actualizar estado:", error);
+      setRooms(originalRooms);
+    }
+  };
+
+  const handleCheckIn = (roomId, reservationId) => {
+    console.log(
+      `Realizando Check-in para Habitación ${roomId}, Reserva ${reservationId}`
+    );
+    handleStatusChange(roomId, "occupied");
+  };
+
+  const handleCheckOut = (roomId, reservationId) => {
+    console.log(
+      `Realizando Check-out para Habitación ${roomId}, Reserva ${reservationId}`
+    );
+    handleStatusChange(roomId, "cleaning");
+  };
+
+  const openDetails = async (room) => {
+    setSelectedRoom(room);
     setDetailsLoading(true);
     setDetailsError(null);
-    setRoomDetails(null);
+    setHistoryDetail(null);
     try {
-      const details = await fetchRoomDetails(r.id);
+      const details = await fetchRoomDetails(room.id, token);
       setRoomDetails(details);
     } catch (err) {
       setDetailsError(err?.message || "Error al cargar detalles");
@@ -120,206 +236,272 @@ const STATUS_OPTIONS = [
     }
   };
 
-  // Loading / Error globales
-  if (loading) {
-    return <div className="p-6">Cargando habitaciones...</div>;
-  }
-  if (error) {
-    return <div className="p-6 text-red-600">Error: {error}</div>;
-  }
+  const handleCloseDialog = () => {
+    setSelectedRoom(null);
+    setHistoryDetail(null);
+  };
+
+  const handleShowHistoryDetail = (type, data) => {
+    setHistoryDetail({ type, data });
+  };
+
+  const handleCloseHistoryDetail = () => {
+    setHistoryDetail(null);
+  };
+
+  const typeOptions = useMemo(
+    () => ["Todos los tipos", ...roomTypes.map((rt) => rt.name)],
+    [roomTypes]
+  );
+  const capacityOptions = ["Cualquier capacidad", "1", "2", "3", "4", "5+"];
+  const floorOptions = useMemo(
+    () => ["Todos los pisos", ...new Set(rooms.map((r) => String(r.floor)))],
+    [rooms]
+  );
+  const statusOptions = [
+    "Todos los estados",
+    "Disponible",
+    "Ocupado",
+    "Limpieza",
+    "Mantenimiento",
+    "Pendiente",
+  ];
+
+  const renderDialogContent = () => {
+    if (historyDetail) {
+      switch (historyDetail.type) {
+        case "maintenance":
+          return (
+            <MaintenanceDetailView
+              item={historyDetail.data}
+              onBack={handleCloseHistoryDetail}
+            />
+          );
+        case "cleaning":
+          return (
+            <CleaningDetailView
+              item={historyDetail.data}
+              onBack={handleCloseHistoryDetail}
+            />
+          );
+        case "reservation":
+          return (
+            <ReservationDetailView
+              item={historyDetail.data}
+              onBack={handleCloseHistoryDetail}
+            />
+          );
+        default:
+          return null;
+      }
+    }
+    if (detailsLoading)
+      return (
+        <p className="text-center text-muted-foreground py-8">
+          Cargando detalles...
+        </p>
+      );
+    if (detailsError)
+      return (
+        <p className="text-destructive text-center py-8">{detailsError}</p>
+      );
+    if (roomDetails) {
+      return (
+        <RoomHistory
+          roomDetails={roomDetails}
+          onShowDetail={handleShowHistoryDetail}
+        />
+      );
+    }
+    return null;
+  };
+
+  if (loading)
+    return <p className="text-muted-foreground">Cargando habitaciones...</p>;
+  if (error) return <p className="text-destructive">Error: {error}</p>;
 
   return (
     <div className="space-y-6">
-      {/* Leyenda (una sola vez) */}
-      <div className="p-4 bg-white rounded-lg shadow">
-        <h3 className="text-xl font-bold text-gray-700 mb-3">Leyenda</h3>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-          <div className="flex items-center"><span className="h-4 w-4 mr-2 bg-green-500 rounded-full border border-gray-200"></span>Disponible</div>
-          <div className="flex items-center"><span className="h-4 w-4 mr-2 bg-red-500 rounded-full border border-gray-200"></span>Ocupado</div>
-          <div className="flex items-center"><span className="h-4 w-4 mr-2 bg-blue-500 rounded-full border border-gray-200"></span>Limpieza</div>
-          <div className="flex items-center"><span className="h-4 w-4 mr-2 bg-gray-800 rounded-full border border-gray-200"></span>Mantenimiento</div>
-          <div className="flex items-center"><span className="h-4 w-4 mr-2 bg-orange-500 rounded-full border border-gray-200"></span>Reservado Pendiente</div>
-        </div>
-      </div>
-
-      {/* Filtros de piso y estado */}
-      <div className="flex flex-wrap justify-end items-center gap-4">
-        <div className="flex flex-col">
-          <label htmlFor="filtro-piso" className="text-xs font-semibold mb-1">Piso</label>
-          <select
-            id="filtro-piso"
-            className="border rounded px-2 py-1"
-            value={selectedFloor}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSelectedFloor(v === "Todos los pisos" ? "Todos los pisos" : Number(v));
-              setPage(1);
-            }}
-          >
-            {FLOORS.map((f) => (
-              <option key={String(f)} value={f}>
-                {f === "Todos los pisos" ? f : `Piso ${f}`}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor="filtro-estado" className="text-xs font-semibold mb-1">Estado</label>
-          <select
-            id="filtro-estado"
-            className="border rounded px-2 py-1"
-            value={selectedStatus}
-            onChange={(e) => {
-              setSelectedStatus(e.target.value);
-              setPage(1);
-            }}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Grid de habitaciones compactas y paginadas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 justify-center min-h-[320px]">
-        {Array.isArray(pagedRooms) && pagedRooms.length > 0 ? (
-          pagedRooms.map((room) => (
-            <div className="p-2 h-auto" key={room.id}>
-              <RoomCard
-                room={room}
-                onDetails={openDetails}
-                compact
+      <StatusSummary rooms={rooms} />
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Label htmlFor="search-room" className="sr-only">
+                Buscar Habitación
+              </Label>
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                id="search-room"
+                placeholder="Buscar por Nº Hab..."
+                className="pl-10"
+                value={filters.searchTerm}
+                onChange={(e) =>
+                  handleFilterChange("searchTerm", e.target.value)
+                }
               />
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={filters.selectedType}
+                onValueChange={(value) =>
+                  handleFilterChange("selectedType", value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filters.selectedCapacity}
+                onValueChange={(value) =>
+                  handleFilterChange("selectedCapacity", value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Capacidad..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {capacityOptions.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o === "5+" ? "5 o más" : `${o} pers.`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filters.selectedFloor}
+                onValueChange={(value) =>
+                  handleFilterChange("selectedFloor", value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Piso..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {floorOptions.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filters.selectedStatus}
+                onValueChange={(value) =>
+                  handleFilterChange("selectedStatus", value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Estado..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        {pagedRooms.length > 0 ? (
+          pagedRooms.map((room) => (
+            <RoomCard
+              key={room.id}
+              room={room}
+              onDetails={openDetails}
+              onStatusChange={handleStatusChange}
+              onCheckIn={handleCheckIn}
+              onCheckOut={handleCheckOut}
+            />
           ))
         ) : (
-          <div className="col-span-4 text-center text-gray-500 py-8">No hay habitaciones para mostrar.</div>
+          <Card className="col-span-full text-center py-16">
+            <p className="font-semibold text-foreground">
+              No se encontraron habitaciones
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Intenta ajustar los filtros de búsqueda.
+            </p>
+          </Card>
         )}
       </div>
-
-      {/* Paginación */}
-      {filteredRooms.length > CARDS_PER_PAGE && (
-        <div className="flex justify-center items-center gap-2 mt-2">
-          <button
-            className="px-3 py-1 rounded bg-gray-200 hover:bg-blue-200 text-gray-700 font-bold"
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
             disabled={page === 1}
-            onClick={() => setPage(page - 1)}
-          >Anterior</button>
-          <span className="mx-2 text-blue-700 font-bold">Página {page} de {Math.ceil(filteredRooms.length / CARDS_PER_PAGE)}</span>
-          <button
-            className="px-3 py-1 rounded bg-gray-200 hover:bg-blue-200 text-gray-700 font-bold"
-            disabled={page === Math.ceil(filteredRooms.length / CARDS_PER_PAGE)}
-            onClick={() => setPage(page + 1)}
-          >Siguiente</button>
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Anterior
+          </Button>
+          <span className="text-sm font-semibold text-foreground">
+            Página {page} de {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente
+          </Button>
         </div>
       )}
+      <Dialog
+        open={!!selectedRoom}
+        onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {historyDetail
+                ? `Detalle de ${historyDetail.type}`
+                : `Detalles de la Habitación ${selectedRoom?.number}`}
+            </DialogTitle>
+            {!historyDetail && (
+              <DialogDescription>
+                {roomDetails?.type} - Capacidad para {roomDetails?.capacity}{" "}
+                personas
+              </DialogDescription>
+            )}
+          </DialogHeader>
 
-      {/* Modal de Detalles */}
-      {selectedRoom && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-100 rounded-2xl p-8 min-w-[340px] max-w-[95vw] shadow-2xl border-2 border-blue-200 relative animate-fadeIn">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-blue-600 text-2xl font-bold transition-colors"
-              onClick={() => { setSelectedRoom(null); setRoomDetails(null); }}
-              title="Cerrar"
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
-            <h2 className="text-3xl font-extrabold mb-4 text-blue-700 flex items-center gap-2">
-              <span role="img" aria-label="room">🛏️</span> Detalles de la habitación
-            </h2>
-            {detailsLoading && <div className="text-blue-600 font-semibold">Cargando detalles...</div>}
-            {detailsError && <div className="text-red-600 font-semibold">{detailsError}</div>}
-            {roomDetails && (
-              <div className="space-y-3 text-base">
-                <div className="flex flex-wrap gap-4 items-center mb-2">
-                  <div><span className="font-bold text-gray-700">Número:</span> <span className="text-lg font-mono text-blue-800">{roomDetails.room_number}</span></div>
-                  <div><span className="font-bold text-gray-700">Piso:</span> <span className="text-blue-800">{roomDetails.floor}</span></div>
-                  <div><span className="font-bold text-gray-700">Tipo:</span> <span className="text-blue-800">{roomDetails.room_types?.name}</span></div>
-                  <div><span className="font-bold text-gray-700">Estado:</span> {statusBadge(roomDetails.status)}</div>
-                </div>
-                {/* Caso reservado, ocupado, pendiente */}
-                {["reserved", "reservado", "occupied", "ocupado", "pending", "pendiente"].includes(String(roomDetails.status).toLowerCase()) ? (
-                  <>
-                    <div className="mt-2 font-bold text-blue-700 text-lg flex items-center gap-2">
-                      <span role="img" aria-label="calendar">📅</span> Datos de la última reserva
-                    </div>
-                    <div className="ml-2 text-base bg-blue-50 rounded-lg p-3 border border-blue-200">
-                      <div><b className="text-gray-700">Código reserva:</b> <span className="font-mono">{roomDetails.reservation_rooms[0]?.reservations?.code}</span></div>
-                      <div><b className="text-gray-700">Check-in:</b> {roomDetails.reservation_rooms[0]?.reservations?.check_in_date?.slice(0,10)}</div>
-                      <div><b className="text-gray-700">Check-out:</b> {roomDetails.reservation_rooms[0]?.reservations?.check_out_date?.slice(0,10)}</div>
-                      <div>
-                        <b className="text-gray-700">Huésped principal:</b>{" "}
-                        <span className="font-semibold text-blue-900">{roomDetails.reservation_rooms[0]?.reservations?.users_reservations_main_guest_idTousers?.first_name}{" "}
-                        {roomDetails.reservation_rooms[0]?.reservations?.users_reservations_main_guest_idTousers?.paternal_last_name}</span>
-                      </div>
-                      <div><b className="text-gray-700">Monto total:</b> <span className="text-green-700 font-bold">${roomDetails.reservation_rooms[0]?.reservations?.total_amount}</span></div>
-                      <div><b className="text-gray-700">Monto pagado:</b> <span className="text-blue-700 font-bold">${roomDetails.reservation_rooms[0]?.reservations?.paid_amount}</span></div>
-                      <div><b className="text-gray-700">Pendiente de pago:</b> <span className="text-red-700 font-bold">${(roomDetails.reservation_rooms[0]?.reservations?.total_amount || 0) - (roomDetails.reservation_rooms[0]?.reservations?.paid_amount || 0)}</span></div>
-                    </div>
-                  </>
-                ) : String(roomDetails.status).toLowerCase() === "cleaning" ? (
-                  // Caso limpieza
-                  <>
-                    <div className="mt-2 font-bold text-blue-700 text-lg flex items-center gap-2">
-                      <span role="img" aria-label="broom">🧹</span> Detalle de limpieza
-                    </div>
-                    <div className="ml-2 text-base bg-blue-50 rounded-lg p-3 border border-blue-200">
-                      {roomDetails.cleaning ? (
-                        <>
-                          <div><b className="text-gray-700">Hora de inicio:</b> <span className="text-blue-900">{roomDetails.cleaning.start_time ? new Date(roomDetails.cleaning.start_time).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'No registrada'}</span></div>
-                          <div><b className="text-gray-700">Hora de término:</b> <span className="text-blue-900">{roomDetails.cleaning.end_time ? new Date(roomDetails.cleaning.end_time).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'En proceso'}</span></div>
-                          <div><b className="text-gray-700">Observación:</b> <span className="text-gray-800">{roomDetails.cleaning.notes || 'Sin observación'}</span></div>
-                        </>
-                      ) : (
-                        <div className="text-blue-700 font-semibold">Esta habitación está siendo limpiada por el personal.</div>
-                      )}
-                    </div>
-                  </>
-                ) : String(roomDetails.status).toLowerCase() === "maintenance" ? (
-                  // Caso mantenimiento
-                  <>
-                    <div className="mt-2 font-bold text-gray-800 text-lg flex items-center gap-2">
-                      <span role="img" aria-label="tools">🛠️</span> Detalle de mantenimiento
-                    </div>
-                    <div className="ml-2 text-base bg-gray-100 rounded-lg p-3 border border-gray-400">
-                      {roomDetails.maintenance ? (
-                        <>
-                          <div><b className="text-gray-700">Categoría:</b> <span className="text-blue-900">{roomDetails.maintenance.category || 'Sin categoría'}</span></div>
-                          <div><b className="text-gray-700">Descripción:</b> <span className="text-gray-800">{roomDetails.maintenance.description || 'Sin descripción'}</span></div>
-                          <div><b className="text-gray-700">Fecha de comienzo:</b> <span className="text-blue-900">{roomDetails.maintenance.start_date ? new Date(roomDetails.maintenance.start_date).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No registrada'}</span></div>
-                          <div><b className="text-gray-700">Fecha de término:</b> <span className="text-blue-900">{roomDetails.maintenance.end_date ? new Date(roomDetails.maintenance.end_date).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'En proceso'}</span></div>
-                          <div><b className="text-gray-700">Prioridad:</b> <span className="text-red-700 font-bold">{roomDetails.maintenance.priority || 'Sin prioridad'}</span></div>
-                          <div><b className="text-gray-700">Estado:</b> <span className="text-gray-800">{roomDetails.maintenance.status || 'Sin estado'}</span></div>
-                        </>
-                      ) : (
-                        <div className="text-gray-700 font-semibold">Esta habitación está en mantenimiento.</div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  // Caso disponible
-                  <>
-                    <div className="mt-2 font-bold text-blue-700 text-lg flex items-center gap-2">
-                      <span role="img" aria-label="info">ℹ️</span> Información de la habitación
-                    </div>
-                    <div className="ml-2 text-base bg-gray-50 rounded-lg p-3 border border-gray-200">
-                      <div><b className="text-gray-700">Capacidad:</b> {roomDetails.capacity}</div>
-                      <div><b className="text-gray-700">Precio base:</b> <span className="text-green-700 font-bold">${roomDetails.base_price}</span></div>
-                      {roomDetails.description && <div><b className="text-gray-700">Descripción:</b> {roomDetails.description}</div>}
-                      {roomDetails.room_types?.description && (
-                        <div><b className="text-gray-700">Tipo descripción:</b> {roomDetails.room_types.description}</div>
-                      )}
-                    </div>
-                  </>
+          {renderDialogContent()}
+
+          {!historyDetail && (
+            <DialogFooter className="mt-4 sm:justify-between">
+              <Button variant="secondary" onClick={handleCloseDialog}>
+                Cerrar
+              </Button>
+              <div className="flex gap-2 mt-2 sm:mt-0">
+                {roomDetails?.currentGuest && <Button>Ver Reserva</Button>}
+                {roomDetails?.status === "available" && (
+                  <Button
+                    onClick={() =>
+                      navigate(`/reservations/new?roomId=${selectedRoom?.id}`)
+                    }
+                  >
+                    Agendar Reserva
+                  </Button>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-      )}
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

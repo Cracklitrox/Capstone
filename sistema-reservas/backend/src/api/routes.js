@@ -8,6 +8,7 @@ const staffRoutes = require('./staff/staff.routes');
 const authRoutes = require('./auth/auth.routes');
 const roomsRoutes = require('./rooms/rooms.routes');
 const adminRoomsRoutes = require('./rooms/admin/adminRooms.routes');
+const planningRoutes = require('./planning/planning.routes');
 
 // Define specific rate limiter for staff routes
 const staffLimiter = rateLimit({
@@ -17,7 +18,7 @@ const staffLimiter = rateLimit({
   legacyHeaders: false,  // Disable the `X-RateLimit-*` headers
 });
 
-const authenticate = require('../middleware/auth.middleware');
+const { authenticate } = require('../middleware/auth.middleware');
 
 router.get('/', (req, res) => {
   res.status(200).json({ message: 'Bienvenido a la API v1 del Hotel Don Teo' });
@@ -25,8 +26,9 @@ router.get('/', (req, res) => {
 
 
 router.use('/auth', authRoutes);
-router.use('/rooms', roomsRoutes);
+router.use('/rooms', authenticate, roomsRoutes);
 router.use('/admin/rooms', adminRoomsRoutes);
 router.use('/staff', staffLimiter, authenticate, staffRoutes);
+router.use('/planning', authenticate, planningRoutes);
 
 module.exports = router;

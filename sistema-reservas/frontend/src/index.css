@@ -1,3 +1,158 @@
+/* Importaciones base de Tailwind CSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+  CAPA BASE: Define la estructura y los estilos más fundamentales.
+*/
+@layer base {
+  /*
+    1. DEFINICIÓN DE COLORES BASE:
+    Se definen en :root para que estén disponibles globalmente.
+    Estos son los colores por defecto si no hay un tema de rol activo.
+  */
+  :root {
+    /* MODO CLARO POR DEFECTO */
+    --background: 43 10% 97%;        /* Crema Suave #FDFBF8 */
+    --foreground: 210 11% 15%;       /* Grafito Suave #2D3748 */
+    --card: 0 0% 100%;               /* Lino Claro #FFFFFF */
+    --card-foreground: 210 11% 15%;  
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+    --primary: 222.2 47.4% 11.2%;    /* Color neutro por defecto */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 214 31% 91%;        /* Gris Pálido #E2E8F0 */
+    --secondary-foreground: 210 11% 15%;
+    --muted: 214 31% 91%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 214 31% 91%;
+    --accent-foreground: 210 11% 15%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 31% 91%;           /* Gris Pálido #E2E8F0 */
+    --input: 214 31% 91%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* MODO OSCURO POR DEFECTO */
+    --background: 210 11% 15%;       /* Versión oscura del Grafito Suave */
+    --foreground: 43 10% 97%;        /* Versión oscura del Crema Suave */
+    --card: 210 11% 20%;             /* Más oscuro que el background */
+    --card-foreground: 43 10% 97%;
+    --popover: 210 11% 20%;
+    --popover-foreground: 43 10% 97%;
+    --primary: 43 10% 97%;           /* Color neutro por defecto oscuro */
+    --primary-foreground: 210 11% 15%;
+    --secondary: 215 16% 25%;
+    --secondary-foreground: 43 10% 97%;
+    --muted: 215 16% 25%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 215 16% 25%;
+    --accent-foreground: 43 10% 97%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 215 16% 25%;
+    --input: 215 16% 25%;
+    --ring: 43 10% 80%;
+  }
+
+  /*
+    2. DEFINICIÓN DE TEMAS DE ROL:
+    VERSIÓN MEJORADA: Colores más diferenciados pero elegantes
+  */
+
+  /* ===== TEMA RECEPCIONISTA - "Azul Océano Profesional" ===== */
+  :root[data-theme="receptionist"] {
+    /* Colores principales del tema - MÁS VISIBLES */
+    --primary: 217 91% 35%;          /* Azul océano profesional más saturado */
+    --primary-foreground: 0 0% 100%; 
+    --accent: 32 95% 44%;            /* Ámbar cálido más vibrante pero elegante */
+    --accent-foreground: 0 0% 100%;  
+    
+    /* Sidebar y Navbar con personalidad azul */
+    --card: 217 91% 97%;             /* Cards con un tinte azul muy suave */
+    --card-foreground: 217 91% 11%;  /* Texto más azulado */
+    --secondary: 217 91% 85%;        /* Azul mucho más claro para secundarios */
+    --secondary-foreground: 217 91% 25%;
+    --muted: 217 91% 92%;            /* Elementos silenciados con tinte azul */
+    --muted-foreground: 217 50% 35%;
+    
+    /* Elementos interactivos */
+    --border: 217 91% 80%;           /* Bordes con tinte azul */
+    --input: 217 91% 88%;            /* Inputs con fondo azul suave */
+    --ring: 217 91% 35%;             /* Focus ring azul */
+  }
+
+  .dark[data-theme="receptionist"] {
+    --primary: 217 91% 45%;          /* Azul más brillante para modo oscuro */
+    --primary-foreground: 217 91% 5%;
+    --accent: 32 95% 55%;            /* Ámbar más brillante */
+    --accent-foreground: 32 95% 10%;
+    
+    /* Fondos oscuros con personalidad azul */
+    --background: 217 50% 8%;        /* Background principal con tinte azul oscuro */
+    --card: 217 50% 12%;             /* Cards oscuras azuladas */
+    --card-foreground: 217 91% 88%;
+    --secondary: 217 50% 18%;        /* Secundarios azul oscuro */
+    --secondary-foreground: 217 91% 80%;
+    --muted: 217 50% 15%;
+    --muted-foreground: 217 30% 60%;
+    
+    --border: 217 50% 25%;
+    --input: 217 50% 20%;
+    --ring: 217 91% 45%;
+  }
+
+  /* ===== TEMA ADMINISTRADOR - "Elegancia Corporativa" ===== */
+  :root[data-theme="administrator"] {
+    /* Colores principales del tema - DISTINTIVOS */
+    --primary: 24 9% 18%;            /* Gris carbón más cálido */
+    --primary-foreground: 0 0% 100%; 
+    --accent: 45 86% 45%;            /* Dorado profesional más visible */
+    --accent-foreground: 45 86% 5%;  
+    
+    /* Sidebar y Navbar con elegancia corporativa */
+    --card: 24 9% 98%;               /* Cards con tinte cálido muy sutil */
+    --card-foreground: 24 9% 12%;    
+    --secondary: 24 9% 88%;          /* Grises cálidos para secundarios */
+    --secondary-foreground: 24 9% 20%;
+    --muted: 24 9% 93%;              /* Elementos silenciados con calidez */
+    --muted-foreground: 24 20% 40%;
+    
+    /* Elementos interactivos */
+    --border: 24 9% 82%;             /* Bordes con tinte cálido */
+    --input: 24 9% 90%;              /* Inputs con fondo cálido */
+    --ring: 24 9% 18%;               /* Focus ring gris oscuro */
+  }
+
+  .dark[data-theme="administrator"] {
+    --primary: 24 9% 30%;            /* Gris más claro para contraste */
+    --primary-foreground: 24 9% 95%;
+    --accent: 45 86% 60%;            /* Dorado más brillante */
+    --accent-foreground: 45 86% 8%;
+    
+    /* Fondos oscuros con elegancia corporativa */
+    --background: 24 20% 6%;         /* Background principal muy oscuro y cálido */
+    --card: 24 20% 10%;              /* Cards oscuras con calidez */
+    --card-foreground: 24 9% 90%;
+    --secondary: 24 20% 16%;         /* Secundarios gris oscuro cálido */
+    --secondary-foreground: 24 9% 85%;
+    --muted: 24 20% 13%;
+    --muted-foreground: 24 15% 65%;
+    
+    --border: 24 20% 22%;
+    --input: 24 20% 18%;
+    --ring: 24 9% 30%;
+  }
+
+  /* Estilos base para la aplicación */
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

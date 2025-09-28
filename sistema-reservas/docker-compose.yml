@@ -37,6 +37,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+    command: npm run dev
     environment:
       POSTGRES_USER: reservas_user
       POSTGRES_PASSWORD: ReservasDevPass_2025
@@ -50,12 +51,16 @@ services:
         condition: service_started
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     container_name: frontend_client
     restart: always
     ports:
-      - "5173:80"
-
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
 
