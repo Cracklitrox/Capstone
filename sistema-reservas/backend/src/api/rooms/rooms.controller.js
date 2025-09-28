@@ -29,7 +29,41 @@ async function getRoomDetails(req, res, next) {
   }
 }
 
+/**
+ * Controlador para obtener todos los tipos de habitación.
+ */
+async function getAllRoomTypes(req, res, next) {
+  try {
+    const roomTypes = await roomsService.getAllRoomTypes();
+    res.json(roomTypes);
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+/**
+ * Controlador para actualizar el estado de una habitación.
+ */
+async function updateRoomStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ message: 'El nuevo estado es requerido.' });
+    }
+
+    const updatedRoom = await roomsService.updateRoomStatus(id, status);
+    res.json(updatedRoom);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getAllRooms,
   getRoomDetails,
+  getAllRoomTypes,
+  updateRoomStatus,
 };
