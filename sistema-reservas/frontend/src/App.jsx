@@ -37,6 +37,29 @@ const DashboardSelector = () => {
 
 // --- Definición de Rutas ---
 const AppRoutes = () => {
+// --- Páginas de Contenido (Placeholder) ---
+const ReservationsPage = () => <h1 className="text-3xl font-bold">Gestionar Reservas</h1>;
+const UsersPage = () => <h1 className="text-3xl font-bold">Gestionar Usuarios</h1>;
+const SettingsPage = () => <h1 className="text-3xl font-bold">Configuración</h1>;
+const NotFoundPage = () => <h1 className="text-3xl font-bold text-center mt-10">404 - Página no encontrada</h1>;
+
+// --- Componente Inteligente para el Dashboard ---
+const DashboardSelector = () => {
+  const { user } = useAuth();
+  if (!user) return <div>Cargando...</div>;
+
+  switch (user.role) {
+    case 'administrator':
+      return <AdminDashboard />;
+    case 'receptionist':
+      return <ReceptionistDashboard />;
+    default:
+      return <div>Rol de usuario no reconocido.</div>;
+  }
+};
+
+// --- Definición de Rutas ---
+const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -62,6 +85,11 @@ const AppRoutes = () => {
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
+};
+
+// --- Componente Principal ---
+function App() {
+  return <AppRoutes />;
 };
 
 // --- Componente Principal ---

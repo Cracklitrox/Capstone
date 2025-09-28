@@ -26,6 +26,33 @@ const NavLink = ({ href, label, icon: Icon, onClick }) => {
     </Button>
   );
 };
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from '../services/authContext.jsx';
+import { Button } from "@/components/ui/Button.jsx";
+import { HomeIcon, CalendarDaysIcon, UserGroupIcon, Cog6ToothIcon, ViewColumnsIcon } from '@heroicons/react/24/outline';
+import { cn } from "@/lib/utils";
+
+const navLinks = [
+  { href: "/", label: "Inicio", icon: HomeIcon, roles: ["administrator", "receptionist"] },
+  { href: "/planning", label: "Planning", icon: ViewColumnsIcon, roles: ["administrator", "receptionist"] },
+  { href: "/reservations", label: "Gestionar Reservas", icon: CalendarDaysIcon, roles: ["administrator", "receptionist"] },
+  { href: "/users", label: "Gestionar Usuarios", icon: UserGroupIcon, roles: ["administrator"] },
+  { href: "/settings", label: "Configuración", icon: Cog6ToothIcon, roles: ["administrator"] },
+];
+
+const NavLink = ({ href, label, icon: Icon, onClick }) => {
+  const location = useLocation();
+  const isActive = location.pathname === href;
+
+  return (
+    <Button asChild variant={isActive ? "secondary" : "ghost"} className="w-full justify-start text-md" onClick={onClick}>
+      <Link to={href}>
+        <Icon className="h-5 w-5 mr-3" />
+        {label}
+      </Link>
+    </Button>
+  );
+};
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { user } = useAuth();
