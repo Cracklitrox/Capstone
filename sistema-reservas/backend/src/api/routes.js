@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const staffRoutes = require('./staff/staff.routes');
 const authRoutes = require('./auth/auth.routes');
 const roomsRoutes = require('./rooms/rooms.routes');
+const adminRoomsRoutes = require('./rooms/admin/adminRooms.routes');
 
 // Define specific rate limiter for staff routes
 const staffLimiter = rateLimit({
@@ -25,6 +26,7 @@ router.get('/', (req, res) => {
 
 router.use('/auth', authRoutes);
 router.use('/rooms', roomsRoutes);
+router.use('/admin/rooms', adminRoomsRoutes);
 router.use('/staff', staffLimiter, authenticate, staffRoutes);
 
 module.exports = router;
