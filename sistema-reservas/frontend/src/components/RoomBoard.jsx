@@ -1,5 +1,3 @@
-// ruta: frontend/src/components/RoomBoard.jsx
-
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import RoomCard from "./RoomCard.jsx";
