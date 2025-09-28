@@ -7,16 +7,16 @@ const createNewUser = async (req, res) => {
     res.status(201).json(newUser);
   } catch (error) {
     console.error('Error al crear el usuario:', error);
-    
+
     // Manejar errores específicos
     if (error.code === 'DUPLICATE_EMAIL' || error.code === 'DUPLICATE_RUT') {
-      return res.status(409).json({ 
+      return res.status(409).json({
         message: error.message,
-        code: error.code 
+        code: error.code
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       message: 'Error interno al crear el usuario.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -29,7 +29,7 @@ const listAllUsers = async (req, res) => {
     res.status(200).json(users);
   } catch (error) {
     console.error('Error al listar los usuarios:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error interno al obtener los usuarios.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -56,7 +56,7 @@ const getUserDetails = async (req, res) => {
     res.status(200).json(user);
   } catch (error) {
     console.error('Error al obtener detalles del usuario:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error interno al obtener el usuario.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -75,24 +75,21 @@ const updateUserInfo = async (req, res) => {
     const updatedUser = await staffService.updateUser(userId, userData);
     res.status(200).json(updatedUser);
   } catch (error) {
-    console.error('Error al actualizar el usuario:', error);
-    
-    // Manejar errores específicos
-    if (error.code === 'USER_NOT_FOUND') {
-      return res.status(404).json({ 
-        message: error.message,
-        code: error.code 
-      });
+    console.error('Error al actualizar el usuario:', error.message);
+
+    // Si el error es de validación (contiene 'obligatorio', 'inválido', 'en uso'),
+    // respondemos con un 400 (Bad Request).
+    if (error.message.includes('obligatorio') || error.message.includes('inválido') || error.message.includes('en uso')) {
+      return res.status(400).json({ message: error.message });
     }
-    
-    if (error.code === 'DUPLICATE_EMAIL' || error.code === 'DUPLICATE_RUT') {
-      return res.status(409).json({ 
-        message: error.message,
-        code: error.code 
-      });
+
+    // Si el error es que el usuario no se encontró, respondemos con 404.
+    if (error.code === 'P2025' || error.message.includes('no encontrado')) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
     }
-    
-    res.status(500).json({ 
+
+    // Para cualquier otro tipo de error, mantenemos el 500 (Error Interno del Servidor).
+    res.status(500).json({
       message: 'Error interno al actualizar el usuario.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });

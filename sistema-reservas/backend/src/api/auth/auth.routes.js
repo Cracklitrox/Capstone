@@ -1,8 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('./auth.controller');
-// ↓↓↓ LA CORRECCIÓN ESTÁ AQUÍ ↓↓↓
-// Importamos la función exportada por defecto y la llamamos 'authenticate'.
 const authenticate = require('../../middleware/auth.middleware');
 
 // Rate Limiting configuration
@@ -19,6 +17,10 @@ router.post('/login', authLimiter, authController.loginUser);
 // GET /api/v1/auth/profile (Protegida)
 // Usamos el middleware 'authenticate' que acabamos de importar correctamente.
 router.get('/profile', authLimiter, authenticate, authController.getUserProfile);
+
+// Ruta para actualizar perfil. Llama a una nueva función en el controlador: 'updateProfile'.
+// PUT /api/v1/auth/profile (Protegida)
+router.put('/profile', authLimiter, authenticate, authController.updateProfile);
 
 // POST /api/v1/auth/logout (Protegida)
 router.post('/logout', authLimiter, authenticate, authController.logoutUser);

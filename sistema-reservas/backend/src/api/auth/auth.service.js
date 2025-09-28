@@ -53,7 +53,7 @@ const logout = async (token) => {
   try {
     const decoded = jwt.decode(token);
     if (!decoded || !decoded.exp) {
-        return { message: 'Token inválido.' };
+      return { message: 'Token inválido.' };
     }
 
     const expirationTime = decoded.exp;
@@ -84,9 +84,16 @@ const getProfile = async (userId) => {
       select: {
         id: true,
         email: true,
+        rut: true,
+        rut_dv: true,
         first_name: true,
         paternal_last_name: true,
         maternal_last_name: true,
+        phone_number: true,
+        gender: true,
+        country: true,
+        region: true,
+        city: true,
         status: true,
         user_roles: {
           select: {
@@ -105,8 +112,51 @@ const getProfile = async (userId) => {
   }
 };
 
+// ACTUALIZAR PERFIL DE USUARIO
+const updateProfile = async (userId, profileData) => {
+  try {
+    // ... (La validación de nombre, apellido y email se mantiene igual)
+    if (profileData.first_name === '' || !profileData.first_name) throw new Error('El nombre es obligatorio.');
+    if (profileData.paternal_last_name === '' || !profileData.paternal_last_name) throw new Error('El apellido paterno es obligatorio.');
+    if (profileData.email === '' || !profileData.email) throw new Error('El correo electrónico es obligatorio.');
+    if (!/\S+@\S+\.\S+/.test(profileData.email)) throw new Error('El formato del correo es inválido.');
+
+    const existingUserByEmail = await prisma.users.findFirst({
+      where: { email: profileData.email, id: { not: userId } }
+    });
+    if (existingUserByEmail) {
+      throw new Error('El correo electrónico ya está en uso por otro usuario.');
+    }
+    
+    // --- VALIDACIÓN DE TELÉFONO AÑADIDA ---
+    if (profileData.phone_number && profileData.phone_number.trim()) {
+      const existingUserByPhone = await prisma.users.findFirst({
+        where: {
+          phone_number: profileData.phone_number,
+          id: { not: userId }
+        }
+      });
+      if (existingUserByPhone) {
+        throw new Error('El número de teléfono ya está en uso por otro usuario.');
+      }
+    }
+    
+    // ... (El resto de la función se mantiene igual)
+    const dataToUpdate = {};
+    const allowedFields = ['first_name', 'paternal_last_name', 'maternal_last_name', 'email', 'phone_number', 'gender', 'country', 'region', 'city'];
+    allowedFields.forEach(field => { if (profileData[field] !== undefined) { dataToUpdate[field] = profileData[field] === '' ? null : profileData[field]; }});
+    const updatedUser = await prisma.users.update({ where: { id: userId }, data: dataToUpdate, select: { id: true, email: true, rut: true, rut_dv: true, first_name: true, paternal_last_name: true, maternal_last_name: true, phone_number: true, gender: true, status: true, country: true, region: true, city: true, user_roles: { select: { roles: { select: { name: true } } } }, } });
+    return updatedUser;
+  } catch (error) {
+    if (error.code === 'P2025') throw new Error('El usuario que intentas actualizar no existe.');
+    console.error("💥 Error en el servicio updateProfile:", error.message);
+    throw error;
+  }
+};
+
 module.exports = {
   login,
   logout,
   getProfile,
+  updateProfile,
 };
