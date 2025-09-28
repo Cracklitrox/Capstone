@@ -8,6 +8,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Login from "./pages/Login.jsx";
 import AdminDashboard from "./pages/Admin/Dashboard.jsx";
 import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
+import TapeChart from "./pages/Receptionist/TapeChart.jsx"; // 1. IMPORTAMOS LA NUEVA PÁGINA
 
 import "./index.css";
 
@@ -39,6 +40,10 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<DashboardSelector />} />
+        
+        {/* --- CAMBIO AQUÍ: AÑADIMOS LA RUTA PARA EL PLANNING --- */}
+        <Route path="planning" element={<TapeChart />} /> 
+        
         <Route path="reservations" element={<ReservationsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />

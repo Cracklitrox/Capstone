@@ -37,6 +37,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+    command: npm run dev
     environment:
       POSTGRES_USER: reservas_user
       POSTGRES_PASSWORD: ReservasDevPass_2025

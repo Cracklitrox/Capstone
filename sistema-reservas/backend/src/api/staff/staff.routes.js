@@ -1,7 +1,6 @@
 const express = require('express');
 const staffController = require('./staff.controller');
-const authenticate = require('../../middleware/auth.middleware');
-const authorize = require('../../middleware/authorize.middleware');
+const { authenticate, authorize } = require('../../middleware/auth.middleware');
 
 const RateLimit = require('express-rate-limit');
 const router = express.Router();

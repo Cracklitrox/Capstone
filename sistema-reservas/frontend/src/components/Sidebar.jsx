@@ -2,11 +2,12 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../services/authContext.jsx';
 import { Button } from "@/components/ui/Button.jsx";
-import { HomeIcon, CalendarDaysIcon, UserGroupIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, CalendarDaysIcon, UserGroupIcon, Cog6ToothIcon, ViewColumnsIcon } from '@heroicons/react/24/outline';
 import { cn } from "@/lib/utils";
 
 const navLinks = [
   { href: "/", label: "Inicio", icon: HomeIcon, roles: ["administrator", "receptionist"] },
+  { href: "/planning", label: "Planning", icon: ViewColumnsIcon, roles: ["administrator", "receptionist"] },
   { href: "/reservations", label: "Gestionar Reservas", icon: CalendarDaysIcon, roles: ["administrator", "receptionist"] },
   { href: "/users", label: "Gestionar Usuarios", icon: UserGroupIcon, roles: ["administrator"] },
   { href: "/settings", label: "Configuración", icon: Cog6ToothIcon, roles: ["administrator"] },

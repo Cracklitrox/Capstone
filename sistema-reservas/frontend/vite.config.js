@@ -2,15 +2,11 @@ import path from "path"
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
-// 1. Importamos tailwind y autoprefixer directamente aquí
 import tailwindcss from 'tailwindcss'
 import autoprefixer from 'autoprefixer'
 
 export default defineConfig({
   plugins: [react(), tsconfigPaths()], 
-
-  // 2. Esta es la sección clave. Le ordenamos a Vite que use
-  //    tailwindcss y autoprefixer explícitamente.
   css: {
     postcss: {
       plugins: [
@@ -19,8 +15,13 @@ export default defineConfig({
       ],
     },
   },
-
-  // El resto de tu configuración se mantiene intacta
+  server: {
+    host: true, 
+    port: 5173,
+    watch: {
+      usePolling: true,
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',
