@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
+
 const adminRoomsController = require('./adminRooms.controller');
-const authenticate = require('../../../middleware/auth.middleware');
-const authorize = require('../../../middleware/authorize.middleware');
+const { authenticate, authorize } = require('../../../middleware/auth.middleware');
 
 
 // Listar habitaciones y tipos

@@ -13,6 +13,12 @@ import { cn } from "@/lib/utils";
 
 const navLinks = [
   {
+    href: "/admin/rooms-crud",
+    label: "Habitaciones",
+    icon: ViewColumnsIcon,
+    roles: ["administrator"],
+  },
+  {
     href: "/",
     label: "Inicio",
     icon: HomeIcon,
