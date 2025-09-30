@@ -5,7 +5,7 @@ import CreateRoom from "../../components/AdminRooms/CreateRoom";
 import EditRoom from "../../components/AdminRooms/EditRoom";
 import DeleteRoom from "../../components/AdminRooms/DeleteRoom";
 import DetailRoom from "../../components/AdminRooms/DetailRoom";
-import DetailRoomButton from "../../components/AdminRooms/DetailRoomButton";
+// ...eliminada la importación de DetailRoomButton...
 
 const RoomsCrud = () => {
   const { token } = useAuth();
@@ -172,7 +172,15 @@ const RoomsCrud = () => {
                   </td>
                   <td className="py-2 px-4 whitespace-nowrap">
                     <div className="flex flex-row items-center gap-2">
-                      <span className="inline-block"><DetailRoomButton onClick={() => { setSelectedRoom(room); setDetailOpen(true); }} /></span>
+                      <span className="inline-block">
+                        <button
+                          className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded shadow hover:bg-primary/80 transition-colors text-sm h-8 min-w-[90px]"
+                          onClick={() => { setSelectedRoom(room); setDetailOpen(true); }}
+                          type="button"
+                        >
+                          Ver detalle
+                        </button>
+                      </span>
                       <span className="inline-block"><EditRoom token={token} room={room} roomTypes={roomTypes} onUpdated={loadRoomsAndTypes} rooms={rooms} /></span>
                       <span className="inline-block"><DeleteRoom token={token} roomId={room.id} roomNumber={room.room_number} onDeleted={loadRoomsAndTypes} /></span>
                     </div>
