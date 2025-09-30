@@ -9,10 +9,10 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
   const [open, setOpen] = useState(false);
   // Solo los campos editables
   const [form, setForm] = useState({
-    floor: room.floor ?? "",
-    room_type_id: room.room_type_id ?? "",
-    capacity: room.capacity ?? "",
-    base_price: room.base_price ?? "",
+    floor: room.floor !== undefined && room.floor !== null ? String(room.floor) : "",
+    room_type_id: room.room_type_id !== undefined && room.room_type_id !== null ? String(room.room_type_id) : "",
+    capacity: room.capacity !== undefined && room.capacity !== null ? String(room.capacity) : "",
+    base_price: room.base_price !== undefined && room.base_price !== null ? String(room.base_price) : "",
     description: room.description ?? "",
     is_active: room.is_active ?? true,
   });
@@ -98,6 +98,7 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
         capacity: Number(form.capacity),
         base_price: Number(form.base_price),
         description: form.description,
+        is_active: !!form.is_active,
       }, token);
       setOpen(false);
       if (onUpdated) onUpdated();
@@ -123,19 +124,19 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
               Edita los datos permitidos de la habitación seleccionada.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-900 rounded-xl shadow-md p-6">
+          <form onSubmit={handleSubmit} className="space-y-6 bg-card text-card-foreground rounded-xl shadow-md p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Número</Label>
-                <div className="py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded text-gray-800 dark:text-gray-100 font-semibold">{room.room_number}</div>
+                <Label className="text-muted-foreground">Número</Label>
+                <div className="py-2 px-3 bg-secondary text-primary rounded font-semibold">{room.room_number}</div>
               </div>
               <div>
-                <Label>Estado</Label>
-                <div className="py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded text-gray-800 dark:text-gray-100 font-semibold">{room.status}</div>
+                <Label className="text-muted-foreground">Estado</Label>
+                <div className="py-2 px-3 bg-secondary text-primary rounded font-semibold">{room.status}</div>
               </div>
               <div>
-                <Label>Piso</Label>
-                <select name="floor" value={form.floor} onChange={handleChange} required className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                <Label className="text-muted-foreground">Piso</Label>
+                <select name="floor" value={form.floor} onChange={handleChange} required className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary">
                   <option value="">Selecciona piso</option>
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -143,8 +144,8 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
                 </select>
               </div>
               <div>
-                <Label>Tipo de habitación</Label>
-                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                <Label className="text-muted-foreground">Tipo de habitación</Label>
+                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary">
                   <option value="">Selecciona tipo</option>
                   {roomTypes.map((type) => (
                     <option key={type.id} value={type.id}>{type.name}</option>
@@ -152,7 +153,7 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
                 </select>
               </div>
               <div>
-                <Label>Capacidad</Label>
+                <Label className="text-muted-foreground">Capacidad</Label>
                 <Input
                   name="capacity"
                   value={form.capacity}
@@ -163,11 +164,11 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
                   max="10"
                   inputMode="numeric"
                   placeholder="Ej: 2"
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
                 />
               </div>
               <div>
-                <Label>Precio base</Label>
+                <Label className="text-muted-foreground">Precio base</Label>
                 <Input
                   name="base_price"
                   value={form.base_price}
@@ -178,28 +179,42 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
                   max="100000"
                   inputMode="numeric"
                   placeholder="Ej: 35000"
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
                 />
               </div>
               <div className="md:col-span-2">
-                <Label>Descripción</Label>
+                <Label className="text-muted-foreground">Descripción</Label>
                 <Input
                   name="description"
                   value={form.description}
                   onChange={handleChange}
                   maxLength={150}
                   placeholder="Descripción breve de la habitación"
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
                 />
-                <div className={`text-xs ${form.description.length > 140 ? "text-red-500" : "text-muted"} mt-1`}>
+                <div className={`text-xs ${form.description.length > 140 ? "text-destructive" : "text-muted-foreground"} mt-1`}>
                   {form.description.length}/150 caracteres
                 </div>
               </div>
             </div>
-            {error && <p className="text-red-500 mt-2">{error}</p>}
+            {/* Campo activo fuera del grid */}
+            <div>
+              <Label className="text-muted-foreground">Activo</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  checked={form.is_active}
+                  onChange={e => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                  className="accent-primary w-4 h-4 rounded focus:ring-2 focus:ring-primary"
+                />
+                <span className={`font-semibold ${form.is_active ? 'text-green-700 dark:text-green-300' : 'text-destructive'}`}>{form.is_active ? 'Sí' : 'No'}</span>
+              </div>
+            </div>
+            {error && <p className="text-destructive mt-2">{error}</p>}
             <DialogFooter className="flex flex-row gap-2 justify-end mt-4">
-              <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded shadow">Guardar</Button>
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)} className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 font-semibold px-4 py-2 rounded shadow">Cancelar</Button>
+              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded shadow">Guardar</Button>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)} className="bg-secondary text-secondary-foreground font-semibold px-4 py-2 rounded shadow">Cancelar</Button>
             </DialogFooter>
           </form>
         </DialogContent>

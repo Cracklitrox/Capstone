@@ -4,6 +4,8 @@ import { useAuth } from "../../services/authContext.jsx";
 import CreateRoom from "../../components/AdminRooms/CreateRoom";
 import EditRoom from "../../components/AdminRooms/EditRoom";
 import DeleteRoom from "../../components/AdminRooms/DeleteRoom";
+import DetailRoom from "../../components/AdminRooms/DetailRoom";
+import DetailRoomButton from "../../components/AdminRooms/DetailRoomButton";
 
 const RoomsCrud = () => {
   const { token } = useAuth();
@@ -16,6 +18,8 @@ const RoomsCrud = () => {
   const [filterStatus, setFilterStatus] = useState("");
   // Paginación por piso
   const [activeFloor, setActiveFloor] = useState("1");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState(null);
 
   const loadRoomsAndTypes = async () => {
     setLoading(true);
@@ -67,15 +71,7 @@ const RoomsCrud = () => {
     limpieza: "limpieza",
     mantenimiento: "mantenimiento"
   };
-  // Colores por estado
-  const estadoColor = {
-    disponible: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    ocupado: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    pendiente: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-    "no disponible": "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-    limpieza: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    mantenimiento: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-  };
+  // ...eliminado: estadoColor, ya no se usa...
   // Normaliza estado: minúsculas, sin tildes, sin espacios extra
   const normalize = (str) => str?.toString().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/\s+/g, " ").trim();
   // Filtra por piso activo primero
@@ -93,8 +89,8 @@ const RoomsCrud = () => {
 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-800">
-        <h2 className="text-3xl font-bold mb-4 text-gray-800 dark:text-gray-100">Habitaciones</h2>
+      <div className="bg-card text-card-foreground rounded-xl shadow-lg p-6 mb-6 border border-input">
+        <h2 className="text-3xl font-bold mb-4 text-card-foreground">Habitaciones</h2>
         {/* Selector de piso y filtros */}
         <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
           <div className="flex flex-col md:flex-row gap-4 w-full">
@@ -103,7 +99,7 @@ const RoomsCrud = () => {
               {["1","2","3"].map(piso => (
                 <button
                   key={piso}
-                  className={`px-4 py-2 rounded font-semibold border transition-colors duration-200 ${activeFloor === piso ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 border-gray-300 dark:border-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900"}`}
+                  className={`px-4 py-2 rounded font-semibold border transition-colors duration-200 min-w-[90px] ${activeFloor === piso ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-secondary-foreground border-border hover:bg-primary/10"}`}
                   onClick={() => setActiveFloor(piso)}
                 >
                   Piso {piso}
@@ -112,14 +108,14 @@ const RoomsCrud = () => {
             </div>
             <input
               type="text"
-              className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-3 py-2 w-full md:w-1/3"
+              className="border border-input bg-card text-card-foreground rounded px-3 py-2 w-full md:w-1/3 placeholder:text-muted-foreground"
               placeholder="Buscar por número de habitación..."
               value={searchNumber}
               onChange={e => setSearchNumber(e.target.value.replace(/\D/g, ""))}
               maxLength={3}
             />
             <select
-              className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-3 py-2 w-full md:w-1/4"
+              className="border border-input bg-card text-card-foreground rounded px-3 py-2 w-full md:w-1/4"
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
             >
@@ -134,40 +130,52 @@ const RoomsCrud = () => {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm md:text-base border-separate border-spacing-0 rounded-lg bg-white dark:bg-gray-900">
+          <table className="min-w-full text-sm md:text-base border-separate border-spacing-0 rounded-lg bg-card text-card-foreground">
             <thead>
-              <tr className="bg-gradient-to-r from-blue-500 to-blue-700 text-white dark:from-blue-800 dark:to-blue-900">
-                <th className="py-3 px-4 font-semibold text-left">Número</th>
-                <th className="py-3 px-4 font-semibold text-left">Piso</th>
-                <th className="py-3 px-4 font-semibold text-left">Tipo</th>
-                <th className="py-3 px-4 font-semibold text-left">Precio Base</th>
-                <th className="py-3 px-4 font-semibold text-left">Estado</th>
-                <th className="py-3 px-4 font-semibold text-left">Activo</th>
-                <th className="py-3 px-4 font-semibold text-left">Acciones</th>
+              <tr className="bg-primary text-primary-foreground">
+                <th className="py-2 px-3 font-semibold text-left text-base tracking-wide">Número</th>
+                <th className="py-2 px-3 font-semibold text-left text-base tracking-wide">Piso</th>
+                <th className="py-2 px-3 font-semibold text-left text-base tracking-wide">Tipo</th>
+                <th className="py-2 px-3 font-semibold text-left text-base tracking-wide">Precio Base</th>
+                <th className="py-2 px-3 font-semibold text-left text-base tracking-wide">Estado</th>
+                <th className="py-2 px-3 font-semibold text-left text-base tracking-wide">Activo</th>
+                <th className="py-2 px-3 font-semibold text-left text-base tracking-wide">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filteredRooms.map((room, idx) => (
-                <tr key={room.id} className={idx % 2 === 0 ? "bg-gray-50 dark:bg-gray-800" : "bg-white dark:bg-gray-900"}>
-                  <td className="py-2 px-4 whitespace-nowrap text-gray-900 dark:text-gray-100">{room.room_number}</td>
-                  <td className="py-2 px-4 whitespace-nowrap text-gray-900 dark:text-gray-100">{room.floor}</td>
-                  <td className="py-2 px-4 whitespace-nowrap text-gray-900 dark:text-gray-100">{room.room_types?.name}</td>
-                  <td className="py-2 px-4 whitespace-nowrap text-gray-900 dark:text-gray-100">${room.base_price}</td>
+                <tr key={room.id} className={idx % 2 === 0 ? "bg-secondary" : "bg-card"}>
+                  <td className="py-2 px-4 whitespace-nowrap text-card-foreground">{room.room_number}</td>
+                  <td className="py-2 px-4 whitespace-nowrap text-card-foreground">{room.floor}</td>
+                  <td className="py-2 px-4 whitespace-nowrap text-card-foreground">{room.room_types?.name}</td>
+                  <td className="py-2 px-4 whitespace-nowrap text-card-foreground">${room.base_price}</td>
                   <td className="py-2 px-4 whitespace-nowrap">
                     {(() => {
                       const estadoEsp = estadoMap[normalize(room.status)] || normalize(room.status);
-                      const color = estadoColor[estadoEsp] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+                      // Colores por estado adaptados a variables de tema
+                      const colorMap = {
+                        disponible: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                        ocupado: "bg-destructive text-destructive-foreground",
+                        pendiente: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+                        "no disponible": "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+                        limpieza: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                        mantenimiento: "bg-muted text-muted-foreground"
+                      };
+                      const color = colorMap[estadoEsp] || "bg-muted text-muted-foreground";
                       return (
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${color}`}>{estadoEsp.charAt(0).toUpperCase() + estadoEsp.slice(1)}</span>
                       );
                     })()}
                   </td>
                   <td className="py-2 px-4 whitespace-nowrap">
-                    {room.is_active ? <span className="text-green-600 dark:text-green-400 font-bold">Sí</span> : <span className="text-red-600 dark:text-red-400 font-bold">No</span>}
+                    {room.is_active ? <span className="text-green-700 dark:text-green-300 font-bold">Sí</span> : <span className="text-destructive font-bold">No</span>}
                   </td>
-                  <td className="py-2 px-4 whitespace-nowrap space-x-2 flex flex-wrap">
-                    <EditRoom token={token} room={room} roomTypes={roomTypes} onUpdated={loadRoomsAndTypes} rooms={rooms} />
-                    <DeleteRoom token={token} roomId={room.id} roomNumber={room.room_number} onDeleted={loadRoomsAndTypes} />
+                  <td className="py-2 px-4 whitespace-nowrap">
+                    <div className="flex flex-row items-center gap-2">
+                      <span className="inline-block"><DetailRoomButton onClick={() => { setSelectedRoom(room); setDetailOpen(true); }} /></span>
+                      <span className="inline-block"><EditRoom token={token} room={room} roomTypes={roomTypes} onUpdated={loadRoomsAndTypes} rooms={rooms} /></span>
+                      <span className="inline-block"><DeleteRoom token={token} roomId={room.id} roomNumber={room.room_number} onDeleted={loadRoomsAndTypes} /></span>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -175,6 +183,7 @@ const RoomsCrud = () => {
           </table>
         </div>
       </div>
+      <DetailRoom open={detailOpen} onClose={() => setDetailOpen(false)} room={selectedRoom} roomTypeName={selectedRoom?.room_types?.name} />
     </div>
   );
 };

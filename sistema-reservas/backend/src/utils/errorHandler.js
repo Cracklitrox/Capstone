@@ -1,0 +1,1 @@
+//Asegurarse de que los errores de validación y negocio se manejen correctamente y se devuelvan mensajes claros al frontend.
