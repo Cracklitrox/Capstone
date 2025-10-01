@@ -8,6 +8,8 @@ import Profile from "./components/Profile";
 // --- Páginas Principales ---
 import Login from "./pages/Login.jsx";
 import AdminDashboard from "./pages/Admin/Dashboard.jsx";
+import RoomsCrud from "./pages/Admin/RoomsCrud.jsx";
+import RoomTypesCrud from "./pages/Admin/RoomTypesCrud.jsx";
 import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
 import TapeChart from "./pages/Receptionist/TapeChart.jsx";
 
@@ -49,6 +51,8 @@ const AppRoutes = () => {
         <Route path="settings" element={<SettingsPage />} />
         {/* Pequeño ajuste: La ruta a Profile ya está protegida por la ruta padre "/" */}
         <Route path="profile" element={<Profile />} />
+        <Route path="admin/rooms-crud" element={<RoomsCrud />} />
+        <Route path="admin/room-types-crud" element={<RoomTypesCrud />} />
       </Route>
 
       {/* Ruta para páginas no encontradas */}
