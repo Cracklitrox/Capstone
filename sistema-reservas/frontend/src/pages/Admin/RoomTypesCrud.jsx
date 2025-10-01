@@ -14,6 +14,7 @@ const RoomTypesCrud = () => {
   const [roomTypes, setRoomTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
 
   // Función para recargar los tipos de habitación desde el backend
   const reloadRoomTypes = async () => {
@@ -35,18 +36,28 @@ const RoomTypesCrud = () => {
     // eslint-disable-next-line
   }, [token]);
 
-  // Ordenar los tipos de habitación por id ascendente
-  const sortedRoomTypes = [...roomTypes].sort((a, b) => a.id - b.id);
+  // Filtrar y ordenar los tipos de habitación por nombre y id ascendente
+  const filteredRoomTypes = roomTypes.filter(type =>
+    type.name.toLowerCase().includes(search.trim().toLowerCase())
+  );
+  const sortedRoomTypes = [...filteredRoomTypes].sort((a, b) => a.id - b.id);
 
   // Render principal: tabla con diseño moderno y componentes CRUD
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-4 md:px-8 py-4">
       {/* Card principal con sombra y bordes redondeados */}
       <div className="bg-card text-card-foreground rounded-2xl shadow-2xl p-4 md:p-8 mb-6 border border-input">
-        {/* Título destacado */}
-        <h2 className="text-3xl md:text-4xl font-extrabold mb-6 text-center text-[var(--primary)] tracking-tight">Tipos de habitación</h2>
-        {/* Botón para crear nuevo tipo */}
-        <div className="flex flex-col sm:flex-row justify-end items-center gap-2 mb-6">
+        {/* Botón para crear nuevo tipo y barra de búsqueda */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-6">
+          <div className="w-full sm:w-auto flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Buscar nombre de tipo habitación..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="border border-input rounded-lg px-3 py-2 bg-card text-card-foreground focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full sm:w-80"
+              />
+          </div>
           <CreateRoomType onCreated={reloadRoomTypes} />
         </div>
         {/* Estado de carga y error */}
