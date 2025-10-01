@@ -18,8 +18,8 @@ const EditRoomType = ({ roomType, onUpdated }) => {
       setError("El nombre es obligatorio.");
       return;
     }
-    if (!baseCapacity || isNaN(baseCapacity) || Number(baseCapacity) < 1) {
-      setError("La capacidad base debe ser un número mayor a 0.");
+    if (!baseCapacity || isNaN(baseCapacity) || Number(baseCapacity) < 1 || Number(baseCapacity) > 10) {
+      setError("La capacidad base debe ser mayor a 1 y menor que 10.");
       return;
     }
     try {
@@ -67,11 +67,22 @@ const EditRoomType = ({ roomType, onUpdated }) => {
                     <input
                       id="capacidad"
                       type="number"
-                      min={1}
+                      min={2}
+                      max={9}
                       className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full"
                       placeholder="Ej: 2"
                       value={baseCapacity}
-                      onChange={e => setBaseCapacity(e.target.value.replace(/\D/g, ""))}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        if (val === "") {
+                          setBaseCapacity("");
+                          return;
+                        }
+                        const num = Number(val);
+                        if (num > 0 && num < 11) {
+                          setBaseCapacity(val);
+                        }
+                      }}
                       required
                     />
                   </div>

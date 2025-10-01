@@ -59,10 +59,10 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
     if (
       form.room_number === "" ||
       isNaN(form.room_number) ||
-      Number(form.room_number) < 0 ||
+      Number(form.room_number) < 1 ||
       Number(form.room_number) > 999
     ) {
-      setError("El número debe ser un valor entre 0 y 999.");
+      setError("El número debe ser un valor entre 1 y 999.");
       setLoading(false);
       return;
     }
@@ -77,20 +77,20 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
     if (
       form.capacity === "" ||
       isNaN(form.capacity) ||
-      Number(form.capacity) < 0 ||
+      Number(form.capacity) < 1 ||
       Number(form.capacity) > 10
     ) {
-      setError("La capacidad debe ser un valor entre 0 y 10.");
+      setError("La capacidad debe ser un valor entre 1 y 10.");
       setLoading(false);
       return;
     }
     if (
       form.base_price === "" ||
       isNaN(form.base_price) ||
-      Number(form.base_price) < 0 ||
+      Number(form.base_price) < 1 ||
       Number(form.base_price) > 100000
     ) {
-      setError("El precio base debe ser un valor entre 0 y 100000.");
+      setError("El precio base debe ser un valor entre 1 y 100000.");
       setLoading(false);
       return;
     }
@@ -130,14 +130,14 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
         Crear habitación
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-card text-card-foreground rounded-xl shadow-md p-6">
+        <DialogContent className="bg-gradient-to-br from-card via-card/80 to-card/60 text-card-foreground border border-input rounded-3xl shadow-2xl p-4 md:p-8 max-w-lg w-full">
           <DialogHeader>
-            <DialogTitle>Crear habitación</DialogTitle>
+            <DialogTitle className="text-center text-2xl md:text-3xl font-extrabold mb-2 text-[var(--primary)]">Crear habitación</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="grid gap-6 mt-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-muted-foreground">Número</Label>
+              <div className="flex flex-col gap-1">
+                <Label className="font-semibold text-[var(--secondary)]">Número</Label>
                 <Input
                   name="room_number"
                   value={form.room_number}
@@ -148,29 +148,29 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
                   max="999"
                   inputMode="numeric"
                   placeholder="Ej: 101"
-                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
+                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                 />
               </div>
-              <div>
-                <Label className="text-muted-foreground">Piso</Label>
-                <select name="floor" value={form.floor} onChange={handleChange} required className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary">
+              <div className="flex flex-col gap-1">
+                <Label className="font-semibold text-[var(--secondary)]">Piso</Label>
+                <select name="floor" value={form.floor} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition">
                   <option value="">Selecciona piso</option>
                   <option value="1">1</option>
                   <option value="2">2</option>
                   <option value="3">3</option>
                 </select>
               </div>
-              <div>
-                <Label className="text-muted-foreground">Tipo de habitación</Label>
-                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary">
+              <div className="flex flex-col gap-1">
+                <Label className="font-semibold text-[var(--secondary)]">Tipo de habitación</Label>
+                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition">
                   <option value="">Selecciona tipo</option>
                   {roomTypes.map((type) => (
                     <option key={type.id} value={type.id}>{type.name}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <Label className="text-muted-foreground">Capacidad</Label>
+              <div className="flex flex-col gap-1">
+                <Label className="font-semibold text-[var(--secondary)]">Capacidad</Label>
                 <Input
                   name="capacity"
                   value={form.capacity}
@@ -181,11 +181,11 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
                   max="10"
                   inputMode="numeric"
                   placeholder="Ej: 2"
-                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
+                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                 />
               </div>
-              <div>
-                <Label className="text-muted-foreground">Precio base</Label>
+              <div className="flex flex-col gap-1">
+                <Label className="font-semibold text-[var(--secondary)]">Precio base</Label>
                 <Input
                   name="base_price"
                   value={form.base_price}
@@ -196,28 +196,27 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
                   max="100000"
                   inputMode="numeric"
                   placeholder="Ej: 35000"
-                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
+                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                 />
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-muted-foreground">Descripción</Label>
-                <Input
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  maxLength={150}
-                  placeholder="Descripción breve de la habitación"
-                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
-                />
-                <div className={`text-xs ${form.description.length > 140 ? "text-destructive" : "text-muted-foreground"} mt-1`}>
-                  {form.description.length}/150 caracteres
-                </div>
               </div>
             </div>
-            {error && <p className="text-destructive mt-2">{error}</p>}
-            <DialogFooter className="flex flex-row gap-2 justify-end mt-4">
-              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded shadow">Crear</Button>
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)} className="bg-secondary text-secondary-foreground font-semibold px-4 py-2 rounded shadow">Cancelar</Button>
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <Label className="font-semibold text-[var(--secondary)]">Descripción (opcional)</Label>
+              <textarea
+                name="description"
+                className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition resize-none"
+                placeholder="Máximo 150 caracteres"
+                value={form.description}
+                onChange={handleChange}
+                maxLength={150}
+                rows={3}
+              />
+              <span className="text-xs text-muted-foreground self-end">{form.description.length}/150</span>
+            </div>
+            {error && <p className="text-destructive text-sm text-center mt-2">{error}</p>}
+            <DialogFooter className="flex flex-row gap-2 justify-center mt-4">
+              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg shadow hover:bg-primary/80 transition">Crear</Button>
+              <Button type="button" onClick={() => setOpen(false)} variant="secondary" className="bg-secondary text-primary font-semibold px-4 py-2 rounded-lg shadow">Cancelar</Button>
             </DialogFooter>
           </form>
         </DialogContent>

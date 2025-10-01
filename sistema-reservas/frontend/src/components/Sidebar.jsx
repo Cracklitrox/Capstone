@@ -26,19 +26,19 @@ const navLinks = [
     roles: ["administrator", "receptionist"],
   },
   {
-    label: "Habitaciones",
+    label: "Gestionar Habitaciones",
     icon: ViewColumnsIcon,
     roles: ["administrator"],
     submenu: [
       {
         href: "/admin/rooms-crud",
-        label: "Gestionar habitaciones",
+        label: "Habitaciones",
         icon: ViewColumnsIcon,
         roles: ["administrator"],
       },
       {
         href: "/admin/room-types-crud",
-        label: "Gestionar tipo de habitaciones",
+        label: "Tipo de habitaciones",
         icon: ViewColumnsIcon,
         roles: ["administrator"],
       },

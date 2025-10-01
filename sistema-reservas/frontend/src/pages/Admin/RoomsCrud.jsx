@@ -43,11 +43,14 @@ const RoomsCrud = () => {
     // eslint-disable-next-line
   }, [token]);
 
+  // Paginación
+  const pageSize = 6;
+  const [page, setPage] = useState(1);
+
   if (loading) return <p>Cargando habitaciones...</p>;
   if (error) return <p className="text-red-500">Error: {error}</p>;
 
-  // Filtrar y ordenar habitaciones
-  // Filtrado por estado usando español y sin tildes
+  // --- Paginación ---
   const estados = [
     "disponible",
     "ocupado",
@@ -55,7 +58,6 @@ const RoomsCrud = () => {
     "limpieza",
     "mantenimiento"
   ];
-  // Mapeo de estados inglés <-> español
   const estadoMap = {
     available: "disponible",
     occupied: "ocupado",
@@ -63,7 +65,6 @@ const RoomsCrud = () => {
     unavailable: "no disponible",
     cleaning: "limpieza",
     maintenance: "mantenimiento",
-    // También soporta español directo
     disponible: "disponible",
     ocupado: "ocupado",
     pendiente: "pendiente",
@@ -71,11 +72,10 @@ const RoomsCrud = () => {
     limpieza: "limpieza",
     mantenimiento: "mantenimiento"
   };
-  // ...eliminado: estadoColor, ya no se usa...
-  // Normaliza estado: minúsculas, sin tildes, sin espacios extra
   const normalize = (str) => str?.toString().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/\s+/g, " ").trim();
-  // Filtra por piso activo primero
-  const roomsByFloor = rooms.filter(room => String(room.floor) === activeFloor);
+  const roomsByFloor = activeFloor === "todos"
+    ? rooms
+    : rooms.filter(room => String(room.floor) === activeFloor);
   const filteredRooms = roomsByFloor
     .filter(room => {
       const estadoRoom = estadoMap[normalize(room.status)] || normalize(room.status);
@@ -87,24 +87,27 @@ const RoomsCrud = () => {
     })
     .sort((a, b) => a.id - b.id);
 
+  const totalPages = Math.ceil(filteredRooms.length / pageSize);
+  const paginatedRooms = filteredRooms.slice((page - 1) * pageSize, page * pageSize);
+
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8">
       <div className="bg-card text-card-foreground rounded-xl shadow-lg p-6 mb-6 border border-input">
-        <h2 className="text-3xl font-bold mb-4 text-card-foreground">Habitaciones</h2>
         {/* Selector de piso y filtros */}
         <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
           <div className="flex flex-col md:flex-row gap-4 w-full">
             {/* Selector de piso tipo paginación */}
-            <div className="flex gap-2 mb-2 md:mb-0">
-              {["1","2","3"].map(piso => (
-                <button
-                  key={piso}
-                  className={`px-4 py-2 rounded font-semibold border transition-colors duration-200 min-w-[90px] ${activeFloor === piso ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-secondary-foreground border-border hover:bg-primary/10"}`}
-                  onClick={() => setActiveFloor(piso)}
-                >
-                  Piso {piso}
-                </button>
-              ))}
+            <div className="mb-2 md:mb-0 w-full md:w-1/4">
+              <select
+                className="border border-input bg-card text-card-foreground rounded px-3 py-2 w-full max-h-40 overflow-y-auto"
+                value={activeFloor}
+                onChange={e => setActiveFloor(e.target.value)}
+              >
+                <option value="todos">Todos los pisos</option>
+                <option value="1">Piso 1</option>
+                <option value="2">Piso 2</option>
+                <option value="3">Piso 3</option>
+              </select>
             </div>
             <input
               type="text"
@@ -143,7 +146,7 @@ const RoomsCrud = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredRooms.map((room, idx) => (
+              {paginatedRooms.map((room, idx) => (
                 <tr key={room.id} className={idx % 2 === 0 ? "bg-secondary" : "bg-card"}>
                   <td className="py-2 px-4 whitespace-nowrap text-card-foreground">{room.room_number}</td>
                   <td className="py-2 px-4 whitespace-nowrap text-card-foreground">{room.floor}</td>
@@ -182,7 +185,7 @@ const RoomsCrud = () => {
                         </button>
                       </span>
                       <span className="inline-block"><EditRoom token={token} room={room} roomTypes={roomTypes} onUpdated={loadRoomsAndTypes} rooms={rooms} /></span>
-                      <span className="inline-block"><DeleteRoom token={token} roomId={room.id} roomNumber={room.room_number} onDeleted={loadRoomsAndTypes} /></span>
+                      <span className="inline-block"><DeleteRoom token={token} roomId={room.id} roomNumber={room.room_number} roomStatus={room.status} onDeleted={loadRoomsAndTypes} /></span>
                     </div>
                   </td>
                 </tr>
@@ -190,6 +193,20 @@ const RoomsCrud = () => {
             </tbody>
           </table>
         </div>
+      </div>
+      {/* Paginación debajo de la tabla */}
+      <div className="flex justify-center items-center gap-2 mt-4">
+        <button
+          className="px-3 py-1 rounded border bg-secondary text-secondary-foreground disabled:opacity-50"
+          onClick={() => setPage(page - 1)}
+          disabled={page === 1}
+        >Anterior</button>
+        <span className="font-semibold">Página {page} de {totalPages}</span>
+        <button
+          className="px-3 py-1 rounded border bg-secondary text-secondary-foreground disabled:opacity-50"
+          onClick={() => setPage(page + 1)}
+          disabled={page === totalPages}
+        >Siguiente</button>
       </div>
       <DetailRoom open={detailOpen} onClose={() => setDetailOpen(false)} room={selectedRoom} roomTypeName={selectedRoom?.room_types?.name} />
     </div>

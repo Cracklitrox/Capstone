@@ -117,43 +117,43 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
     <>
       <Button onClick={() => setOpen(true)} variant="outline">Modificar</Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="bg-gradient-to-br from-card via-card/80 to-card/60 text-card-foreground border border-input rounded-3xl shadow-2xl p-4 md:p-8 max-w-lg w-full">
           <DialogHeader>
-            <DialogTitle>Modificar habitación</DialogTitle>
-            <DialogDescription>
-              Edita los datos permitidos de la habitación seleccionada.
-            </DialogDescription>
+            <DialogTitle className="text-center text-2xl md:text-3xl font-extrabold mb-2 text-[var(--primary)]">Modificar habitación</DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground">Edita los datos permitidos de la habitación seleccionada.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6 bg-card text-card-foreground rounded-xl shadow-md p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-muted-foreground">Número</Label>
-                <div className="py-2 px-3 bg-secondary text-primary rounded font-semibold">{room.room_number}</div>
+          <form onSubmit={handleSubmit} className="grid gap-6 mt-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1 col-span-1">
+                <Label className="font-semibold text-[var(--secondary)]">Número</Label>
+                <div className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 font-bold text-lg w-full">{room.room_number}</div>
               </div>
-              <div>
-                <Label className="text-muted-foreground">Estado</Label>
-                <div className="py-2 px-3 bg-secondary text-primary rounded font-semibold">{room.status}</div>
+              <div className="flex flex-col gap-1 col-span-1">
+                <Label className="font-semibold text-[var(--secondary)]">Estado</Label>
+                <div className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 font-semibold w-full">
+                  {room.status === 'available' ? 'Disponible' : room.status === 'occupied' ? 'Ocupada' : room.status === 'pending' ? 'Pendiente' : room.status}
+                </div>
               </div>
-              <div>
-                <Label className="text-muted-foreground">Piso</Label>
-                <select name="floor" value={form.floor} onChange={handleChange} required className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary">
+              <div className="flex flex-col gap-1 col-span-1">
+                <Label className="font-semibold text-[var(--secondary)]">Piso</Label>
+                <select name="floor" value={form.floor} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full">
                   <option value="">Selecciona piso</option>
                   <option value="1">1</option>
                   <option value="2">2</option>
                   <option value="3">3</option>
                 </select>
               </div>
-              <div>
-                <Label className="text-muted-foreground">Tipo de habitación</Label>
-                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary">
+              <div className="flex flex-col gap-1 col-span-1">
+                <Label className="font-semibold text-[var(--secondary)]">Tipo de habitación</Label>
+                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full">
                   <option value="">Selecciona tipo</option>
                   {roomTypes.map((type) => (
                     <option key={type.id} value={type.id}>{type.name}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <Label className="text-muted-foreground">Capacidad</Label>
+              <div className="flex flex-col gap-1 col-span-1">
+                <Label className="font-semibold text-[var(--secondary)]">Capacidad</Label>
                 <Input
                   name="capacity"
                   value={form.capacity}
@@ -164,11 +164,11 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
                   max="10"
                   inputMode="numeric"
                   placeholder="Ej: 2"
-                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
+                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full"
                 />
               </div>
-              <div>
-                <Label className="text-muted-foreground">Precio base</Label>
+              <div className="flex flex-col gap-1 col-span-1">
+                <Label className="font-semibold text-[var(--secondary)]">Precio base</Label>
                 <Input
                   name="base_price"
                   value={form.base_price}
@@ -179,42 +179,38 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
                   max="100000"
                   inputMode="numeric"
                   placeholder="Ej: 35000"
-                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
+                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full"
                 />
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-muted-foreground">Descripción</Label>
-                <Input
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  maxLength={150}
-                  placeholder="Descripción breve de la habitación"
-                  className="mt-1 w-full border border-input rounded px-3 py-2 bg-secondary text-primary"
-                />
-                <div className={`text-xs ${form.description.length > 140 ? "text-destructive" : "text-muted-foreground"} mt-1`}>
-                  {form.description.length}/150 caracteres
-                </div>
               </div>
             </div>
-            {/* Campo activo fuera del grid */}
-            <div>
-              <Label className="text-muted-foreground">Activo</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="checkbox"
-                  name="is_active"
-                  checked={form.is_active}
-                  onChange={e => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
-                  className="accent-primary w-4 h-4 rounded focus:ring-2 focus:ring-primary"
-                />
-                <span className={`font-semibold ${form.is_active ? 'text-green-700 dark:text-green-300' : 'text-destructive'}`}>{form.is_active ? 'Sí' : 'No'}</span>
-              </div>
+            <div className="flex flex-col gap-1 col-span-2">
+              <Label className="font-semibold text-[var(--secondary)]">Descripción (opcional)</Label>
+              <textarea
+                name="description"
+                className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition resize-none w-full"
+                placeholder="Máximo 150 caracteres"
+                value={form.description}
+                onChange={handleChange}
+                maxLength={150}
+                rows={3}
+              />
+              <span className="text-xs text-muted-foreground self-end">{form.description.length}/150</span>
             </div>
-            {error && <p className="text-destructive mt-2">{error}</p>}
-            <DialogFooter className="flex flex-row gap-2 justify-end mt-4">
-              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded shadow">Guardar</Button>
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)} className="bg-secondary text-secondary-foreground font-semibold px-4 py-2 rounded shadow">Cancelar</Button>
+            <div className="flex items-center gap-2 col-span-2">
+              <Label className="font-semibold text-[var(--secondary)]">Activo</Label>
+              <input
+                type="checkbox"
+                name="is_active"
+                checked={form.is_active}
+                onChange={e => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                className="accent-primary w-4 h-4 rounded focus:ring-2 focus:ring-primary"
+              />
+              <span className={`font-semibold ${form.is_active ? 'text-green-700 dark:text-green-300' : 'text-destructive'}`}>{form.is_active ? 'Sí' : 'No'}</span>
+            </div>
+            {error && <p className="text-destructive text-sm text-center mt-2 col-span-2">{error}</p>}
+            <DialogFooter className="flex flex-row gap-2 justify-center mt-4 col-span-2">
+              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg shadow hover:bg-primary/80 transition">Guardar</Button>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)} className="bg-secondary text-primary font-semibold px-4 py-2 rounded-lg shadow">Cancelar</Button>
             </DialogFooter>
           </form>
         </DialogContent>

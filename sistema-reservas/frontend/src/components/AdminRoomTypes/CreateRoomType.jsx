@@ -18,12 +18,14 @@ const CreateRoomType = ({ onCreated, roomTypes = [] }) => {
       setError("El nombre es obligatorio.");
       return;
     }
-    if (!baseCapacity || isNaN(baseCapacity) || Number(baseCapacity) < 1) {
-      setError("La capacidad base debe ser un número mayor a 0.");
+    if (!baseCapacity || isNaN(baseCapacity) || Number(baseCapacity) < 1 || Number(baseCapacity) > 10) {
+      setError("La capacidad base debe ser mayor a 1 y menor que 10.");
       return;
     }
     // Validación de nombre duplicado (case-insensitive)
-    if (roomTypes.some(rt => rt.name.trim().toLowerCase() === name.trim().toLowerCase())) {
+    // Mejor validación: elimina tildes y caracteres especiales
+    const normalizeName = str => str.trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, '_');
+    if (roomTypes.some(rt => normalizeName(rt.name) === normalizeName(name))) {
       setError("Ya existe un tipo de habitación con ese nombre.");
       return;
     }
@@ -75,11 +77,22 @@ const CreateRoomType = ({ onCreated, roomTypes = [] }) => {
                 <input
                   id="capacidad"
                   type="number"
-                  min={1}
+                  min={2}
+                  max={9}
                   className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                   placeholder="Ej: 2"
                   value={baseCapacity}
-                  onChange={e => setBaseCapacity(e.target.value.replace(/\D/g, ""))}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    if (val === "") {
+                      setBaseCapacity("");
+                      return;
+                    }
+                    const num = Number(val);
+                    if (num > 0 && num < 11) {
+                      setBaseCapacity(val);
+                    }
+                  }}
                   required
                 />
               </div>
