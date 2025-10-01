@@ -1,4 +1,4 @@
-const roomsService = require('./rooms.service');
+const roomsService = require("./rooms.service");
 
 /**
  * Controlador para obtener todas las habitaciones.
@@ -21,7 +21,7 @@ async function getRoomDetails(req, res, next) {
     const { id } = req.params;
     const room = await roomsService.getRoomById(id);
     if (!room) {
-      return res.status(404).json({ message: 'Habitación no encontrada' });
+      return res.status(404).json({ message: "Habitación no encontrada" });
     }
     res.json(room);
   } catch (error) {
@@ -41,9 +41,9 @@ async function getAllRoomTypes(req, res, next) {
   }
 }
 
-
 /**
  * Controlador para actualizar el estado de una habitación.
+ * Ahora registra la actividad del usuario.
  */
 async function updateRoomStatus(req, res, next) {
   try {
@@ -51,10 +51,19 @@ async function updateRoomStatus(req, res, next) {
     const { status } = req.body;
 
     if (!status) {
-      return res.status(400).json({ message: 'El nuevo estado es requerido.' });
+      return res.status(400).json({ message: "El nuevo estado es requerido." });
     }
 
-    const updatedRoom = await roomsService.updateRoomStatus(id, status);
+    // Obtener información del usuario autenticado desde el middleware
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    const updatedRoom = await roomsService.updateRoomStatus(
+      id,
+      status,
+      userId,
+      userRole
+    );
     res.json(updatedRoom);
   } catch (error) {
     next(error);

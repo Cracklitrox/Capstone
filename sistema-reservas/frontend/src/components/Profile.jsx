@@ -9,8 +9,15 @@ import {
   PencilSquareIcon,
   ChartBarIcon,
   ClockIcon,
-  DevicePhoneMobileIcon,
   AdjustmentsHorizontalIcon,
+  CheckCircleIcon,
+  HomeIcon,
+  CalendarDaysIcon,
+  WrenchScrewdriverIcon,
+  SparklesIcon,
+  CurrencyDollarIcon,
+  UserPlusIcon,
+  LockClosedIcon,
 } from "@heroicons/react/24/outline";
 
 import { Button } from "@/components/ui/Button";
@@ -43,9 +50,13 @@ import {
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { authService } from "@/services/services";
+import { profileService } from "@/services/profileService";
+import { formatActivity } from "@/lib/activityFormatter";
+import { useAuth } from "@/services/authContext";
 import { toast } from "sonner";
 
 const Profile = () => {
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,6 +84,16 @@ const Profile = () => {
 
   const [loginHistory, setLoginHistory] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+  const [activityLog, setActivityLog] = useState([]);
+  const [isActivityLoading, setIsActivityLoading] = useState(true);
+
+  const [preferences, setPreferences] = useState({
+    defaultTheme: "system",
+    defaultDashboard: null,
+  });
+  const [isPreferencesLoading, setIsPreferencesLoading] = useState(true);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -132,6 +153,34 @@ const Profile = () => {
       }
     };
     fetchLoginHistory();
+
+    const fetchActivity = async () => {
+      try {
+        setIsActivityLoading(true);
+        const activityData = await profileService.getMyActivity(15);
+        setActivityLog(activityData);
+      } catch (err) {
+        console.error("Error al obtener actividad:", err);
+        toast.error("No se pudo cargar la actividad reciente.");
+      } finally {
+        setIsActivityLoading(false);
+      }
+    };
+    fetchActivity();
+
+    const fetchPreferences = async () => {
+      try {
+        setIsPreferencesLoading(true);
+        const prefs = await profileService.getMyPreferences();
+        setPreferences(prefs);
+      } catch (err) {
+        console.error("Error al obtener preferencias:", err);
+        toast.error("No se pudieron cargar las preferencias.");
+      } finally {
+        setIsPreferencesLoading(false);
+      }
+    };
+    fetchPreferences();
   }, []);
 
   const countries = useMemo(
@@ -244,6 +293,36 @@ const Profile = () => {
     }
   };
 
+  const handlePreferencesChange = (field, value) => {
+    setPreferences((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSavePreferences = async () => {
+    try {
+      setIsSavingPreferences(true);
+      await profileService.updateMyPreferences(preferences);
+      toast.success("Preferencias guardadas correctamente");
+    } catch (err) {
+      console.error("Error al guardar preferencias:", err);
+      toast.error("No se pudieron guardar las preferencias.");
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
+
+  const getActivityIcon = (action) => {
+    const iconMap = {
+      UPDATE_ROOM_STATUS: HomeIcon,
+      CREATE_RESERVATION: CalendarDaysIcon,
+      CREATE_MAINTENANCE: WrenchScrewdriverIcon,
+      CREATE_CLEANING: SparklesIcon,
+      CREATE_PAYMENT: CurrencyDollarIcon,
+      CREATE_USER: UserPlusIcon,
+      CHANGE_PASSWORD: LockClosedIcon,
+    };
+    return iconMap[action] || CheckCircleIcon;
+  };
+
   if (error)
     return (
       <div className="flex justify-center items-center h-full text-destructive">
@@ -280,7 +359,6 @@ const Profile = () => {
           <TabsTrigger value="preferences">Preferencias</TabsTrigger>
         </TabsList>
 
-        {/* --- 3. Contenido de la primera pestaña (tu componente actual) --- */}
         <TabsContent value="personal">
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <Card className="animate-fade-in">
@@ -487,20 +565,57 @@ const Profile = () => {
           </Dialog>
         </TabsContent>
 
-        {/* --- 4. Pestañas con contenido de marcador de posición (placeholder) --- */}
         <TabsContent value="activity">
           <Card>
             <CardHeader>
-              <CardTitle>Actividad y Estadísticas</CardTitle>
+              <CardTitle>Actividad Reciente</CardTitle>
               <CardDescription>
-                Un resumen de tu actividad reciente en el hotel.
+                Un registro de tus últimas 15 acciones en el sistema.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center text-center h-48">
-              <ChartBarIcon className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Esta funcionalidad estará disponible próximamente.
-              </p>
+            <CardContent>
+              {isActivityLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-muted-foreground">Cargando actividad...</p>
+                </div>
+              ) : activityLog.length > 0 ? (
+                <ul className="space-y-4">
+                  {activityLog.map((activity) => {
+                    const Icon = getActivityIcon(activity.action);
+                    return (
+                      <li
+                        key={activity.id}
+                        className="flex items-start p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex-shrink-0 mt-1">
+                          <Icon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <p className="text-sm font-medium">
+                            {formatActivity(activity)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(activity.timestamp).toLocaleString(
+                              "es-CL",
+                              {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              }
+                            )}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <ChartBarIcon className="h-16 w-16 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground text-center">
+                    Aún no tienes actividad registrada en el sistema.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -546,7 +661,10 @@ const Profile = () => {
                             <p className="font-medium">
                               {new Date(entry.timestamp).toLocaleString(
                                 "es-CL",
-                                { dateStyle: "long", timeStyle: "short" }
+                                {
+                                  dateStyle: "long",
+                                  timeStyle: "short",
+                                }
                               )}
                             </p>
                             <p className="text-muted-foreground">
@@ -623,13 +741,11 @@ const Profile = () => {
                     </p>
                   )}
                 </div>
-
                 {passwordFormErrors.general && (
                   <p className="text-red-500 text-sm text-center">
                     {passwordFormErrors.general}
                   </p>
                 )}
-
                 <DialogFooter className="pt-4">
                   <Button
                     type="button"
@@ -650,15 +766,89 @@ const Profile = () => {
             <CardHeader>
               <CardTitle>Preferencias</CardTitle>
               <CardDescription>
-                Personaliza la apariencia y las notificaciones de la aplicación.
+                Personaliza la apariencia y el comportamiento de la aplicación.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center text-center h-48">
-              <AdjustmentsHorizontalIcon className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Esta funcionalidad estará disponible próximamente.
-              </p>
+            <CardContent className="space-y-6">
+              {isPreferencesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-muted-foreground">
+                    Cargando preferencias...
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3 p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-semibold">Tema por Defecto</h3>
+                      <p className="text-sm text-muted-foreground">
+                        El tema que se aplicará automáticamente al iniciar
+                        sesión.
+                      </p>
+                    </div>
+                    <Select
+                      value={preferences.defaultTheme}
+                      onValueChange={(value) =>
+                        handlePreferencesChange("defaultTheme", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un tema" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="light">Claro</SelectItem>
+                        <SelectItem value="dark">Oscuro</SelectItem>
+                        <SelectItem value="system">Según el sistema</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-3 p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-semibold">Vista Inicial</h3>
+                      <p className="text-sm text-muted-foreground">
+                        La página que verás al iniciar sesión.
+                      </p>
+                    </div>
+                    <Select
+                      value={preferences.defaultDashboard || "main"}
+                      onValueChange={(value) =>
+                        handlePreferencesChange("defaultDashboard", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una vista" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="main">
+                          Dashboard Principal
+                        </SelectItem>
+                        <SelectItem value="planning">Planning</SelectItem>
+                        {user?.role === "administrator" && (
+                          <>
+                            <SelectItem value="users">
+                              Gestión de Usuarios
+                            </SelectItem>
+                            <SelectItem value="settings">
+                              Configuración
+                            </SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </CardContent>
+            <CardFooter>
+              <Button
+                onClick={handleSavePreferences}
+                disabled={isSavingPreferences || isPreferencesLoading}
+                className="w-full"
+              >
+                {isSavingPreferences ? "Guardando..." : "Guardar Preferencias"}
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>

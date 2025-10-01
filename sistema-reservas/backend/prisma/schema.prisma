@@ -12,7 +12,7 @@ model activity_logs {
   id             Int       @id @default(autoincrement())
   user_id        Int?
   user_role      String?   @db.VarChar(30)
-  action         String?   @db.VarChar(80)
+  action         action_type_enum?
   timestamp      DateTime? @default(now()) @db.Timestamp(6)
   affected_table String?   @db.VarChar(60)
   record_id      Int?
@@ -302,6 +302,7 @@ model users {
   system_errors                                    system_errors[]
   user_roles                                       user_roles[]
   LoginHistory                                     LoginHistory[]
+  user_preferences                                 user_preferences?
 }
 
 model LoginHistory {
@@ -314,6 +315,17 @@ model LoginHistory {
   user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("login_history")
+}
+
+model user_preferences {
+  id                    Int      @id @default(autoincrement())
+  user_id               Int      @unique
+  default_theme         String   @default("system") @db.VarChar(20)
+  default_dashboard     String?  @db.VarChar(50)
+  created_at            DateTime @default(now()) @db.Timestamp(6)
+  updated_at            DateTime @updatedAt @db.Timestamp(6)
+  
+  users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 enum alert_status_enum {
@@ -430,4 +442,24 @@ enum user_status_enum {
   active
   inactive
   suspended
+}
+
+enum action_type_enum {
+  CREATE_RESERVATION
+  UPDATE_RESERVATION
+  CANCEL_RESERVATION
+  CHECK_IN
+  CHECK_OUT
+  UPDATE_ROOM_STATUS
+  CREATE_MAINTENANCE
+  UPDATE_MAINTENANCE
+  COMPLETE_MAINTENANCE
+  CREATE_CLEANING
+  COMPLETE_CLEANING
+  CREATE_PAYMENT
+  UPDATE_PAYMENT
+  CREATE_USER
+  UPDATE_USER
+  UPDATE_PROFILE
+  CHANGE_PASSWORD
 }
