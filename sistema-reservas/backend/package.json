@@ -18,7 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^6.16.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -36,7 +36,7 @@
     "@vitest/coverage-v8": "^3.2.4",
     "dotenv-cli": "^10.0.0",
     "nodemon": "^3.1.10",
-    "prisma": "^5.15.0",
+    "prisma": "^6.16.2",
     "supertest": "^7.0.0"
   }
 }

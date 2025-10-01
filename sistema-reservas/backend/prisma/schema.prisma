@@ -301,6 +301,19 @@ model users {
   reservations_reservations_receptionist_idTousers reservations[]             @relation("reservations_receptionist_idTousers")
   system_errors                                    system_errors[]
   user_roles                                       user_roles[]
+  LoginHistory                                     LoginHistory[]
+}
+
+model LoginHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?
+  timestamp DateTime @default(now())
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("login_history")
 }
 
 enum alert_status_enum {

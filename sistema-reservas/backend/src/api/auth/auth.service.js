@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const redisClient = require('../../db/redis.client')
 
-const login = async (email, password) => {
+const login = async (email, password, req) => {
   try {
     if (!email || !password) {
       throw new Error('Credenciales inválidas');
@@ -53,6 +53,21 @@ const login = async (email, password) => {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
+
+    try {
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      
+      await prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: ipAddress,
+          userAgent: userAgent,
+        },
+      });
+    } catch (logError) {
+      console.error("💥 Error al registrar el historial de login:", logError);
+    }
 
     return { 
       token,
@@ -181,9 +196,63 @@ const updateProfile = async (userId, profileData) => {
   }
 };
 
+const changePassword = async (userId, currentPassword, newPassword, confirmPassword) => {
+  try {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      throw new Error('Todos los campos son obligatorios.');
+    }
+    if (newPassword !== confirmPassword) {
+      throw new Error('La nueva contraseña y la confirmación no coinciden.');
+    }
+    if (newPassword.length < 8) {
+      throw new Error('La nueva contraseña debe tener al menos 8 caracteres.');
+    }
+
+    const user = await prisma.users.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new Error('Usuario no encontrado.');
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isPasswordValid) {
+      throw new Error('La contraseña actual es incorrecta.');
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10); 
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: { password_hash: newPasswordHash },
+    });
+
+    return { message: 'Contraseña actualizada correctamente.' };
+
+  } catch (error) {
+    console.error("💥 Error en el servicio changePassword:", error.message);
+    throw error;
+  }
+};
+
+
+const getLoginHistory = async (userId) => {
+  try {
+    return prisma.loginHistory.findMany({
+      where: { userId: userId },
+      orderBy: { timestamp: 'desc' },
+      take: 10,
+    });
+  } catch (error) {
+    console.error("💥 Error en el servicio getLoginHistory:", error);
+    throw new Error('Error al obtener el historial de inicios de sesión.');
+  }
+};
+
+
 module.exports = {
   login,
   logout,
   getProfile,
   updateProfile,
+  changePassword,
+  getLoginHistory,
 };

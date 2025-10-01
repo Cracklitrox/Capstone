@@ -11,7 +11,7 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'La contraseña es requerida.' });
     }
     
-    const result = await authService.login(email, password);
+    const result = await authService.login(email, password, req);
     res.status(200).json(result);
   } catch (error) {
     console.error('Error de autenticación:', error.message);
@@ -70,9 +70,51 @@ const updateProfile = async (req, res) => {
   }
 };
 
+
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    const result = await authService.changePassword(
+      userId,
+      currentPassword,
+      newPassword,
+      confirmPassword
+    );
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error al cambiar la contraseña:', error.message);
+    
+    if (error.message.includes('incorrecta') || error.message.includes('coinciden')) {
+      return res.status(400).json({ message: error.message });
+    }
+    
+    if (error.message.includes('no encontrado')) {
+      return res.status(404).json({ message: error.message });
+    }
+
+    res.status(500).json({ message: 'Error interno al cambiar la contraseña.' });
+  }
+};
+
+const getLoginHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const history = await authService.getLoginHistory(userId);
+    res.status(200).json(history);
+  } catch (error) {
+    console.error('Error al obtener el historial de login:', error);
+    res.status(500).json({ message: 'Error interno al obtener el historial.' });
+  }
+};
+
 module.exports = {
   loginUser,
   logoutUser,
   getUserProfile,
-  updateProfile, 
+  updateProfile,
+  changePassword,
+  getLoginHistory,
 };
