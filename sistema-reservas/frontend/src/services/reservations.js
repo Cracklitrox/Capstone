@@ -58,4 +58,13 @@ export const reservationsService = {
     );
     return response.data;
   },
+
+  // Obtener menú de desayunos
+  getBreakfastMenu: async () => {
+  const response = await axios.get(
+    `${API_URL}/reservations/breakfast-menu`,
+    getAuthHeaders()
+  );
+  return response.data;
+},
 };

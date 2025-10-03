@@ -1,37 +1,27 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const reservationsController = require('./reservations.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const { authenticate } = require("../../middleware/auth.middleware");
+const {
+  searchAvailability,
+  calculatePrice,
+  createReservation,
+  getAvailableServices,
+  getBreakfastMenu,
+} = require("./reservations.controller");
 
-// Todas las rutas requieren autenticación
-router.use(authenticate);
+// Buscar disponibilidad
+router.get("/search-availability", authenticate, searchAvailability);
 
-// Buscar disponibilidad (receptionist y administrator)
-router.get(
-  '/search-availability',
-  authorize(['receptionist', 'administrator']),
-  reservationsController.searchAvailability
-);
+// Calcular precio
+router.post("/calculate-price", authenticate, calculatePrice);
 
-// Calcular precio estimado
-router.post(
-  '/calculate-price',
-  authorize(['receptionist', 'administrator']),
-  reservationsController.calculatePrice
-);
+// Crear reserva
+router.post("/", authenticate, createReservation);
 
 // Obtener servicios disponibles
-router.get(
-  '/services',
-  authorize(['receptionist', 'administrator']),
-  reservationsController.getAvailableServices
-);
+router.get("/services", authenticate, getAvailableServices);
 
-// Crear reserva (solo receptionist y administrator)
-router.post(
-  '/',
-  authorize(['receptionist', 'administrator']),
-  reservationsController.createReservation
-);
+// Obtener menú de desayunos
+router.get("/breakfast-menu", authenticate, getBreakfastMenu);
 
 module.exports = router;

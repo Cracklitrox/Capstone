@@ -1,18 +1,19 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const guestsController = require('./guests.controller');
-const { authenticate } = require('../../middleware/auth.middleware');
+const { authenticate } = require("../../middleware/auth.middleware");
+const {
+  searchGuest,
+  createGuest,
+  updateGuest,
+} = require("./guests.controller");
 
-// Todas las rutas requieren autenticación
-router.use(authenticate);
-
-// Buscar huésped por RUT
-router.get('/search/:rut/:rutDv', guestsController.searchGuestByRut);
+// Buscar huésped por identificación
+router.get("/search/:identificationNumber", authenticate, searchGuest);
 
 // Crear nuevo huésped
-router.post('/', guestsController.createGuest);
+router.post("/", authenticate, createGuest);
 
 // Actualizar huésped
-router.put('/:id', guestsController.updateGuest);
+router.put("/:id", authenticate, updateGuest);
 
 module.exports = router;

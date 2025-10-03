@@ -1,9 +1,9 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_URL = 'http://localhost:3001/api/v1';
+const API_URL = "http://localhost:3001/api/v1";
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   return {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -12,10 +12,10 @@ const getAuthHeaders = () => {
 };
 
 export const guestsService = {
-  // Buscar huésped por RUT
-  searchByRut: async (rut, rutDv) => {
+  // Buscar huésped por número de identificación (actualizado)
+  searchByIdentification: async (identificationNumber) => {
     const response = await axios.get(
-      `${API_URL}/guests/search/${rut}/${rutDv}`,
+      `${API_URL}/guests/search/${identificationNumber}`,
       getAuthHeaders()
     );
     return response.data;

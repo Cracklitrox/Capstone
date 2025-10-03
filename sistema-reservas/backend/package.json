@@ -9,9 +9,7 @@
     "test": "dotenv -e .env.test -- vitest",
     "coverage": "dotenv -e .env.test -- vitest run --coverage",
     "migrate:dev": "dotenv -e .env.development -- npx prisma migrate dev",
-    "prisma:dev": "dotenv -e .env.development -- npx prisma"
-  },
-  "prisma": {
+    "prisma:dev": "dotenv -e .env.development -- npx prisma",
     "seed": "node prisma/seed.js"
   },
   "keywords": [],

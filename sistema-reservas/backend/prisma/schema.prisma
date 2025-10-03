@@ -509,6 +509,7 @@ enum service_unit_enum {
   per_person
   per_unit
   per_room
+  custom
 }
 
 enum user_status_enum {

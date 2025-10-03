@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Plus } from "lucide-react";
 import { profileService } from "@/services/profileService";
-import { formatActivityMessage } from "@/lib/activityFormatter";
+import { formatActivity } from "@/lib/activityFormatter";
 
 const ReceptionistDashboard = () => {
   const navigate = useNavigate();
@@ -65,7 +65,7 @@ const ReceptionistDashboard = () => {
                   key={activity.id}
                   className="text-sm border-b pb-2 last:border-b-0"
                 >
-                  {formatActivityMessage(activity)}
+                  {formatActivity(activity)} {/* CORREGIDO */}
                   <span className="text-xs text-muted-foreground ml-2">
                     {new Date(activity.timestamp).toLocaleString("es-CL")}
                   </span>

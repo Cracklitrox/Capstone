@@ -2,13 +2,20 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 /**
- * Buscar huésped por RUT
+ * Buscar huésped por número de identificación
  */
-async function searchGuestByRut(rut, rutDv) {
+async function searchGuestByIdentification(identificationNumber) {
+  // Buscar SOLO usuarios con rol 'guest'
   const guest = await prisma.users.findFirst({
     where: {
-      rut: rut,
-      rut_dv: rutDv,
+      identification_number: identificationNumber,
+      user_roles: {
+        some: {
+          roles: {
+            name: "guest",
+          },
+        },
+      },
     },
     include: {
       guest_details: true,
@@ -28,7 +35,7 @@ async function searchGuestByRut(rut, rutDv) {
     found: true,
     guest: {
       id: guest.id,
-      rut: `${guest.rut}-${guest.rut_dv}`,
+      identificationNumber: guest.identification_number,
       firstName: guest.first_name,
       paternalLastName: guest.paternal_last_name,
       maternalLastName: guest.maternal_last_name,
@@ -39,8 +46,8 @@ async function searchGuestByRut(rut, rutDv) {
       country: guest.country,
       region: guest.region,
       city: guest.city,
-      commune: guest.commune,
       travelsWithChildren: guest.guest_details?.travels_with_children,
+      childrenUnderFour: guest.guest_details?.children_under_four || 0,
       specialRequests: guest.guest_details?.special_requests,
       observations: guest.guest_details?.observations,
     },
@@ -50,10 +57,13 @@ async function searchGuestByRut(rut, rutDv) {
 /**
  * Crear o actualizar huésped
  */
-async function createOrUpdateGuest(guestData, isUpdate = false, guestId = null) {
+async function createOrUpdateGuest(
+  guestData,
+  isUpdate = false,
+  guestId = null
+) {
   const {
-    rut,
-    rutDv,
+    identificationNumber,
     firstName,
     paternalLastName,
     maternalLastName,
@@ -64,17 +74,11 @@ async function createOrUpdateGuest(guestData, isUpdate = false, guestId = null) 
     country,
     region,
     city,
-    commune,
     travelsWithChildren,
+    childrenUnderFour,
     specialRequests,
     observations,
-    nationality,
   } = guestData;
-
-  // Para huéspedes no chilenos, usar email como identificador único
-  const uniqueIdentifier = nationality === 'chileno' 
-    ? { rut, rut_dv: rutDv }
-    : { email };
 
   if (isUpdate && guestId) {
     // Actualizar huésped existente
@@ -91,16 +95,17 @@ async function createOrUpdateGuest(guestData, isUpdate = false, guestId = null) 
         country,
         region,
         city,
-        commune,
         guest_details: {
           upsert: {
             create: {
               travels_with_children: travelsWithChildren || false,
+              children_under_four: childrenUnderFour || 0,
               special_requests: specialRequests,
               observations,
             },
             update: {
               travels_with_children: travelsWithChildren || false,
+              children_under_four: childrenUnderFour || 0,
               special_requests: specialRequests,
               observations,
             },
@@ -115,8 +120,7 @@ async function createOrUpdateGuest(guestData, isUpdate = false, guestId = null) 
   // Crear nuevo huésped
   const newGuest = await prisma.users.create({
     data: {
-      rut: rut || email.substring(0, 8), // Para extranjeros, usar parte del email
-      rut_dv: rutDv || '0',
+      identification_number: identificationNumber,
       first_name: firstName,
       paternal_last_name: paternalLastName,
       maternal_last_name: maternalLastName,
@@ -124,22 +128,23 @@ async function createOrUpdateGuest(guestData, isUpdate = false, guestId = null) 
       phone_number: phoneNumber,
       birth_date: birthDate ? new Date(birthDate) : null,
       gender,
-      country: country || 'Chile',
+      country: country || "Chile",
       region,
       city,
-      commune,
-      password_hash: 'GUEST_NO_PASSWORD', // Los huéspedes no tienen login
-      status: 'active',
+      password_hash: "GUEST_NO_PASSWORD", // Los huéspedes no tienen login
+      status: "active",
+      is_fully_registered: true,
       user_roles: {
         create: {
           roles: {
-            connect: { name: 'guest' },
+            connect: { name: "guest" },
           },
         },
       },
       guest_details: {
         create: {
           travels_with_children: travelsWithChildren || false,
+          children_under_four: childrenUnderFour || 0,
           special_requests: specialRequests,
           observations,
         },
@@ -151,6 +156,6 @@ async function createOrUpdateGuest(guestData, isUpdate = false, guestId = null) 
 }
 
 module.exports = {
-  searchGuestByRut,
+  searchGuestByIdentification,
   createOrUpdateGuest,
 };
