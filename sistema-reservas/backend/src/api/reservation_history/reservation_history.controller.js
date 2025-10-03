@@ -48,7 +48,29 @@ const getHistoryDetailById = async (req, res) => {
   }
 };
 
+/**
+ * Maneja la petición para actualizar la observación de una reserva.
+ */
+const updateObservation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { observation } = req.body;
+
+    if (!observation) {
+      return res.status(400).json({ message: 'La observación no puede estar vacía.' });
+    }
+
+    // Llamamos al servicio para actualizar la observación
+    const updatedReservation = await historyService.updateObservation(id, observation);
+    res.status(200).json(updatedReservation);
+  } catch (error) {
+    console.error('Error al actualizar la observación:', error);
+    res.status(500).json({ message: 'Error interno del servidor.' });
+  }
+};
+
 module.exports = {
   getHistory,
-  getHistoryDetailById, // <-- Se añade la nueva función
+  getHistoryDetailById,
+  updateObservation, 
 };

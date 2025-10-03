@@ -11,4 +11,7 @@ router.get('/', historyController.getHistory);
 // GET /api/v1/reservation_history/:id (para los detalles del modal)
 router.get('/:id', historyController.getHistoryDetailById);
 
+// PUT /api/v1/reservation_history/:id/observation (para actualizar la observación)
+router.put('/:id/observation', historyController.updateObservation);
+
 module.exports = router;

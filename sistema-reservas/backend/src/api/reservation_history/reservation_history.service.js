@@ -144,7 +144,33 @@ const getHistoryDetailById = async (id) => {
   return { ...reservation, days_stayed };
 };
 
+
+/** * Actualiza la observación de una reserva específica.
+ * @param {number} id - El ID de la reserva a actualizar.
+ * @param {string} observation - La nueva observación.
+ */
+const updateObservation = async (id, observation) => {
+  // Buscamos la reserva por su ID
+  const reservation = await prisma.reservations.update({
+    where: { id: parseInt(id) },
+    data: {
+      users_reservations_main_guest_idTousers: {
+        update: {
+          guest_details: {
+            update: {
+              observations: observation,  // Actualizamos la observación
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return reservation;
+};
+
 module.exports = {
   getHistory,
-  getHistoryDetailById, // <-- Se añade la nueva función
+  getHistoryDetailById,
+  updateObservation,
 };
