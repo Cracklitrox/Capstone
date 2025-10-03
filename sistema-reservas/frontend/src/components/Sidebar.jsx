@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../services/authContext.jsx";
+import { fetchCheckoutAlertsCount } from "../services/notifications.js";
 import { Button } from "@/components/ui/Button.jsx";
 import {
   HomeIcon,
@@ -8,6 +9,7 @@ import {
   UserGroupIcon,
   Cog6ToothIcon,
   ViewColumnsIcon,
+  BellAlertIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +26,13 @@ const navLinks = [
     label: "Planning",
     icon: ViewColumnsIcon,
     roles: ["administrator", "receptionist"],
+  },
+  {
+    href: "/checkout-alerts",
+    label: "Check-outs Hoy",
+    icon: BellAlertIcon,
+    roles: ["administrator", "receptionist"],
+    showBadge: true, // Indicador para mostrar badge
   },
   {
     label: "Gestionar Habitaciones",
@@ -70,8 +79,8 @@ const navLinks = [
   },
 ];
 
-// NavLink ahora acepta className y style para el label
-const NavLink = ({ href, label, icon: Icon, onClick, className = "", style = {} }) => {
+// NavLink ahora acepta className y style para el label, más el badge
+const NavLink = ({ href, label, icon: Icon, onClick, className = "", style = {}, badge = null }) => {
   const location = useLocation();
   const isActive = location.pathname === href;
 
@@ -90,16 +99,43 @@ const NavLink = ({ href, label, icon: Icon, onClick, className = "", style = {} 
         >
           {label}
         </span>
+        {badge !== null && badge > 0 && (
+          <span className="ml-2 flex-shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 text-xs font-bold text-white bg-orange-500 rounded-full">
+            {badge}
+          </span>
+        )}
       </Link>
     </Button>
   );
 };
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const closeSidebar = () => setSidebarOpen(false);
   // Estado para abrir/cerrar el submenú de habitaciones
   const [roomsOpen, setRoomsOpen] = useState(false);
+  // Estado para el contador de check-outs
+  const [checkoutCount, setCheckoutCount] = useState(0);
+
+  // Cargar el contador de check-outs
+  useEffect(() => {
+    const loadCheckoutCount = async () => {
+      if (!token) return;
+      try {
+        const response = await fetchCheckoutAlertsCount(token);
+        setCheckoutCount(response.count || 0);
+      } catch (error) {
+        console.error('Error al cargar conteo de check-outs:', error);
+        setCheckoutCount(0);
+      }
+    };
+
+    loadCheckoutCount();
+
+    // Auto-refresh cada 10 minutos
+    const interval = setInterval(loadCheckoutCount, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   return (
     <>
@@ -178,6 +214,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         label={link.label}
                         icon={link.icon}
                         onClick={closeSidebar}
+                        badge={link.showBadge ? checkoutCount : null}
                       />
                     </li>
                   )
