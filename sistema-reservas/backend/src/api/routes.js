@@ -8,6 +8,8 @@ const staffRoutes = require('./staff/staff.routes');
 const authRoutes = require('./auth/auth.routes');
 const roomsRoutes = require('./rooms/rooms.routes');
 const planningRoutes = require('./planning/planning.routes');
+const guestsRoutes = require('./guests/guests.routes');
+const reservationsRoutes = require('./reservations/reservations.routes');
 
 // Define specific rate limiter for staff routes
 const staffLimiter = rateLimit({
@@ -28,5 +30,7 @@ router.use('/auth', authRoutes);
 router.use('/rooms', authenticate, roomsRoutes);
 router.use('/staff', staffLimiter, authenticate, staffRoutes);
 router.use('/planning', authenticate, planningRoutes);
+router.use('/guests', authenticate, guestsRoutes);
+router.use('/reservations', authenticate, reservationsRoutes);
 
 module.exports = router;

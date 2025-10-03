@@ -22,6 +22,8 @@ Capstone
 │  │  │  │  │  └─ migration.sql                                            
 │  │  │  │  ├─ 20250928233606_tabla_login_history                          
 │  │  │  │  │  └─ migration.sql                                            
+│  │  │  │  ├─ 20251001022503_creacion_tabla_logs_mas_enum_y_preferencias  
+│  │  │  │  │  └─ migration.sql                                            
 │  │  │  │  └─ migration_lock.toml                                         
 │  │  │  ├─ check-seed.js                                                  
 │  │  │  ├─ schema.prisma                                                  
@@ -125,6 +127,7 @@ Capstone
 │  │  │  │  ├─ Sidebar.jsx                                                 
 │  │  │  │  └─ Validations.jsx                                             
 │  │  │  ├─ lib                                                            
+│  │  │  │  ├─ activityFormatter.js                                        
 │  │  │  │  └─ utils.js                                                    
 │  │  │  ├─ pages                                                          
 │  │  │  │  ├─ Admin                                                       
@@ -136,6 +139,7 @@ Capstone
 │  │  │  ├─ services                                                       
 │  │  │  │  ├─ authContext.jsx                                             
 │  │  │  │  ├─ planning.js                                                 
+│  │  │  │  ├─ profileService.js                                           
 │  │  │  │  ├─ roomDetails.js                                              
 │  │  │  │  ├─ rooms.js                                                    
 │  │  │  │  └─ services.jsx                                                

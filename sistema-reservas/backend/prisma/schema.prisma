@@ -61,6 +61,7 @@ model cleaning_records {
 model guest_details {
   user_id               Int      @id
   travels_with_children Boolean?
+  children_under_four   Int?     @default(0)
   special_requests      String?  @db.VarChar(200)
   observations          String?  @db.VarChar(250)
   users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -107,16 +108,19 @@ model notifications {
 }
 
 model payments {
-  id             Int                  @id @default(autoincrement())
-  reservation_id Int
-  payment_method payment_method_enum?
-  status         payment_status_enum? @default(pending)
-  amount         Int
-  is_deposit     Boolean?             @default(false)
-  transaction_id String?              @db.VarChar(255)
-  created_at     DateTime?            @default(now()) @db.Timestamp(6)
-  alerts         alerts[]
-  reservations   reservations         @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id               Int                  @id @default(autoincrement())
+  reservation_id   Int
+  payment_method   payment_method_enum?
+  status           payment_status_enum? @default(pending)
+  amount           Int
+  is_deposit       Boolean?             @default(false)
+  payment_sequence Int?                 @default(1)
+  notes            String?
+  transaction_id   String?              @db.VarChar(255)
+  created_at       DateTime?            @default(now()) @db.Timestamp(6)
+  
+  alerts           alerts[]
+  reservations     reservations         @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model promotions {
@@ -148,15 +152,17 @@ model reservation_promotions {
 }
 
 model reservation_rooms {
-  id             Int          @id @default(autoincrement())
-  reservation_id Int
-  room_id        Int
-  start_date     DateTime     @db.Timestamp(6)
-  end_date       DateTime     @db.Timestamp(6)
-  unit_price     Int
-  subtotal       Int
-  reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  rooms          rooms        @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  id                 Int                  @id @default(autoincrement())
+  reservation_id     Int
+  room_id            Int
+  start_date         DateTime             @db.Timestamp(6)
+  end_date           DateTime             @db.Timestamp(6)
+  unit_price         Int
+  subtotal           Int
+  
+  reservations       reservations         @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms              rooms                @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  room_service_daily room_service_daily[]
 }
 
 model reservation_services {
@@ -166,6 +172,9 @@ model reservation_services {
   quantity       Int
   unit_price     Int
   subtotal       Int
+  specific_dates String?      // JSON de fechas específicas
+  daily_rate     Int?
+  
   reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   services       services     @relation(fields: [service_id], references: [id], onUpdate: NoAction)
 }
@@ -182,8 +191,12 @@ model reservations {
   total_amount                              Int?
   paid_amount                               Int?                      @default(0)
   receptionist_id                           Int?
+  booking_type                              String?                   @db.VarChar(20) @default("individual")
+  booking_group_id                          Int?
+  stay_type                                 String?                   @db.VarChar(20) @default("short")
   created_at                                DateTime?                 @default(now()) @db.Timestamp(6)
   updated_at                                DateTime?                 @default(now()) @db.Timestamp(6)
+  
   alerts                                    alerts[]
   payments                                  payments[]
   reservation_guests                        reservation_guests[]
@@ -192,6 +205,7 @@ model reservations {
   reservation_services                      reservation_services[]
   users_reservations_main_guest_idTousers   users                     @relation("reservations_main_guest_idTousers", fields: [main_guest_id], references: [id], onUpdate: NoAction)
   users_reservations_receptionist_idTousers users?                    @relation("reservations_receptionist_idTousers", fields: [receptionist_id], references: [id], onUpdate: NoAction)
+  booking_groups                            booking_groups?           @relation(fields: [booking_group_id], references: [id], onDelete: SetNull)
 }
 
 model roles {
@@ -204,12 +218,13 @@ model roles {
 }
 
 model room_types {
-  id            Int      @id @default(autoincrement())
-  name          String   @unique @db.VarChar(50)
-  base_capacity Int
-  description   String?  @db.VarChar(200)
-  is_active     Boolean? @default(true)
-  rooms         rooms[]
+  id                Int      @id @default(autoincrement())
+  name              String   @unique @db.VarChar(50)
+  base_capacity     Int
+  description       String?
+  bed_configuration String?  @db.VarChar(200)
+  is_active         Boolean? @default(true)
+  rooms             rooms[]
 }
 
 model rooms {
@@ -220,10 +235,11 @@ model rooms {
   capacity          Int
   base_price        Int
   status            room_status_enum?   @default(available)
-  description       String?             @db.VarChar(250)
+  description       String?
   is_active         Boolean?            @default(true)
   created_at        DateTime?           @default(now()) @db.Timestamp(6)
   updated_at        DateTime?           @default(now()) @db.Timestamp(6)
+  
   cleaning_records  cleaning_records[]
   maintenance_tasks maintenance_tasks[]
   reservation_rooms reservation_rooms[]
@@ -235,17 +251,21 @@ model seasons {
   name           String   @unique @db.VarChar(100)
   start_date     DateTime @db.Date
   end_date       DateTime @db.Date
-  price_modifier Decimal  @db.Decimal(5, 2)
+  price_modifier Decimal  @db.Decimal(10, 2)
   is_active      Boolean? @default(true)
 }
 
 model services {
   id                   Int                    @id @default(autoincrement())
   name                 String                 @unique @db.VarChar(80)
+  description          String?
   unit                 service_unit_enum
   price                Int
+  allows_custom_price  Boolean?               @default(false)
   is_active            Boolean?               @default(true)
+  
   reservation_services reservation_services[]
+  room_service_daily   room_service_daily[]
 }
 
 model system_errors {
@@ -270,8 +290,7 @@ model user_roles {
 
 model users {
   id                                               Int                        @id @default(autoincrement())
-  rut                                              String                     @unique @db.VarChar(8)
-  rut_dv                                           String                     @db.Char(1)
+  identification_number                            String                     @unique @db.VarChar(15)
   first_name                                       String                     @db.VarChar(100)
   paternal_last_name                               String                     @db.VarChar(80)
   maternal_last_name                               String?                    @db.VarChar(80)
@@ -282,12 +301,13 @@ model users {
   country                                          String?                    @db.VarChar(100)
   region                                           String?                    @db.VarChar(100)
   city                                             String?                    @db.VarChar(100)
-  commune                                          String?                    @db.VarChar(100)
   password_hash                                    String                     @db.VarChar(255)
   status                                           user_status_enum?          @default(active)
+  is_fully_registered                              Boolean?                   @default(true)
   last_login_at                                    DateTime?                  @db.Timestamp(6)
   created_at                                       DateTime?                  @default(now()) @db.Timestamp(6)
   updated_at                                       DateTime?                  @default(now()) @db.Timestamp(6)
+  
   activity_logs                                    activity_logs[]
   alert_read_status                                alert_read_status[]
   alerts                                           alerts[]
@@ -303,6 +323,7 @@ model users {
   user_roles                                       user_roles[]
   LoginHistory                                     LoginHistory[]
   user_preferences                                 user_preferences?
+  reservation_drafts                               reservation_drafts[]
 }
 
 model LoginHistory {
@@ -326,6 +347,57 @@ model user_preferences {
   updated_at            DateTime @updatedAt @db.Timestamp(6)
   
   users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model booking_groups {
+  id                Int      @id @default(autoincrement())
+  group_name        String   @db.VarChar(150)
+  organization_type organization_type_enum
+  tax_id            String?  @db.VarChar(20)
+  contact_name      String   @db.VarChar(150)
+  contact_email     String   @db.VarChar(150)
+  contact_phone     String?  @db.VarChar(30)
+  billing_address   String?
+  special_terms     String?
+  created_at        DateTime @default(now()) @db.Timestamp(6)
+  updated_at        DateTime @updatedAt @db.Timestamp(6)
+  deleted_at        DateTime? @db.Timestamp(6)
+  
+  reservations      reservations[]
+}
+
+model breakfast_menu_items {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?
+  category    String?  @db.VarChar(50)
+  is_active   Boolean? @default(true)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+}
+
+model room_service_daily {
+  id                  Int              @id @default(autoincrement())
+  reservation_room_id Int
+  service_id          Int
+  service_date        DateTime         @db.Date
+  unit_price          Int
+  quantity            Int
+  subtotal            Int
+  created_at          DateTime         @default(now()) @db.Timestamp(6)
+  
+  reservation_rooms   reservation_rooms @relation(fields: [reservation_room_id], references: [id], onDelete: Cascade)
+  services            services          @relation(fields: [service_id], references: [id])
+}
+
+model reservation_drafts {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  draft_data   Json     // JSON con todos los datos del formulario
+  current_step Int      @default(1)
+  created_at   DateTime @default(now()) @db.Timestamp(6)
+  expires_at   DateTime? @db.Timestamp(6)
+  
+  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 enum alert_status_enum {
@@ -436,6 +508,7 @@ enum service_unit_enum {
   per_night
   per_person
   per_unit
+  per_room
 }
 
 enum user_status_enum {
@@ -462,4 +535,15 @@ enum action_type_enum {
   UPDATE_USER
   UPDATE_PROFILE
   CHANGE_PASSWORD
+}
+
+enum organization_type_enum {
+  empresa
+  institucion_educativa
+  institucion_gubernamental
+  ong
+  tour_operador
+  agencia_viajes
+  evento_corporativo
+  otro
 }

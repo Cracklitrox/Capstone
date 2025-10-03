@@ -10,6 +10,7 @@ import {
   ViewColumnsIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
+import { PlusCircle } from "lucide-react";
 
 const navLinks = [
   {
@@ -23,6 +24,12 @@ const navLinks = [
     label: "Planning",
     icon: ViewColumnsIcon,
     roles: ["administrator", "receptionist"],
+  },
+  {
+    href: "/reservations/new",
+    label: "Nueva Reserva",
+    icon: PlusCircle,
+    roles: ["receptionist", "administrator"],
   },
   {
     href: "/reservations",
@@ -101,7 +108,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
               {navLinks
                 .filter((link) => link.roles.includes(user.role))
                 .map((link) => (
-                  <li key={link.label}>
+                  <li key={link.href}>
                     <NavLink
                       href={link.href}
                       label={link.label}

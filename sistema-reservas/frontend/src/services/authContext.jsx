@@ -58,7 +58,6 @@ export const AuthProvider = ({ children }) => {
     try {
       const preferences = await profileService.getMyPreferences();
 
-      // Aplicar tema por defecto
       if (preferences.defaultTheme) {
         if (preferences.defaultTheme === "system") {
           const systemPrefersDark = window.matchMedia(
@@ -70,7 +69,6 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // Aplicar dashboard por defecto (si existe)
       if (
         preferences.defaultDashboard &&
         preferences.defaultDashboard !== "main"
@@ -78,8 +76,11 @@ export const AuthProvider = ({ children }) => {
         navigate(`/${preferences.defaultDashboard}`);
       }
     } catch (error) {
-      console.error("Error al aplicar preferencias:", error);
-      // Si falla, simplemente continuamos con las preferencias por defecto
+      if (error.response?.status === 400) {
+        console.log('Usuario sin preferencias configuradas, usando valores por defecto');
+      } else {
+        console.error("Error al aplicar preferencias:", error);
+      }
     }
   }, [navigate]);
 
@@ -116,7 +117,6 @@ export const AuthProvider = ({ children }) => {
       setUser(decodedUser);
       setToken(newToken);
 
-      // Aplicar preferencias al hacer login
       profileService
         .getMyPreferences()
         .then((preferences) => {
@@ -131,7 +131,6 @@ export const AuthProvider = ({ children }) => {
             }
           }
 
-          // Navegar al dashboard preferido o al principal
           if (
             preferences.defaultDashboard &&
             preferences.defaultDashboard !== "main"
@@ -142,7 +141,11 @@ export const AuthProvider = ({ children }) => {
           }
         })
         .catch((error) => {
-          console.error("Error al cargar preferencias:", error);
+          if (error.response?.status === 400) {
+            console.log('Usuario sin preferencias, usando valores por defecto');
+          } else {
+            console.error("Error al cargar preferencias:", error);
+          }
           navigate("/");
         });
     },

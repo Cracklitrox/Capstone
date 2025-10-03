@@ -1,41 +1,46 @@
-export async function fetchRooms(token) {
-  const response = await fetch('http://localhost:3001/api/v1/rooms', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  if (!response.ok) {
-    throw new Error('Error al obtener habitaciones');
-  }
-  return response.json();
-}
+import axios from 'axios';
 
-export async function fetchRoomTypes(token) {
-  const response = await fetch('http://localhost:3001/api/v1/rooms/types', {
+const API_URL = 'http://localhost:3001/api/v1';
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
     },
-  }); 
-  if (!response.ok) {
+  };
+};
+
+export const fetchRooms = async (token) => {
+  try {
+    const response = await axios.get(`${API_URL}/rooms`, getAuthHeaders());
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener las habitaciones:', error);
+    throw new Error('Error al obtener las habitaciones');
+  }
+};
+
+export const fetchRoomTypes = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/rooms/types`, getAuthHeaders());
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener los tipos de habitación:', error);
     throw new Error('Error al obtener los tipos de habitación');
   }
-  return response.json();
-}
+};
 
-export async function updateRoomStatus(roomId, newStatus, token) {
-  const response = await fetch(`http://localhost:3001/api/v1/rooms/${roomId}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ status: newStatus }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Error al actualizar el estado de la habitación');
+export const updateRoomStatus = async (roomId, newStatus, token) => {
+  try {
+    const response = await axios.patch(
+      `${API_URL}/rooms/${roomId}/status`,
+      { status: newStatus },
+      getAuthHeaders()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error al actualizar el estado de la habitación:', error);
+    throw new Error('Error al actualizar el estado de la habitación');
   }
-
-  return response.json();
-}
+};
