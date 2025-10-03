@@ -9,6 +9,7 @@ const authRoutes = require('./auth/auth.routes');
 const roomsRoutes = require('./rooms/rooms.routes');
 const adminRoomsRoutes = require('./rooms/admin/adminRooms.routes');
 const planningRoutes = require('./planning/planning.routes');
+const notificationsRoutes = require('./notifications/notifications.routes');
 
 // Define specific rate limiter for staff routes
 const staffLimiter = rateLimit({
@@ -30,5 +31,6 @@ router.use('/rooms', authenticate, roomsRoutes);
 router.use('/admin/rooms', adminRoomsRoutes);
 router.use('/staff', staffLimiter, authenticate, staffRoutes);
 router.use('/planning', authenticate, planningRoutes);
+router.use('/notifications', authenticate, notificationsRoutes);
 
 module.exports = router;
