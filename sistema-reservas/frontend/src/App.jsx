@@ -12,7 +12,7 @@ import RoomsCrud from "./pages/Admin/RoomsCrud.jsx";
 import RoomTypesCrud from "./pages/Admin/RoomTypesCrud.jsx";
 import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
 import TapeChart from "./pages/Receptionist/TapeChart.jsx";
-import CheckoutAlerts from "./pages/Receptionist/CheckoutAlerts.jsx";
+import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlertsImproved.jsx";
 
 import "./index.css";
 
@@ -47,7 +47,7 @@ const AppRoutes = () => {
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<DashboardSelector />} />
         <Route path="planning" element={<TapeChart />} />
-        <Route path="checkout-alerts" element={<CheckoutAlerts />} />
+        <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} />
         <Route path="reservations" element={<ReservationsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />

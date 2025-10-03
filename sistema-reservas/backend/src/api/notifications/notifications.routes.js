@@ -27,4 +27,30 @@ router.get(
   notificationsController.getCheckoutAlertsCount
 );
 
+/**
+ * @route GET /api/v1/notifications/past-checkouts
+ * @desc Obtiene check-outs de días pasados
+ * @query days - Número de días hacia atrás (default: 7)
+ * @access Recepcionista y Administrador
+ */
+router.get(
+  '/past-checkouts',
+  authenticate,
+  authorize(['receptionist', 'administrator']),
+  notificationsController.getPastCheckouts
+);
+
+/**
+ * @route GET /api/v1/notifications/future-checkouts
+ * @desc Obtiene check-outs de días futuros
+ * @query days - Número de días hacia adelante (default: 7)
+ * @access Recepcionista y Administrador
+ */
+router.get(
+  '/future-checkouts',
+  authenticate,
+  authorize(['receptionist', 'administrator']),
+  notificationsController.getFutureCheckouts
+);
+
 module.exports = router;

@@ -48,3 +48,49 @@ export async function fetchCheckoutAlertsCount(token) {
 
   return response.json();
 }
+
+/**
+ * Obtiene check-outs pasados
+ * @param {string} token - JWT token de autenticación
+ * @param {number} days - Número de días hacia atrás (default: 7)
+ * @returns {Promise<Object>} Objeto con los checkouts pasados
+ */
+export async function fetchPastCheckouts(token, days = 7) {
+  const response = await fetch(`${API_BASE_URL}/notifications/past-checkouts?days=${days}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al obtener checkouts pasados');
+  }
+
+  return response.json();
+}
+
+/**
+ * Obtiene check-outs futuros
+ * @param {string} token - JWT token de autenticación
+ * @param {number} days - Número de días hacia adelante (default: 7)
+ * @returns {Promise<Object>} Objeto con los checkouts futuros
+ */
+export async function fetchFutureCheckouts(token, days = 7) {
+  const response = await fetch(`${API_BASE_URL}/notifications/future-checkouts?days=${days}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al obtener checkouts futuros');
+  }
+
+  return response.json();
+}
