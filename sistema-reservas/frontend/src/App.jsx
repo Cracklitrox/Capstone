@@ -12,7 +12,7 @@ import RoomsCrud from "./pages/Admin/RoomsCrud.jsx";
 import RoomTypesCrud from "./pages/Admin/RoomTypesCrud.jsx";
 import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
 import TapeChart from "./pages/Receptionist/TapeChart.jsx";
-import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlertsImproved.jsx";
+import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlerts.jsx";
 
 import "./index.css";
 

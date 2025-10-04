@@ -1,101 +1,150 @@
-import React from "react";
-import { Card, CardContent } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import {
-  UserIcon,
-  ClockIcon,
-  HomeIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-} from "@heroicons/react/24/outline";
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { CalendarClock, User, Home, Phone, Mail, Bed } from 'lucide-react';
 
 /**
- * Componente de tarjeta individual para mostrar una alerta de check-out
- * @param {Object} alert - Datos de la alerta
- * @param {Function} onRoomClick - Función a ejecutar al hacer click en la habitación
+ * Componente de tarjeta mejorado para alertas de checkout
+ * Maneja huéspedes con múltiples habitaciones
+ * 
+ * @param {Object} alert - Objeto de alerta con información del checkout
+ * @param {string} variant - Tipo de alerta: 'today', 'past', 'future'
  */
-function CheckoutAlertCard({ alert, onRoomClick }) {
-  const { reservationCode, checkOutTime, guestInfo, roomInfo, guestCount } = alert;
+export default function CheckoutAlertCard({ alert, variant = 'today' }) {
+  const { guestInfo, rooms, roomCount, checkOutDate, checkOutTime, status, reservationCode } = alert;
+
+  // Colores según el estado
+  const getStatusColor = () => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'confirmed':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'pending':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  // Color del borde de la tarjeta según el tipo
+  const getVariantColor = () => {
+    switch (variant) {
+      case 'today':
+        return 'border-l-4 border-l-orange-500';
+      case 'past':
+        return 'border-l-4 border-l-gray-400';
+      case 'future':
+        return 'border-l-4 border-l-blue-400';
+      default:
+        return 'border-l-4 border-l-orange-500';
+    }
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('es-CL', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'completed':
+        return 'Completado';
+      case 'in_progress':
+        return 'En Progreso';
+      case 'confirmed':
+        return 'Confirmado';
+      case 'pending':
+        return 'Pendiente';
+      default:
+        return status;
+    }
+  };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-orange-500">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <HomeIcon className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-bold text-foreground">
-                Habitación {roomInfo.number}
-              </h3>
-              <Badge variant="warning" className="ml-2">
-                Check-out {checkOutTime}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {roomInfo.type} • Piso {roomInfo.floor}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground mb-1">Reserva</p>
-            <p className="text-sm font-semibold text-foreground">{reservationCode}</p>
-          </div>
-        </div>
-
-        <div className="space-y-2 border-t pt-3">
-          {/* Información del Huésped */}
+    <Card className={`hover:shadow-lg transition-shadow ${getVariantColor()}`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <UserIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
-                {guestInfo.fullName}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {guestCount} {guestCount === 1 ? 'huésped' : 'huéspedes'}
-              </p>
-            </div>
+            <User className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">{guestInfo.fullName}</CardTitle>
           </div>
+          <Badge className={getStatusColor()}>{getStatusText()}</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">Código: {reservationCode}</p>
+      </CardHeader>
 
-          {/* Email */}
-          {guestInfo.email && (
-            <div className="flex items-center gap-2">
-              <EnvelopeIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <p className="text-sm text-muted-foreground truncate">
-                {guestInfo.email}
-              </p>
-            </div>
-          )}
-
-          {/* Teléfono */}
-          {guestInfo.phone && (
-            <div className="flex items-center gap-2">
-              <PhoneIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <p className="text-sm text-muted-foreground">
-                {guestInfo.phone}
-              </p>
-            </div>
-          )}
-
-          {/* Hora de Check-out */}
-          <div className="flex items-center gap-2 pt-2 border-t">
-            <ClockIcon className="h-4 w-4 text-orange-500 flex-shrink-0" />
-            <p className="text-sm font-medium text-orange-600">
-              Check-out programado: {checkOutTime}
-            </p>
-          </div>
+      <CardContent className="space-y-4">
+        {/* Fecha y hora de checkout */}
+        <div className="flex items-center gap-2 text-sm">
+          <CalendarClock className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{formatDate(checkOutDate)}</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-orange-600 font-semibold">{checkOutTime}</span>
         </div>
 
-        {/* Botón de acción (opcional) */}
-        {onRoomClick && (
-          <button
-            onClick={() => onRoomClick(roomInfo.id)}
-            className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors"
-          >
-            Ver Detalles de Habitación
-          </button>
-        )}
+        {/* Información de contacto */}
+        <div className="space-y-1">
+          {guestInfo.email && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Mail className="h-3.5 w-3.5" />
+              <span className="truncate">{guestInfo.email}</span>
+            </div>
+          )}
+          {guestInfo.phone && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Phone className="h-3.5 w-3.5" />
+              <span>{guestInfo.phone}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Habitaciones */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Home className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">
+              {roomCount === 1 ? 'Habitación' : `${roomCount} Habitaciones`}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {rooms.map((room) => (
+              <div
+                key={room.id}
+                className="flex items-center justify-between p-2 bg-muted rounded-md"
+              >
+                <div className="flex items-center gap-2">
+                  <Bed className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Habitación {room.number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {room.type} • Piso {room.floor}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {room.status === 'available'
+                    ? 'Disponible'
+                    : room.status === 'occupied'
+                    ? 'Ocupada'
+                    : room.status === 'cleaning'
+                    ? 'Limpieza'
+                    : room.status === 'maintenance'
+                    ? 'Mantenimiento'
+                    : room.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
 }
-
-export default CheckoutAlertCard;

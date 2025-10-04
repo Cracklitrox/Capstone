@@ -1,198 +1,264 @@
-import React, { useState, useEffect } from "react";
-import { useAuth } from "../../services/authContext";
-import { fetchCheckoutAlerts } from "../../services/notifications";
-import CheckoutAlertCard from "../../components/CheckoutAlertCard";
-import { Card, CardContent } from "@/components/ui/Card";
-import { BellIcon, ArrowPathIcon, ClockIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../services/authContext';
+import { fetchCheckoutAlerts, fetchPastCheckouts, fetchFutureCheckouts } from '../../services/notifications';
+import CheckoutAlertCardImproved from '../../components/CheckoutAlertCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
+import { Badge } from '../../components/ui/badge';
+import { CalendarClock, History, CalendarDays, Loader2 } from 'lucide-react';
 
-/**
- * Página de Notificaciones de Check-out para Recepcionistas
- * Muestra todas las habitaciones con check-out programado para hoy
- */
-function CheckoutAlerts() {
+export default function CheckoutAlertsImproved() {
   const { token } = useAuth();
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [currentTime, setCurrentTime] = useState(null);
+  const [todayAlerts, setTodayAlerts] = useState([]);
+  const [pastCheckouts, setPastCheckouts] = useState([]);
+  const [futureCheckouts, setFutureCheckouts] = useState([]);
+  const [loading, setLoading] = useState({ today: true, past: false, future: false });
+  const [error, setError] = useState({ today: null, past: null, future: null });
+  const [lastUpdate, setLastUpdate] = useState({ today: null, past: null, future: null });
+  const [activeTab, setActiveTab] = useState('today');
 
-  // Función para cargar las alertas
-  const loadAlerts = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // Cargar alertas de hoy
+  const loadTodayAlerts = useCallback(async () => {
+    if (!token) return;
+
     try {
+      setLoading((prev) => ({ ...prev, today: true }));
+      setError((prev) => ({ ...prev, today: null }));
+
       const response = await fetchCheckoutAlerts(token);
-      setAlerts(response.data || []);
-      setCurrentTime(response.currentTime);
-      setLastUpdate(new Date().toLocaleTimeString('es-CL'));
+      setTodayAlerts(response.data || []);
+      setLastUpdate((prev) => ({ ...prev, today: new Date() }));
     } catch (err) {
-      setError(err.message || 'Error al cargar las notificaciones');
-      console.error('Error al cargar alertas:', err);
+      console.error('Error al cargar alertas de hoy:', err);
+      setError((prev) => ({ ...prev, today: err.message }));
     } finally {
-      setLoading(false);
+      setLoading((prev) => ({ ...prev, today: false }));
     }
   }, [token]);
 
-  // Cargar alertas al montar el componente
-  useEffect(() => {
-    if (token) {
-      loadAlerts();
-    }
-  }, [token, loadAlerts]);
+  // Cargar checkouts pasados
+  const loadPastCheckouts = useCallback(async () => {
+    if (!token) return;
 
-  // Auto-refresh cada 10 minutos
+    try {
+      setLoading((prev) => ({ ...prev, past: true }));
+      setError((prev) => ({ ...prev, past: null }));
+
+      const response = await fetchPastCheckouts(token, 7); // Últimos 7 días
+      setPastCheckouts(response.data || []);
+      setLastUpdate((prev) => ({ ...prev, past: new Date() }));
+    } catch (err) {
+      console.error('Error al cargar checkouts pasados:', err);
+      setError((prev) => ({ ...prev, past: err.message }));
+    } finally {
+      setLoading((prev) => ({ ...prev, past: false }));
+    }
+  }, [token]);
+
+  // Cargar checkouts futuros
+  const loadFutureCheckouts = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      setLoading((prev) => ({ ...prev, future: true }));
+      setError((prev) => ({ ...prev, future: null }));
+
+      const response = await fetchFutureCheckouts(token, 7); // Próximos 7 días
+      setFutureCheckouts(response.data || []);
+      setLastUpdate((prev) => ({ ...prev, future: new Date() }));
+    } catch (err) {
+      console.error('Error al cargar checkouts futuros:', err);
+      setError((prev) => ({ ...prev, future: err.message }));
+    } finally {
+      setLoading((prev) => ({ ...prev, future: false }));
+    }
+  }, [token]);
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadTodayAlerts();
+  }, [loadTodayAlerts]);
+
+  // Cargar datos según la pestaña activa
+  useEffect(() => {
+    if (activeTab === 'past' && pastCheckouts.length === 0 && !loading.past) {
+      loadPastCheckouts();
+    } else if (activeTab === 'future' && futureCheckouts.length === 0 && !loading.future) {
+      loadFutureCheckouts();
+    }
+  }, [activeTab, pastCheckouts.length, futureCheckouts.length, loading.past, loading.future, loadPastCheckouts, loadFutureCheckouts]);
+
+  // Auto-refresh cada 10 minutos (solo para la pestaña activa)
   useEffect(() => {
     const interval = setInterval(() => {
-      if (token) {
-        loadAlerts();
+      if (activeTab === 'today') {
+        loadTodayAlerts();
+      } else if (activeTab === 'past') {
+        loadPastCheckouts();
+      } else if (activeTab === 'future') {
+        loadFutureCheckouts();
       }
     }, 10 * 60 * 1000); // 10 minutos
 
     return () => clearInterval(interval);
-  }, [token, loadAlerts]);
+  }, [activeTab, loadTodayAlerts, loadPastCheckouts, loadFutureCheckouts]);
 
-  // Manejador de click en habitación (opcional)
-  const handleRoomClick = (roomId) => {
-    console.log('Ver detalles de habitación:', roomId);
-    // Aquí podrías navegar a la página de detalles de la habitación
-    // o abrir un modal con más información
+  const formatLastUpdate = (date) => {
+    if (!date) return '';
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000); // segundos
+
+    if (diff < 60) return 'hace unos segundos';
+    if (diff < 3600) return `hace ${Math.floor(diff / 60)} minutos`;
+    return `hace ${Math.floor(diff / 3600)} horas`;
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <ArrowPathIcon className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando notificaciones...</p>
+  const renderContent = (alerts, loadingState, errorState, variant, emptyMessage) => {
+    if (loadingState) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-4 text-sm text-muted-foreground">Cargando checkouts...</p>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (error) {
+    if (errorState) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <p className="text-red-500">Error: {errorState}</p>
+        </div>
+      );
+    }
+
+    if (alerts.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <CalendarClock className="h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        </div>
+      );
+    }
+
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-          <BellIcon className="h-8 w-8 text-orange-500" />
-          Notificaciones de Check-out
-        </h1>
-        <Card className="border-destructive">
-          <CardContent className="p-6">
-            <p className="text-destructive font-semibold">Error: {error}</p>
-            <button
-              onClick={loadAlerts}
-              className="mt-4 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
-            >
-              Reintentar
-            </button>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {alerts.map((alert) => (
+          <CheckoutAlertCardImproved key={alert.reservationId} alert={alert} variant={variant} />
+        ))}
       </div>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-            <BellIcon className="h-8 w-8 text-orange-500" />
-            Notificaciones de Check-out
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Habitaciones con check-out programado para hoy
-          </p>
-        </div>
-        <button
-          onClick={loadAlerts}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-          disabled={loading}
-        >
-          <ArrowPathIcon className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Gestión de Checkouts</h1>
+        <p className="text-muted-foreground">
+          Visualiza y gestiona los checkouts de hoy, pasados y futuros
+        </p>
       </div>
 
-      {/* Información de última actualización */}
-      {lastUpdate && currentTime && (
-        <Card className="bg-muted/50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <ClockIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">
-                  Última actualización: {lastUpdate}
-                </span>
-              </div>
-              <div className="text-muted-foreground">
-                Fecha Chile: {currentTime.date} • Hora: {currentTime.time}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Resumen de alertas */}
-      <Card className={alerts.length > 0 ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' : ''}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Total de Check-outs Hoy</p>
-              <p className="text-4xl font-bold text-foreground mt-1">
-                {alerts.length}
-              </p>
-            </div>
-            {alerts.length > 0 && (
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Hora límite</p>
-                <p className="text-2xl font-bold text-orange-600 mt-1">
-                  11:00 AM
-                </p>
-              </div>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="today" className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4" />
+            Hoy
+            {todayAlerts.length > 0 && (
+              <Badge variant="destructive" className="ml-1">
+                {todayAlerts.length}
+              </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="past" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Pasados (7d)
+            {pastCheckouts.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {pastCheckouts.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="future" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Próximos (7d)
+            {futureCheckouts.length > 0 && (
+              <Badge variant="outline" className="ml-1">
+                {futureCheckouts.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Today Tab */}
+        <TabsContent value="today" className="space-y-4 mt-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {lastUpdate.today && `Última actualización: ${formatLastUpdate(lastUpdate.today)}`}
+            </p>
+            <button
+              onClick={loadTodayAlerts}
+              className="text-sm text-primary hover:underline"
+              disabled={loading.today}
+            >
+              Actualizar
+            </button>
           </div>
-        </CardContent>
-      </Card>
+          {renderContent(
+            todayAlerts,
+            loading.today,
+            error.today,
+            'today',
+            'No hay checkouts programados para hoy'
+          )}
+        </TabsContent>
 
-      {/* Lista de alertas */}
-      {alerts.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {alerts.map((alert) => (
-            <CheckoutAlertCard
-              key={alert.reservationId}
-              alert={alert}
-              onRoomClick={handleRoomClick}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <BellIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <p className="text-xl font-semibold text-foreground mb-2">
-              No hay check-outs programados para hoy
+        {/* Past Tab */}
+        <TabsContent value="past" className="space-y-4 mt-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {lastUpdate.past && `Última actualización: ${formatLastUpdate(lastUpdate.past)}`}
             </p>
-            <p className="text-muted-foreground">
-              Todas las habitaciones están en orden. El sistema se actualiza automáticamente cada 10 minutos.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+            <button
+              onClick={loadPastCheckouts}
+              className="text-sm text-primary hover:underline"
+              disabled={loading.past}
+            >
+              Actualizar
+            </button>
+          </div>
+          {renderContent(
+            pastCheckouts,
+            loading.past,
+            error.past,
+            'past',
+            'No hay checkouts en los últimos 7 días'
+          )}
+        </TabsContent>
 
-      {/* Información adicional */}
-      <Card className="bg-muted/30">
-        <CardContent className="p-4">
-          <p className="text-sm text-muted-foreground">
-            💡 <strong>Nota:</strong> Esta página se actualiza automáticamente cada 10 minutos. 
-            Los check-outs están programados para las 11:00 AM. Recuerda cambiar el estado de las 
-            habitaciones a "Limpieza" después de que los huéspedes realicen el check-out.
-          </p>
-        </CardContent>
-      </Card>
+        {/* Future Tab */}
+        <TabsContent value="future" className="space-y-4 mt-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {lastUpdate.future && `Última actualización: ${formatLastUpdate(lastUpdate.future)}`}
+            </p>
+            <button
+              onClick={loadFutureCheckouts}
+              className="text-sm text-primary hover:underline"
+              disabled={loading.future}
+            >
+              Actualizar
+            </button>
+          </div>
+          {renderContent(
+            futureCheckouts,
+            loading.future,
+            error.future,
+            'future',
+            'No hay checkouts programados en los próximos 7 días'
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
-
-export default CheckoutAlerts;
