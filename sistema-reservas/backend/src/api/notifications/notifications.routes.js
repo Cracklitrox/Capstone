@@ -2,13 +2,22 @@ const express = require('express');
 const router = express.Router();
 const notificationsController = require('./notifications.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const rateLimit = require('express-rate-limit');
 
+// Configure a rate limiter: 100 requests per 15 minutes (per IP)
+const notificationsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+ max: 100, // Limit each IP to 100 requests per windowMs
+ standardHeaders: true, // Send rate limit info in the RateLimit-* headers
+ legacyHeaders: false, // Disable the X-RateLimit-* headers
+});
 /**
  * @route GET /api/v1/notifications/checkout-alerts
  * @desc Obtiene todas las alertas de check-out para el día actual (zona horaria Chile)
  * @access Recepcionista y Administrador
  */
 router.get(
+  notificationsLimiter,
   '/checkout-alerts',
   authenticate,
   authorize(['receptionist', 'administrator']),
@@ -21,6 +30,7 @@ router.get(
  * @access Recepcionista y Administrador
  */
 router.get(
+  notificationsLimiter,
   '/checkout-count',
   authenticate,
   authorize(['receptionist', 'administrator']),
@@ -34,6 +44,7 @@ router.get(
  * @access Recepcionista y Administrador
  */
 router.get(
+  notificationsLimiter,
   '/past-checkouts',
   authenticate,
   authorize(['receptionist', 'administrator']),
@@ -47,6 +58,7 @@ router.get(
  * @access Recepcionista y Administrador
  */
 router.get(
+  notificationsLimiter,
   '/future-checkouts',
   authenticate,
   authorize(['receptionist', 'administrator']),
