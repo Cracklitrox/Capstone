@@ -33,6 +33,12 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
   const [showMultiplePayments, setShowMultiplePayments] = useState(false);
 
   useEffect(() => {
+    if (creating && data.paymentMethod && data.paymentAmount > 0) {
+      onCreate();
+    }
+  }, [data.paymentMethod, data.paymentAmount, creating, onCreate]);
+
+  useEffect(() => {
     if (!data.pricing) {
       calculatePricing();
     }
@@ -46,7 +52,7 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
         data.selectedServices.map(s => ({ 
           serviceId: s.id, 
           quantity: s.quantity,
-          customPrice: s.customPrice // Para servicios personalizados
+          customPrice: s.customPrice || s.price
         })),
         data.checkInDate,
         data.checkOutDate,
@@ -188,15 +194,15 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
       return;
     }
 
-    onUpdate({
+    const paymentData = {
       paymentMethod: showMultiplePayments ? 'multiple' : paymentMethod,
       paymentAmount: totalPaid,
       isDeposit: pricing ? totalPaid < pricing.total : false,
       multiplePayments: showMultiplePayments ? multiplePayments : undefined,
-    });
+    };
 
+    onUpdate(paymentData);
     setCreating(true);
-    onCreate();
   };
 
   if (loading) {

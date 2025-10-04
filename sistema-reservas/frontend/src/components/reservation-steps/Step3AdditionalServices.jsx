@@ -203,9 +203,14 @@ const Step3AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
       return;
     }
 
+    const servicesWithPricing = selectedServices.map(service => ({
+      ...service,
+      customPrice: service.customPrice !== undefined ? service.customPrice : service.price
+    }));
+
     onUpdate({
-      selectedServices,
-      breakfastPreferences: selectedBreakfastItems, // NUEVO
+      selectedServices: servicesWithPricing,
+      breakfastPreferences: selectedBreakfastItems,
     });
     onNext();
   };

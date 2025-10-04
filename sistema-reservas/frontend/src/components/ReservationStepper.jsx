@@ -15,6 +15,8 @@ import Step6Summary from "./reservation-steps/Step6Summary";
 
 import { reservationsService } from "@/services/reservations";
 
+import { guestsService } from "@/services/guests";
+
 const STEPS = [
   { id: 1, name: "Búsqueda", description: "Fechas y huéspedes" },
   { id: 2, name: "Habitaciones", description: "Selección" },
@@ -27,7 +29,7 @@ const STEPS = [
 const ReservationStepper = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
-  const [completedSteps, setCompletedSteps] = useState([]); // NUEVO: Steps completados
+  const [completedSteps, setCompletedSteps] = useState([]);
   const [bookingType, setBookingType] = useState("individual");
 
   const [reservationData, setReservationData] = useState({
@@ -49,6 +51,95 @@ const ReservationStepper = () => {
 
   const updateStepData = (stepData) => {
     setReservationData((prev) => ({ ...prev, ...stepData }));
+    
+    const criticalFieldsByStep = {
+      1: ['checkInDate', 'checkOutDate', 'guests'], // Step 1: Búsqueda
+      2: ['selectedRooms', 'availableRooms'], // Step 2: Habitaciones
+      3: ['selectedServices'], // Step 3: Servicios
+      4: ['mainGuest'], // Step 4: Huésped Principal
+      5: ['additionalGuests'], // Step 5: Huéspedes Adicionales
+      6: ['paymentMethod', 'paymentAmount'], // Step 6: Resumen
+    };
+
+    // Detectar qué step se está modificando
+    let modifiedStep = null;
+    for (const [step, fields] of Object.entries(criticalFieldsByStep)) {
+      if (fields.some(field => Object.prototype.hasOwnProperty.call(stepData, field))) {
+        modifiedStep = parseInt(step);
+        break;
+      }
+    }
+
+    // Si se modifica un step anterior al actual, limpiar progreso posterior
+    if (modifiedStep && modifiedStep < currentStep) {
+      // Limpiar completedSteps posteriores
+      setCompletedSteps(prev => prev.filter(step => step < modifiedStep));
+      
+      // Limpiar datos posteriores según el step modificado
+      if (modifiedStep === 1) {
+        // Si cambian fechas/guests, limpiar TODO desde step 2
+        setReservationData(prev => ({
+          ...prev,
+          ...stepData,
+          selectedRooms: [],
+          availableRooms: [],
+          activeSeason: null,
+          selectedServices: [],
+          mainGuest: null,
+          additionalGuests: [],
+          pricing: null,
+          paymentMethod: "",
+          paymentAmount: 0,
+          isDeposit: false,
+        }));
+      } else if (modifiedStep === 2) {
+        // Si cambian habitaciones, limpiar desde step 3
+        setReservationData(prev => ({
+          ...prev,
+          ...stepData,
+          selectedServices: [],
+          mainGuest: null,
+          additionalGuests: [],
+          pricing: null,
+          paymentMethod: "",
+          paymentAmount: 0,
+          isDeposit: false,
+        }));
+      } else if (modifiedStep === 3) {
+        // Si cambian servicios, limpiar desde step 4
+        setReservationData(prev => ({
+          ...prev,
+          ...stepData,
+          mainGuest: null,
+          additionalGuests: [],
+          pricing: null,
+          paymentMethod: "",
+          paymentAmount: 0,
+          isDeposit: false,
+        }));
+      } else if (modifiedStep === 4) {
+        // Si cambia huésped principal, limpiar desde step 5
+        setReservationData(prev => ({
+          ...prev,
+          ...stepData,
+          additionalGuests: [],
+          pricing: null,
+          paymentMethod: "",
+          paymentAmount: 0,
+          isDeposit: false,
+        }));
+      } else if (modifiedStep === 5) {
+        // Si cambian huéspedes adicionales, limpiar solo step 6
+        setReservationData(prev => ({
+          ...prev,
+          ...stepData,
+          pricing: null,
+          paymentMethod: "",
+          paymentAmount: 0,
+          isDeposit: false,
+        }));
+      }
+    }
   };
 
   // NUEVO: Marcar step como completado
@@ -118,13 +209,35 @@ const ReservationStepper = () => {
 
   const handleCreateReservation = async () => {
     try {
+      // PASO 1: Crear huésped principal
+      const mainGuestPayload = {
+        ...reservationData.mainGuest,
+        isMainGuest: true,
+      };
+
+      const mainGuestResult = await guestsService.createGuest(mainGuestPayload);
+      const mainGuestId = mainGuestResult.guest.id;
+
+      // PASO 2: Crear huéspedes adicionales
+      const additionalGuestIds = [];
+      for (const guestData of reservationData.additionalGuests) {
+        const payload = {
+          ...guestData,
+          isMainGuest: false,
+        };
+        const result = await guestsService.createGuest(payload);
+        additionalGuestIds.push(result.guest.id);
+      }
+
+      // PASO 3: Crear reserva
       const payload = {
-        mainGuestId: reservationData.mainGuest.id,
-        additionalGuestIds: reservationData.additionalGuests.map((g) => g.id),
+        mainGuestId: mainGuestId,
+        additionalGuestIds: additionalGuestIds,
         roomIds: reservationData.selectedRooms.map((r) => r.id),
         services: reservationData.selectedServices.map((s) => ({
           serviceId: s.id,
           quantity: s.quantity,
+          customPrice: s.customPrice,
         })),
         checkInDate: reservationData.checkInDate,
         checkOutDate: reservationData.checkOutDate,
@@ -133,6 +246,7 @@ const ReservationStepper = () => {
         paymentMethod: reservationData.paymentMethod,
         paymentAmount: reservationData.paymentAmount,
         isDeposit: reservationData.isDeposit,
+        multiplePayments: reservationData.multiplePayments,
       };
 
       const result = await reservationsService.createReservation(payload);

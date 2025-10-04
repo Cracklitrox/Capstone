@@ -49,6 +49,10 @@ const Step2SelectRooms = ({ data, onUpdate, onNext, onBack }) => {
     if (isSelected) {
       setSelectedRooms(selectedRooms.filter((r) => r.id !== room.id));
     } else {
+      if (selectedRooms.length >= guests) {
+        toast.error(`Solo puedes seleccionar hasta ${guests} habitaciones (1 por huésped)`);
+        return;
+      }
       setSelectedRooms([...selectedRooms, room]);
     }
   };

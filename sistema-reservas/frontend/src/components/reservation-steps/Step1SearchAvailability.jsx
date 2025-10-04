@@ -172,12 +172,19 @@ const Step1SearchAvailability = ({ data, onUpdate, onNext }) => {
         <Label htmlFor="guests">Número de Huéspedes *</Label>
         <Input
           id="guests"
-          type="number"
-          min="1"
-          max="10"
+          type="text"
           value={guests}
-          onChange={(e) => setGuests(parseInt(e.target.value) || 1)}
-          placeholder="Cantidad de personas"
+          onChange={(e) => {
+            const value = e.target.value;
+            if (/^\d*$/.test(value)) {
+              const num = parseInt(value) || '';
+              if (num === '' || (num >= 1 && num <= 10)) {
+                setGuests(num || 1);
+              }
+            }
+          }}
+          placeholder="Número de huéspedes (1-10)"
+          className="text-center"
         />
       </div>
 

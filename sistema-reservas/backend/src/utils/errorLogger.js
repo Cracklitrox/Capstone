@@ -13,7 +13,6 @@ async function logError({
   errorObject = null,
 }) {
   try {
-    // Extraer información adicional del error si existe
     let errorDetails = description;
 
     if (errorObject) {
@@ -33,19 +32,17 @@ async function logError({
           typeof errorDetails === "object"
             ? JSON.stringify(errorDetails)
             : errorDetails,
-        origin_module: originModule,
+        origin_module: originModule.substring(0, 40),
         severity,
         status: "pending",
       },
     });
 
-    // Log en consola también
     console.error(`[${severity.toUpperCase()}] ${originModule}:`, description);
     if (errorObject) {
       console.error(errorObject);
     }
   } catch (error) {
-    // Si falla el log en BD, al menos registrar en consola
     console.error("Error al registrar en BD:", error);
     console.error("Error original:", description);
   }

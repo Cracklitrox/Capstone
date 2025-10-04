@@ -27,7 +27,7 @@ async function searchGuest(req, res) {
 
     await logError({
       userId: req.user?.id,
-      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      userRole: req.user?.role,
       description: `Error al buscar huésped: ${error.message}`,
       originModule: "guests.controller - searchGuest",
       severity: "medium",
@@ -47,26 +47,34 @@ async function searchGuest(req, res) {
 async function createGuest(req, res) {
   try {
     const guestData = req.body;
+    const isMainGuest =
+      req.body.isMainGuest !== undefined ? req.body.isMainGuest : true;
 
     // Validaciones básicas
     if (
       !guestData.identificationNumber ||
       !guestData.firstName ||
-      !guestData.paternalLastName ||
-      !guestData.email
+      !guestData.paternalLastName
     ) {
       return res.status(400).json({
         message:
-          "Datos incompletos. Identificación, nombre, apellido paterno y email son obligatorios.",
+          "Datos incompletos. Identificación, nombre y apellido paterno son obligatorios.",
       });
     }
 
-    // Validar email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(guestData.email)) {
-      return res.status(400).json({
-        message: "Email inválido",
-      });
+    // Validar email solo si es huésped principal
+    if (isMainGuest) {
+      if (!guestData.email) {
+        return res.status(400).json({
+          message: "Email es obligatorio para el huésped principal",
+        });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(guestData.email)) {
+        return res.status(400).json({
+          message: "Email inválido",
+        });
+      }
     }
 
     // Verificar si ya existe
@@ -80,7 +88,8 @@ async function createGuest(req, res) {
       });
     }
 
-    const newGuest = await createOrUpdateGuest(guestData, false);
+    // CORREGIDO: Pasar isMainGuest correctamente
+    const newGuest = await createOrUpdateGuest(guestData, isMainGuest, false);
 
     return res.status(201).json({
       message: "Huésped creado exitosamente",
@@ -92,6 +101,7 @@ async function createGuest(req, res) {
         maternalLastName: newGuest.maternal_last_name,
         email: newGuest.email,
         phoneNumber: newGuest.phone_number,
+        isFullyRegistered: newGuest.is_fully_registered,
       },
     });
   } catch (error) {
@@ -99,7 +109,7 @@ async function createGuest(req, res) {
 
     await logError({
       userId: req.user?.id,
-      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      userRole: req.user?.role,
       description: `Error al crear huésped: ${error.message}`,
       originModule: "guests.controller - createGuest",
       severity: "medium",
@@ -120,23 +130,33 @@ async function updateGuest(req, res) {
   try {
     const { id } = req.params;
     const guestData = req.body;
+    const isMainGuest =
+      req.body.isMainGuest !== undefined ? req.body.isMainGuest : true;
 
+    // CORREGIDO: Pasar todos los parámetros correctamente
     const updatedGuest = await createOrUpdateGuest(
       guestData,
+      isMainGuest,
       true,
       parseInt(id)
     );
 
     return res.status(200).json({
       message: "Huésped actualizado exitosamente",
-      guest: updatedGuest,
+      guest: {
+        id: updatedGuest.id,
+        identificationNumber: updatedGuest.identification_number,
+        firstName: updatedGuest.first_name,
+        paternalLastName: updatedGuest.paternal_last_name,
+        isFullyRegistered: updatedGuest.is_fully_registered,
+      },
     });
   } catch (error) {
     console.error("Error al actualizar huésped:", error);
 
     await logError({
       userId: req.user?.id,
-      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      userRole: req.user?.role,
       description: `Error al actualizar huésped: ${error.message}`,
       originModule: "guests.controller - updateGuest",
       severity: "low",

@@ -114,7 +114,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
           errors.identificationNumber = "Dígito verificador incorrecto";
         }
       } else {
-        if (!validatePassport(formData.identificationNumber)) {
+        if (!/^[A-Z0-9]{8,15}$/i.test(formData.identificationNumber)) {
           errors.identificationNumber = "Pasaporte inválido (8-15 caracteres)";
         }
       }
@@ -128,14 +128,36 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       errors.paternalLastName = "Apellido paterno es obligatorio";
     }
 
-    if (touched.email) {
-      if (!formData.email) {
-        errors.email = "Email es obligatorio";
-      } else {
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(formData.email)) {
-          errors.email = "Email inválido";
-        }
+    // NUEVO: Apellido materno obligatorio
+    if (touched.maternalLastName && !formData.maternalLastName) {
+      errors.maternalLastName = "Apellido materno es obligatorio";
+    }
+
+    // NUEVO: Teléfono obligatorio
+    if (touched.phoneNumber && !formData.phoneNumber) {
+      errors.phoneNumber = "Teléfono es obligatorio";
+    }
+
+    // NUEVO: País obligatorio
+    if (touched.country && !formData.country) {
+      errors.country = "País es obligatorio";
+    }
+
+    // NUEVO: Región obligatoria
+    if (touched.region && !formData.region) {
+      errors.region = "Región es obligatoria";
+    }
+
+    // NUEVO: Ciudad obligatoria
+    if (touched.city && !formData.city) {
+      errors.city = "Ciudad es obligatoria";
+    }
+
+    // Email opcional para adicionales
+    if (touched.email && formData.email) {
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(formData.email)) {
+        errors.email = "Email inválido";
       }
     }
 
@@ -232,21 +254,29 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
   };
 
   const handleCreateGuest = async () => {
-    // Marcar campos como touched
     setTouched({
       identificationNumber: true,
       firstName: true,
       paternalLastName: true,
-      email: true,
+      maternalLastName: true,
+      phoneNumber: true,
+      country: true,
+      region: true,
+      city: true,
     });
 
+    // Validar campos obligatorios
     if (
       !formData.identificationNumber ||
       !formData.firstName ||
       !formData.paternalLastName ||
-      !formData.email
+      !formData.maternalLastName ||
+      !formData.phoneNumber ||
+      !formData.country ||
+      !formData.region ||
+      !formData.city
     ) {
-      toast.error("Complete los campos obligatorios");
+      toast.error("Complete todos los campos obligatorios");
       return;
     }
 
@@ -255,11 +285,10 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       return;
     }
 
-    // Validar duplicados
     const cleaned = cleanRut(formData.identificationNumber);
     if (
       data.mainGuest &&
-      cleaned === cleanRut(data.mainGuest.identificationNumber)
+      cleanRut(data.mainGuest.identificationNumber) === cleaned
     ) {
       toast.error("No puede registrar al huésped principal como adicional");
       return;
@@ -273,45 +302,40 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       return;
     }
 
-    setCreating(true);
-    try {
-      const countryName =
-        countries.find((c) => c.value === formData.country)?.label || "";
-      const stateName =
-        states.find((s) => s.value === formData.region)?.label || "";
+    const countryName =
+      countries.find((c) => c.value === formData.country)?.label || "";
+    const stateName =
+      states.find((s) => s.value === formData.region)?.label || "";
 
-      const payload = {
-        ...formData,
-        country: countryName,
-        region: stateName,
-      };
+    const guestData = {
+      ...formData,
+      country: countryName,
+      region: stateName,
+      isMainGuest: false,
+    };
 
-      const result = await guestsService.createGuest(payload);
+    const newGuests = [...additionalGuests];
+    newGuests[currentGuestIndex] = guestData;
+    setAdditionalGuests(newGuests);
 
-      const newGuests = [...additionalGuests];
-      newGuests[currentGuestIndex] = {
-        id: result.guest.id,
-        identificationNumber: result.guest.identificationNumber,
-        firstName: result.guest.firstName,
-        paternalLastName: result.guest.paternalLastName,
-        maternalLastName: result.guest.maternalLastName,
-        email: result.guest.email,
-      };
-      setAdditionalGuests(newGuests);
+    toast.success(`Huésped ${currentGuestIndex + 2} guardado`);
 
-      toast.success(`Huésped ${currentGuestIndex + 2} registrado`);
+    resetForm();
 
-      resetForm();
-
-      if (currentGuestIndex < remainingGuests - 1) {
-        setCurrentGuestIndex(currentGuestIndex + 1);
-      }
-    } catch (error) {
-      console.error("Error al crear huésped:", error);
-      toast.error(error.response?.data?.message || "Error al crear huésped");
-    } finally {
-      setCreating(false);
+    if (currentGuestIndex < remainingGuests - 1) {
+      setCurrentGuestIndex(currentGuestIndex + 1);
     }
+  };
+
+  const canSkip = () => {
+    if (
+      formData.identificationNumber ||
+      formData.firstName ||
+      formData.paternalLastName
+    ) {
+      return false;
+    }
+    return true;
   };
 
   const resetForm = () => {
@@ -353,6 +377,11 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
   };
 
   const handleSkip = () => {
+    if (!canSkip()) {
+      toast.error("Completa los datos del huésped actual antes de continuar");
+      return;
+    }
+
     if (additionalGuests.length === 0) {
       toast.info("Los huéspedes pueden registrarse después en el check-in");
     }
@@ -375,7 +404,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       const formatted = formatRutInput(value);
       setIdentificationSearch(formatted);
     } else {
-      setIdentificationSearch(value.toUpperCase().replace(/\s/g, ""));
+      setIdentificationSearch(value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
     }
   };
 
@@ -388,7 +417,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     } else {
       updateFormField(
         "identificationNumber",
-        value.toUpperCase().replace(/\s/g, "")
+        value.toUpperCase().replace(/[^A-Z0-9]/g, "")
       );
     }
   };
@@ -659,9 +688,39 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                     </div>
                   </div>
 
+                  {/* Apellido Materno - Campo individual */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Email *</Label>
+                      <Label>Apellido Materno *</Label>
+                      {getCharacterCount(
+                        "maternalLastName",
+                        MAX_LENGTHS.maternalLastName
+                      )}
+                    </div>
+                    <Input
+                      value={formData.maternalLastName}
+                      onChange={(e) =>
+                        updateFormField("maternalLastName", e.target.value)
+                      }
+                      onBlur={() => handleFieldBlur("maternalLastName")}
+                      maxLength={MAX_LENGTHS.maternalLastName}
+                      className={
+                        validationErrors.maternalLastName
+                          ? "border-destructive"
+                          : ""
+                      }
+                    />
+                    {validationErrors.maternalLastName && (
+                      <div className="flex items-center gap-1 text-destructive text-sm">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{validationErrors.maternalLastName}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Email (opcional)</Label>
                       {getCharacterCount("email", MAX_LENGTHS.email)}
                     </div>
                     <Input
@@ -686,7 +745,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Teléfono</Label>
+                      <Label>Teléfono *</Label>
                       {getCharacterCount(
                         "phoneNumber",
                         MAX_LENGTHS.phoneNumber
@@ -697,9 +756,125 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                       onChange={(e) =>
                         updateFormField("phoneNumber", e.target.value)
                       }
+                      onBlur={() => handleFieldBlur("phoneNumber")}
                       placeholder="+56 9 1234 5678"
                       maxLength={MAX_LENGTHS.phoneNumber}
+                      className={
+                        validationErrors.phoneNumber ? "border-destructive" : ""
+                      }
                     />
+                    {validationErrors.phoneNumber && (
+                      <div className="flex items-center gap-1 text-destructive text-sm">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{validationErrors.phoneNumber}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>País *</Label>
+                    <LocationCombobox
+                      options={countries}
+                      value={formData.country}
+                      onChange={(value) => {
+                        setFormData((p) => ({
+                          ...p,
+                          country: value,
+                          region: "",
+                          city: "",
+                        }));
+                        handleFieldBlur("country");
+                      }}
+                      placeholder="País"
+                    />
+                    {validationErrors.country && (
+                      <div className="flex items-center gap-1 text-destructive text-sm">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{validationErrors.country}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {formData.country && (
+                    <div className="space-y-2 animate-fade-in">
+                      <Label>Región *</Label>
+                      <LocationCombobox
+                        options={states}
+                        value={formData.region}
+                        onChange={(value) => {
+                          setFormData((p) => ({
+                            ...p,
+                            region: value,
+                            city: "",
+                          }));
+                          handleFieldBlur("region");
+                        }}
+                        placeholder="Región"
+                      />
+                      {validationErrors.region && (
+                        <div className="flex items-center gap-1 text-destructive text-sm">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{validationErrors.region}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {formData.region && (
+                    <div className="space-y-2 animate-fade-in">
+                      <Label>Ciudad *</Label>
+                      <LocationCombobox
+                        options={cities}
+                        value={formData.city}
+                        onChange={(value) => {
+                          setFormData((p) => ({ ...p, city: value }));
+                          handleFieldBlur("city");
+                        }}
+                        placeholder="Ciudad"
+                      />
+                      {validationErrors.city && (
+                        <div className="flex items-center gap-1 text-destructive text-sm">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{validationErrors.city}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Datos Opcionales */}
+                  <Separator />
+                  <h4 className="font-medium text-foreground">
+                    Datos Opcionales
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Fecha de Nacimiento</Label>
+                      <Input
+                        type="date"
+                        value={formData.birthDate}
+                        onChange={(e) =>
+                          updateFormField("birthDate", e.target.value)
+                        }
+                        max={new Date().toISOString().split("T")[0]}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Género</Label>
+                      <Select
+                        value={formData.gender}
+                        onValueChange={(val) => updateFormField("gender", val)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">Masculino</SelectItem>
+                          <SelectItem value="female">Femenino</SelectItem>
+                          <SelectItem value="other">Otro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <Button
@@ -724,8 +899,10 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
           Volver
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleSkip}>
-            {additionalGuests.length > 0 ? "Continuar" : "Omitir Restantes"}
+          <Button variant="outline" onClick={handleSkip} disabled={!canSkip()}>
+            {additionalGuests.length > 0
+              ? "Continuar sin más huéspedes"
+              : "Omitir huéspedes adicionales"}
           </Button>
           {additionalGuests.length === remainingGuests && (
             <Button onClick={handleContinue}>Continuar</Button>

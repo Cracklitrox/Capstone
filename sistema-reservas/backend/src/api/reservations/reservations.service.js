@@ -47,6 +47,7 @@ async function createReservation(reservationData, receptionistId, receptionistRo
     paymentMethod,
     paymentAmount,
     isDeposit,
+    multiplePayments = [], // NUEVO
   } = reservationData;
 
   // Validar fechas
@@ -154,17 +155,32 @@ async function createReservation(reservationData, receptionistId, receptionistRo
       await tx.reservation_services.createMany({ data: servicesData });
     }
 
-    // 6. Crear registro de pago
+    // 6. Crear registro(s) de pago - MODIFICADO
     if (paymentAmount > 0) {
-      await tx.payments.create({
-        data: {
+      if (paymentMethod === 'multiple' && multiplePayments.length > 0) {
+        // Pagos múltiples
+        const paymentsData = multiplePayments.map((payment, index) => ({
           reservation_id: newReservation.id,
-          payment_method: paymentMethod,
-          status: paymentMethod === 'cash' ? 'confirmed' : 'pending',
-          amount: paymentAmount,
-          is_deposit: isDeposit || (paymentAmount < pricing.total),
-        },
-      });
+          payment_method: payment.method,
+          status: payment.method === 'cash' ? 'confirmed' : 'pending',
+          amount: payment.amount,
+          is_deposit: paymentAmount < pricing.total,
+          payment_sequence: index + 1,
+        }));
+        
+        await tx.payments.createMany({ data: paymentsData });
+      } else {
+        // Pago simple
+        await tx.payments.create({
+          data: {
+            reservation_id: newReservation.id,
+            payment_method: paymentMethod,
+            status: paymentMethod === 'cash' ? 'confirmed' : 'pending',
+            amount: paymentAmount,
+            is_deposit: isDeposit || (paymentAmount < pricing.total),
+          },
+        });
+      }
     }
 
     return newReservation;

@@ -5,10 +5,10 @@ const prisma = new PrismaClient();
  * Buscar huésped por número de identificación
  */
 async function searchGuestByIdentification(identificationNumber) {
-  // Buscar SOLO usuarios con rol 'guest'
   const guest = await prisma.users.findFirst({
     where: {
       identification_number: identificationNumber,
+      deleted_at: null, // Excluir eliminados
       user_roles: {
         some: {
           roles: {
@@ -59,6 +59,7 @@ async function searchGuestByIdentification(identificationNumber) {
  */
 async function createOrUpdateGuest(
   guestData,
+  isMainGuest = true, // NUEVO parámetro
   isUpdate = false,
   guestId = null
 ) {
@@ -80,34 +81,72 @@ async function createOrUpdateGuest(
     observations,
   } = guestData;
 
+  // Convertir campos vacíos a NULL
+  const cleanData = {
+    identificationNumber,
+    firstName,
+    paternalLastName,
+    maternalLastName: maternalLastName || null,
+    email: email || null,
+    phoneNumber: phoneNumber || null,
+    birthDate: birthDate || null,
+    gender: gender || null,
+    country: country || null,
+    region: region || null,
+    city: city || null,
+    travelsWithChildren,
+    childrenUnderFour,
+    specialRequests: specialRequests || null,
+    observations: observations || null,
+  };
+
+  // Calcular is_fully_registered dinámicamente
+  const allRequiredFields = [
+    "identificationNumber",
+    "firstName",
+    "paternalLastName",
+    "maternalLastName",
+    "email",
+    "phoneNumber",
+    "birthDate",
+    "gender",
+    "country",
+    "region",
+    "city",
+  ];
+  const isFullyRegistered = allRequiredFields.every(
+    (field) => cleanData[field]
+  );
+
   if (isUpdate && guestId) {
     // Actualizar huésped existente
     const updatedGuest = await prisma.users.update({
       where: { id: guestId },
       data: {
-        first_name: firstName,
-        paternal_last_name: paternalLastName,
-        maternal_last_name: maternalLastName,
-        email,
-        phone_number: phoneNumber,
-        birth_date: birthDate ? new Date(birthDate) : null,
-        gender,
-        country,
-        region,
-        city,
+        first_name: cleanData.firstName,
+        paternal_last_name: cleanData.paternalLastName,
+        maternal_last_name: cleanData.maternalLastName,
+        email: cleanData.email,
+        phone_number: cleanData.phoneNumber,
+        birth_date: cleanData.birthDate ? new Date(cleanData.birthDate) : null,
+        gender: cleanData.gender,
+        country: cleanData.country,
+        region: cleanData.region,
+        city: cleanData.city,
+        is_fully_registered: isFullyRegistered,
         guest_details: {
           upsert: {
             create: {
-              travels_with_children: travelsWithChildren || false,
-              children_under_four: childrenUnderFour || 0,
-              special_requests: specialRequests,
-              observations,
+              travels_with_children: cleanData.travelsWithChildren || false,
+              children_under_four: cleanData.childrenUnderFour || 0,
+              special_requests: cleanData.specialRequests,
+              observations: cleanData.observations,
             },
             update: {
-              travels_with_children: travelsWithChildren || false,
-              children_under_four: childrenUnderFour || 0,
-              special_requests: specialRequests,
-              observations,
+              travels_with_children: cleanData.travelsWithChildren || false,
+              children_under_four: cleanData.childrenUnderFour || 0,
+              special_requests: cleanData.specialRequests,
+              observations: cleanData.observations,
             },
           },
         },
@@ -120,20 +159,20 @@ async function createOrUpdateGuest(
   // Crear nuevo huésped
   const newGuest = await prisma.users.create({
     data: {
-      identification_number: identificationNumber,
-      first_name: firstName,
-      paternal_last_name: paternalLastName,
-      maternal_last_name: maternalLastName,
-      email,
-      phone_number: phoneNumber,
-      birth_date: birthDate ? new Date(birthDate) : null,
-      gender,
-      country: country || "Chile",
-      region,
-      city,
-      password_hash: "GUEST_NO_PASSWORD", // Los huéspedes no tienen login
+      identification_number: cleanData.identificationNumber,
+      first_name: cleanData.firstName,
+      paternal_last_name: cleanData.paternalLastName,
+      maternal_last_name: cleanData.maternalLastName,
+      email: cleanData.email,
+      phone_number: cleanData.phoneNumber,
+      birth_date: cleanData.birthDate ? new Date(cleanData.birthDate) : null,
+      gender: cleanData.gender,
+      country: cleanData.country || "Chile",
+      region: cleanData.region,
+      city: cleanData.city,
+      password_hash: "GUEST_NO_PASSWORD",
       status: "active",
-      is_fully_registered: true,
+      is_fully_registered: isFullyRegistered, // Calculado dinámicamente
       user_roles: {
         create: {
           roles: {
@@ -143,10 +182,10 @@ async function createOrUpdateGuest(
       },
       guest_details: {
         create: {
-          travels_with_children: travelsWithChildren || false,
-          children_under_four: childrenUnderFour || 0,
-          special_requests: specialRequests,
-          observations,
+          travels_with_children: cleanData.travelsWithChildren || false,
+          children_under_four: cleanData.childrenUnderFour || 0,
+          special_requests: cleanData.specialRequests,
+          observations: cleanData.observations,
         },
       },
     },

@@ -57,13 +57,24 @@ async function calculateRoomPrice(roomId, checkInDate, checkOutDate) {
 /**
  * Calcular precio de servicio
  */
-async function calculateServicePrice(serviceId, quantity, nights, guests) {
+async function calculateServicePrice(serviceId, quantity, nights, guests, customPrice = null) {
   const service = await prisma.services.findUnique({
     where: { id: serviceId },
   });
 
   if (!service) {
     throw new Error(`Servicio ${serviceId} no encontrado`);
+  }
+
+  if (service.unit === 'custom' && customPrice !== null) {
+    return {
+      serviceId: service.id,
+      serviceName: service.name,
+      unit: service.unit,
+      unitPrice: customPrice,
+      quantity: quantity,
+      subtotal: customPrice * quantity,
+    };
   }
 
   let subtotal = 0;
@@ -76,10 +87,10 @@ async function calculateServicePrice(serviceId, quantity, nights, guests) {
       subtotal = service.price * guests * nights;
       break;
     case 'per_room':
-      subtotal = service.price * quantity; // quantity = número de habitaciones
+      subtotal = service.price * quantity;
       break;
     case 'per_unit':
-      subtotal = service.price * quantity; // quantity = cantidad especificada
+      subtotal = service.price * quantity;
       break;
     default:
       subtotal = service.price;
@@ -131,7 +142,8 @@ async function calculateReservationTotal(roomIds, serviceData, checkInDate, chec
       serviceItem.serviceId,
       serviceItem.quantity,
       nights,
-      guests
+      guests,
+      serviceItem.customPrice
     );
     servicesSubtotal += servicePrice.subtotal;
     servicesBreakdown.push(servicePrice);
