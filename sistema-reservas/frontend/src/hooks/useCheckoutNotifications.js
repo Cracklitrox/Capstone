@@ -107,34 +107,23 @@ export function useAlertTime(alertHour = 9) {
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
-      
-      // Obtener la hora local (Chile UTC-3)
       const currentHour = now.getHours();
       const today = now.toDateString();
       
-      console.log('⏰ Hora actual:', currentHour, '- Fecha:', today);
-      
       // ⭐ Alertar desde las 9:00 AM en adelante (sin límite superior)
       const isPastAlertHour = currentHour >= alertHour;
-      
-      console.log('⏰ isPastAlertHour:', isPastAlertHour, '(currentHour:', currentHour, '>= alertHour:', alertHour + ')');
       
       if (isPastAlertHour) {
         // Verificar si ya fue marcada como leída hoy
         const readAlertsKey = `checkoutAlerts_read_${today}`;
         const isReadToday = localStorage.getItem(readAlertsKey) === 'true';
 
-        console.log('📖 isReadToday:', isReadToday, '- Key:', readAlertsKey);
-
         if (!isReadToday) {
-          console.log('✅ Activando alerta (no ha sido leída)');
           setShouldAlert(true);
         } else {
-          console.log('🔕 Alerta ya fue leída hoy');
           setShouldAlert(false);
         }
       } else {
-        console.log('⏳ Aún no es hora de alertar (antes de las', alertHour + ':00)');
         // Antes de las 9 AM, no mostrar alerta
         setShouldAlert(false);
       }

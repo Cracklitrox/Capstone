@@ -1,15 +1,17 @@
-import React from "react";
-// 1. Ahora obtenemos 'isDarkMode' y 'toggleTheme' del contexto.
+import React, { useState } from "react";
 import { useAuth } from '../services/authContext.jsx';
+import { useCheckoutCount } from '../hooks/useCheckoutCount';
+import CheckoutNotificationPopover from './CheckoutNotificationPopover';
 import { Button } from "@/components/ui/Button.jsx";
 import { Switch } from "@/components/ui/Switch.jsx";
 import { Label } from "@/components/ui/Label.jsx";
-import { ArrowLeftOnRectangleIcon, Bars3Icon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftOnRectangleIcon, Bars3Icon, SunIcon, MoonIcon, BellAlertIcon } from '@heroicons/react/24/outline';
 import { Link } from "react-router-dom";
 
-const Navbar = ({ toggleSidebar }) => {
-    // 2. Usamos los valores y funciones del contexto. ¡No más lógica de tema aquí!
+const Navbar = ({ toggleSidebar, markAsRead }) => {
     const { logout, user, isDarkMode, toggleTheme } = useAuth();
+    const { count, refetch } = useCheckoutCount();
+    const [showPopover, setShowPopover] = useState(false);
 
     const navLinks = [
         { href: "/", label: "Inicio", roles: ["administrator", "receptionist"] },
@@ -38,6 +40,34 @@ const Navbar = ({ toggleSidebar }) => {
             </div>
             
             <div className="flex items-center space-x-4">
+                {/* Campanita de notificaciones - Solo para recepcionistas */}
+                {user?.role === 'receptionist' && (
+                    <>
+                        <Button 
+                            onClick={() => setShowPopover(true)} 
+                            variant="ghost" 
+                            size="icon"
+                            className="relative"
+                            title="Ver checkouts de hoy"
+                        >
+                            <BellAlertIcon className="h-6 w-6" />
+                            {count > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                                    {count > 9 ? '9+' : count}
+                                </span>
+                            )}
+                        </Button>
+                        
+                        {/* Popover de notificaciones */}
+                        <CheckoutNotificationPopover 
+                            isOpen={showPopover}
+                            onClose={() => setShowPopover(false)}
+                            onMarkAsRead={markAsRead}
+                            onRefetchCount={refetch}
+                        />
+                    </>
+                )}
+
                 <div className="flex items-center space-x-2">
                     <SunIcon className="h-5 w-5" />
                     <Switch

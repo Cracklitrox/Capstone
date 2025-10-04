@@ -31,7 +31,7 @@ const navLinks = [
     href: "/checkout-alerts",
     label: "Check-outs Hoy",
     icon: BellAlertIcon,
-    roles: ["administrator", "receptionist"],
+    roles: ["receptionist"], // Solo recepcionistas
     showBadge: true, // Indicador para mostrar badge
   },
   {
