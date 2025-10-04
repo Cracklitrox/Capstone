@@ -97,30 +97,46 @@ export function useCheckoutNotifications() {
 }
 
 /**
- * Hook para verificar si es hora de mostrar la alerta (9:00 AM - 10:59 AM)
+ * Hook para verificar si es hora de mostrar la alerta (desde 9:00 AM en adelante)
+ * La alerta se mantiene visible hasta que el recepcionista la marque como leída
  * @param {number} alertHour - Hora de inicio de alerta (default: 9)
- * @param {number} endHour - Hora de fin de alerta (default: 11)
  */
-export function useAlertTime(alertHour = 9, endHour = 11) {
+export function useAlertTime(alertHour = 9) {
   const [shouldAlert, setShouldAlert] = useState(false);
 
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
+      
+      // Obtener la hora local (Chile UTC-3)
       const currentHour = now.getHours();
+      const today = now.toDateString();
       
-      // ⭐ Alertar solo entre 9:00 AM y 10:59 AM
-      const isWithinAlertWindow = currentHour >= alertHour && currentHour < endHour;
+      console.log('⏰ Hora actual:', currentHour, '- Fecha:', today);
       
-      if (isWithinAlertWindow) {
-        // Verificar si ya se mostró hoy
-        const lastAlertDate = localStorage.getItem('lastCheckoutAlertDate');
-        const today = now.toDateString();
+      // ⭐ Alertar desde las 9:00 AM en adelante (sin límite superior)
+      const isPastAlertHour = currentHour >= alertHour;
+      
+      console.log('⏰ isPastAlertHour:', isPastAlertHour, '(currentHour:', currentHour, '>= alertHour:', alertHour + ')');
+      
+      if (isPastAlertHour) {
+        // Verificar si ya fue marcada como leída hoy
+        const readAlertsKey = `checkoutAlerts_read_${today}`;
+        const isReadToday = localStorage.getItem(readAlertsKey) === 'true';
 
-        if (lastAlertDate !== today) {
+        console.log('📖 isReadToday:', isReadToday, '- Key:', readAlertsKey);
+
+        if (!isReadToday) {
+          console.log('✅ Activando alerta (no ha sido leída)');
           setShouldAlert(true);
-          localStorage.setItem('lastCheckoutAlertDate', today);
+        } else {
+          console.log('🔕 Alerta ya fue leída hoy');
+          setShouldAlert(false);
         }
+      } else {
+        console.log('⏳ Aún no es hora de alertar (antes de las', alertHour + ':00)');
+        // Antes de las 9 AM, no mostrar alerta
+        setShouldAlert(false);
       }
     };
 
@@ -131,11 +147,19 @@ export function useAlertTime(alertHour = 9, endHour = 11) {
     const interval = setInterval(checkTime, 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [alertHour, endHour]);
+  }, [alertHour]);
+
+  // Función para marcar la alerta como leída
+  const markAsRead = useCallback(() => {
+    const today = new Date().toDateString();
+    const readAlertsKey = `checkoutAlerts_read_${today}`;
+    localStorage.setItem(readAlertsKey, 'true');
+    setShouldAlert(false);
+  }, []);
 
   const resetAlert = useCallback(() => {
     setShouldAlert(false);
   }, []);
 
-  return { shouldAlert, resetAlert };
+  return { shouldAlert, resetAlert, markAsRead };
 }

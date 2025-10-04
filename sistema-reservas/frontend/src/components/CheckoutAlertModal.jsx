@@ -15,12 +15,19 @@ import { BellAlertIcon, ClockIcon, HomeIcon } from "@heroicons/react/24/outline"
  * Modal de alerta que se muestra al iniciar sesión
  * cuando hay check-outs programados para hoy
  */
-function CheckoutAlertModal({ isOpen, onClose, alertsData }) {
+function CheckoutAlertModal({ isOpen, onClose, alertsData, onMarkAsRead }) {
   const navigate = useNavigate();
 
   const handleViewDetails = () => {
     onClose();
     navigate('/checkout-alerts');
+  };
+
+  const handleMarkAsRead = () => {
+    if (onMarkAsRead) {
+      onMarkAsRead();
+    }
+    onClose();
   };
 
   if (!alertsData || alertsData.count === 0) {
@@ -98,11 +105,25 @@ function CheckoutAlertModal({ isOpen, onClose, alertsData }) {
           </div>
         </div>
 
-        <DialogFooter className="flex gap-2 sm:gap-0">
-          <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-initial">
-            Cerrar
+        <DialogFooter className="flex flex-col sm:flex-row gap-2">
+          <Button 
+            variant="outline" 
+            onClick={onClose} 
+            className="flex-1 sm:flex-initial order-3 sm:order-1"
+          >
+            Ahora no
           </Button>
-          <Button onClick={handleViewDetails} className="flex-1 sm:flex-initial">
+          <Button 
+            variant="secondary" 
+            onClick={handleMarkAsRead} 
+            className="flex-1 sm:flex-initial order-2"
+          >
+            ✓ Marcar como Leído
+          </Button>
+          <Button 
+            onClick={handleViewDetails} 
+            className="flex-1 sm:flex-initial order-1 sm:order-3"
+          >
             Ver Detalles
           </Button>
         </DialogFooter>

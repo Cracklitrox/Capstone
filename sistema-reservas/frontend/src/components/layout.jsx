@@ -13,10 +13,10 @@ const Layout = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [checkoutAlerts, setCheckoutAlerts] = useState([]);
   
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
   const { requestPermission, notifyCheckouts } = useCheckoutNotifications();
-  const { shouldAlert } = useAlertTime(9); // 9 AM
+  const { shouldAlert, markAsRead } = useAlertTime(0); // TEMPORAL: 0 AM para testing (cambiar a 9 cuando se corrija la hora)
 
   // Creamos una función 'toggle' para que sea más fácil de entender.
   const toggleSidebar = () => {
@@ -32,29 +32,61 @@ const Layout = () => {
 
   // Cargar alertas y mostrar modal/notificación cuando sea hora
   useEffect(() => {
-    if (!shouldAlert || user?.role !== 'receptionist') return;
+    console.log('🔍 DEBUG - useEffect ejecutado:', {
+      user: user?.email,
+      role: user?.role,
+      tokenLength: token?.length,
+      shouldAlert
+    });
 
-    const loadAlertsAndNotify = async () => {
-      try {
-        const data = await fetchCheckoutAlerts();
-        setCheckoutAlerts(data);
-        
-        if (data.length > 0) {
-          // Mostrar modal en login
-          setModalOpen(true);
+    // Primero verificar que el usuario esté autenticado
+    if (!user || !token || user.role !== 'receptionist') {
+      console.log('❌ Validación falló - no se ejecutará la carga de alertas');
+      return;
+    }
+    
+    // Luego verificar si debe mostrar alerta
+    if (!shouldAlert) {
+      console.log('⏸️ shouldAlert es false - no es hora de mostrar alertas');
+      return;
+    }
+
+    console.log('✅ Todas las validaciones pasaron - programando carga de alertas');
+
+    // Pequeño delay para asegurar que el token esté completamente disponible
+    const timeoutId = setTimeout(() => {
+      const loadAlertsAndNotify = async () => {
+        try {
+          console.log('📡 Enviando petición con token:', token.substring(0, 20) + '...');
+          const data = await fetchCheckoutAlerts(token);
           
-          // Mostrar notificación del navegador
-          notifyCheckouts(data.length, () => {
-            navigate('/checkout-alerts');
-          });
+          console.log('📦 Datos recibidos:', data);
+          
+          if (data && data.data) {
+            setCheckoutAlerts(data);
+            
+            if (data.data.length > 0) {
+              // Mostrar modal en login
+              setModalOpen(true);
+              
+              // Mostrar notificación del navegador
+              notifyCheckouts(data.data.length, () => {
+                navigate('/checkout-alerts');
+              });
+            }
+          }
+        } catch (error) {
+          console.error('💥 Error al cargar alertas de checkout:', error);
+          console.error('💥 Token usado:', token?.substring(0, 20) + '...');
+          // Si el token es inválido, no hacer nada (el usuario ya está en la página)
         }
-      } catch (error) {
-        console.error('Error al cargar alertas de checkout:', error);
-      }
-    };
+      };
 
-    loadAlertsAndNotify();
-  }, [shouldAlert, user, notifyCheckouts, navigate]);
+      loadAlertsAndNotify();
+    }, 500); // Esperar 500ms para que el contexto se actualice
+
+    return () => clearTimeout(timeoutId);
+  }, [shouldAlert, user, token, notifyCheckouts, navigate]);
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
@@ -80,9 +112,10 @@ const Layout = () => {
       
       {/* Modal de alertas de checkout */}
       <CheckoutAlertModal 
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        alerts={checkoutAlerts}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        alertsData={checkoutAlerts}
+        onMarkAsRead={markAsRead}
       />
     </div>
   );
