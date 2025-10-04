@@ -304,6 +304,85 @@ async function createComplexScenarios(faker, { users, rooms, services, reception
         });
     }
     console.log('✅ 50 Reservaciones adicionales creadas.');
+
+  // ============================================================================
+  // ESCENARIO ESPECIAL: Reservas con CHECK-OUT HOY (Para testing de notificaciones)
+  // ============================================================================
+  console.log('🔔 Creando reservas con check-out HOY para testing de notificaciones...');
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Inicio del día
+  
+  const checkInYesterday = new Date(today);
+  checkInYesterday.setDate(today.getDate() - 1);
+  checkInYesterday.setHours(8, 0, 0, 0); // Check-in ayer a las 8:00 AM
+  
+  const checkOutToday = new Date(today);
+  checkOutToday.setHours(11, 0, 0, 0); // Check-out hoy a las 11:00 AM
+  
+  // Obtener habitaciones ocupadas que podemos usar para este escenario
+  const occupiedRooms = rooms.filter(r => r.status === 'occupied').slice(0, 5);
+  
+  for (let i = 0; i < Math.min(5, occupiedRooms.length); i++) {
+    const room = occupiedRooms[i];
+    const mainGuest = faker.helpers.arrayElement(users.guests);
+    const receptionist = faker.helpers.arrayElement(users.receptionists);
+    
+    // Calcular días de estancia (1-3 días)
+    const stayDays = faker.number.int({ min: 1, max: 3 });
+    const checkInDate = new Date(checkOutToday);
+    checkInDate.setDate(checkOutToday.getDate() - stayDays);
+    checkInDate.setHours(8, 0, 0, 0);
+    
+    const subtotalRoom = room.base_price * stayDays;
+    const service = faker.helpers.arrayElement(services);
+    const serviceQuantity = faker.number.int({ min: 1, max: 3 });
+    const subtotalService = service.price * serviceQuantity;
+    const totalAmount = subtotalRoom + subtotalService;
+    
+    await prisma.reservations.create({
+      data: {
+        code: `CHECKOUT-TODAY-${String(i + 1).padStart(3, '0')}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: receptionist.id,
+        channel: faker.helpers.arrayElement(['reception', 'web', 'chatbot']),
+        status: 'in_progress', // Reserva activa
+        check_in_date: checkInDate,
+        check_out_date: checkOutToday, // Check-out HOY a las 11:00 AM
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: totalAmount,
+        paid_amount: totalAmount, // Totalmente pagado
+        reservation_rooms: {
+          create: {
+            room_id: room.id,
+            start_date: checkInDate,
+            end_date: checkOutToday,
+            unit_price: room.base_price,
+            subtotal: subtotalRoom
+          }
+        },
+        reservation_services: {
+          create: {
+            service_id: service.id,
+            quantity: serviceQuantity,
+            unit_price: service.price,
+            subtotal: subtotalService
+          }
+        },
+        payments: {
+          create: {
+            amount: totalAmount,
+            payment_method: faker.helpers.arrayElement(['credit_card', 'debit_card', 'cash']),
+            status: 'confirmed',
+            is_deposit: false
+          }
+        }
+      }
+    });
+  }
+  console.log(`✅ Creadas ${Math.min(5, occupiedRooms.length)} reservas con check-out HOY a las 11:00 AM.`);
+  // ============================================================================
+
   // Creación de registros de limpieza realistas para habitaciones en estado 'cleaning'
   const cleaningRooms = rooms.filter(r => r.status === 'cleaning');
   for (const room of cleaningRooms) {

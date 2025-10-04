@@ -8,6 +8,10 @@ until pg_isready -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
   sleep 2
 done
 
+# Espera adicional para asegurar que PostgreSQL esté completamente inicializado
+echo "Base de datos aceptando conexiones. Esperando inicialización completa..."
+sleep 5
+
 # Creamos el rol "root" si no existe
 echo "Verificando si el rol 'root' existe..."
 

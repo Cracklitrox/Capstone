@@ -9,9 +9,18 @@ const authRoutes = require('./auth/auth.routes');
 const roomsRoutes = require('./rooms/rooms.routes');
 const adminRoomsRoutes = require('./rooms/admin/adminRooms.routes');
 const planningRoutes = require('./planning/planning.routes');
+const notificationsRoutes = require('./notifications/notifications.routes');
 
 // Define specific rate limiter for staff routes
 const staffLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false,  // Disable the `X-RateLimit-*` headers
+});
+
+// Define specific rate limiter for notifications routes
+const notificationsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
@@ -30,5 +39,6 @@ router.use('/rooms', authenticate, roomsRoutes);
 router.use('/admin/rooms', adminRoomsRoutes);
 router.use('/staff', staffLimiter, authenticate, staffRoutes);
 router.use('/planning', authenticate, planningRoutes);
+router.use('/notifications', notificationsLimiter, authenticate, notificationsRoutes);
 
 module.exports = router;
