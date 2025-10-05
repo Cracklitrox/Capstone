@@ -1,26 +1,27 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const notificationsController = require('./notifications.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
-const rateLimit = require('express-rate-limit');
+const notificationsController = require("./notifications.controller");
+const { authenticate, authorize } = require("../../middleware/auth.middleware");
+const rateLimit = require("express-rate-limit");
 
 // Configure a rate limiter: 100 requests per 15 minutes (per IP)
 const notificationsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
- max: 100, // Limit each IP to 100 requests per windowMs
- standardHeaders: true, // Send rate limit info in the RateLimit-* headers
- legacyHeaders: false, // Disable the X-RateLimit-* headers
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Send rate limit info in the RateLimit-* headers
+  legacyHeaders: false, // Disable the X-RateLimit-* headers
 });
+
 /**
  * @route GET /api/v1/notifications/checkout-alerts
  * @desc Obtiene todas las alertas de check-out para el día actual (zona horaria Chile)
  * @access Recepcionista y Administrador
  */
 router.get(
+  "/checkout-alerts",
   notificationsLimiter,
-  '/checkout-alerts',
   authenticate,
-  authorize(['receptionist', 'administrator']),
+  authorize(["receptionist", "administrator"]),
   notificationsController.getCheckoutAlerts
 );
 
@@ -30,10 +31,10 @@ router.get(
  * @access Recepcionista y Administrador
  */
 router.get(
+  "/checkout-count",
   notificationsLimiter,
-  '/checkout-count',
   authenticate,
-  authorize(['receptionist', 'administrator']),
+  authorize(["receptionist", "administrator"]),
   notificationsController.getCheckoutAlertsCount
 );
 
@@ -44,10 +45,10 @@ router.get(
  * @access Recepcionista y Administrador
  */
 router.get(
+  "/past-checkouts",
   notificationsLimiter,
-  '/past-checkouts',
   authenticate,
-  authorize(['receptionist', 'administrator']),
+  authorize(["receptionist", "administrator"]),
   notificationsController.getPastCheckouts
 );
 
@@ -58,10 +59,10 @@ router.get(
  * @access Recepcionista y Administrador
  */
 router.get(
+  "/future-checkouts",
   notificationsLimiter,
-  '/future-checkouts',
   authenticate,
-  authorize(['receptionist', 'administrator']),
+  authorize(["receptionist", "administrator"]),
   notificationsController.getFutureCheckouts
 );
 
