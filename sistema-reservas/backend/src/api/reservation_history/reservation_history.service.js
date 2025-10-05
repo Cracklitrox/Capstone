@@ -1,5 +1,3 @@
-// backend/src/api/reservation_history/reservation_history.service.js
-
 const prisma = require('../../db/prisma.client');
 
 /**
@@ -19,7 +17,6 @@ const getHistory = async (filters, pagination) => {
       users_reservations_main_guest_idTousers: { rut: { contains: rut, mode: 'insensitive' } }
     });
   }
-  // --- CORRECCIÓN ---: Filtra por el número de habitación (room_number) en lugar del ID interno.
   if (roomId) {
     where.AND.push({ reservation_rooms: { some: { rooms: { room_number: parseInt(roomId) } } } });
   }
@@ -30,7 +27,6 @@ const getHistory = async (filters, pagination) => {
     where.AND.push({ check_in_date: { gte: new Date(startDate) } });
   }
   if (endDate) {
-    // Ajustado para que la búsqueda incluya el día completo de la fecha final
     const nextDay = new Date(endDate);
     nextDay.setDate(nextDay.getDate() + 1);
     where.AND.push({ check_out_date: { lte: nextDay } });
@@ -54,12 +50,11 @@ const getHistory = async (filters, pagination) => {
       skip,
       take: limit,
       orderBy: {
-        check_in_date: 'desc', // Ordenamos por fecha de ingreso para mayor relevancia
+        check_in_date: 'desc', 
       },
       select: {
         id: true,
         guest_count: true,
-        // --- CORRECCIÓN ---: Se añaden las fechas a la consulta de la base de datos
         check_in_date: true,
         check_out_date: true,
         users_reservations_main_guest_idTousers: {
@@ -67,7 +62,7 @@ const getHistory = async (filters, pagination) => {
         },
         reservation_rooms: {
           select: { rooms: { select: { room_number: true } } },
-          take: 1 // Solo necesitamos una habitación para la vista de tabla
+          take: 1
         }
       }
     }),
@@ -82,7 +77,6 @@ const getHistory = async (filters, pagination) => {
       grupo_asignado: r.guest_count,
       habitacion_reservada: r.reservation_rooms[0]?.rooms?.room_number || 'N/A',
       observacion: r.users_reservations_main_guest_idTousers.guest_details?.observations || 'Sin observaciones',
-      // --- CORRECCIÓN ---: Se añaden las fechas a la respuesta que se envía al frontend
       check_in_date: r.check_in_date,
       check_out_date: r.check_out_date
     })),
@@ -152,7 +146,7 @@ const getHistoryDetailById = async (id) => {
   const diffTime = Math.abs(checkOut - checkIn);
   const days_stayed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  // 🟢 Cálculo del monto pagado y precio por noche
+  // Cálculo del monto pagado y precio por noche
   const paid_amount = reservation.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const price_per_night = reservation.total_amount && days_stayed > 0
     ? reservation.total_amount / days_stayed
@@ -179,7 +173,7 @@ const updateObservation = async (id, observation) => {
         update: {
           guest_details: {
             update: {
-              observations: observation,  // Actualizamos la observación
+              observations: observation,  
             },
           },
         },

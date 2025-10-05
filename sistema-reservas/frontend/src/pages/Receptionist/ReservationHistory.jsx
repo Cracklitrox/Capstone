@@ -68,7 +68,7 @@ const ReservationHistory = () => {
                 page,
                 rut: filters.rut || undefined,
                 roomId: filters.roomId && !isNaN(filters.roomId) ? Number(filters.roomId) : undefined,
-                floor: filters.floor || undefined, // Enviamos 'floor' que es lo que el controller espera
+                floor: filters.floor || undefined,
                 startDate: filters.startDate ? format(filters.startDate, 'yyyy-MM-dd') : undefined,
                 endDate: filters.endDate ? format(filters.endDate, 'yyyy-MM-dd') : undefined,
             };
@@ -82,10 +82,9 @@ const ReservationHistory = () => {
         }
     }, [token, filters]);
 
-    // useEffect con Debounce para una mejor experiencia al filtrar
     useEffect(() => {
         const handler = setTimeout(() => {
-            fetchHistory(1); // Siempre vuelve a la página 1 al cambiar un filtro
+            fetchHistory(1);
         }, 500);
         return () => clearTimeout(handler);
     }, [filters, fetchHistory]);
@@ -98,7 +97,6 @@ const ReservationHistory = () => {
         setFilters({ rut: '', floor: '', roomId: '', startDate: null, endDate: null });
     };
 
-    // --- TUS FUNCIONES ORIGINALES SE MANTIENEN ---
     const handleViewDetails = async (reservationId) => {
         setIsModalOpen(true);
         setModalLoading(true);
@@ -119,7 +117,6 @@ const ReservationHistory = () => {
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         try {
-            // parseISO es más robusto para fechas de API
             return format(parseISO(dateString), 'dd/MM/yyyy');
         } catch {
             return 'Fecha inválida';
@@ -146,7 +143,6 @@ const ReservationHistory = () => {
 
                 const updatedReservation = await response.json();
 
-                // Actualiza localmente el modal
                 setSelectedReservation(prevReservation => ({
                     ...prevReservation,
                     users_reservations_main_guest_idTousers: {
@@ -158,7 +154,6 @@ const ReservationHistory = () => {
                     },
                 }));
 
-                // Actualiza la tabla si es necesario
                 setHistory(prevHistory =>
                     prevHistory.map(item =>
                         item.reservation_id === updatedReservation.id
@@ -172,7 +167,6 @@ const ReservationHistory = () => {
                 setError(err.message);
             }
         } else {
-            // Activa edición y carga la observación actual
             setNewObservation(selectedReservation.users_reservations_main_guest_idTousers.guest_details?.observations || '');
             setIsEditingObservation(true);
         }
@@ -250,7 +244,6 @@ const ReservationHistory = () => {
                 </CardContent>
             </Card>
 
-            {/* --- TABLA CONECTADA A LOS DATOS CORREGIDOS --- */}
             {loading ? (
                 <p className="text-center text-muted-foreground py-10">Cargando historial...</p>
             ) : error ? (
@@ -274,7 +267,6 @@ const ReservationHistory = () => {
                                     <TableCell className="font-mono">{item.rut}</TableCell>
                                     <TableCell>{item.nombre_cliente}</TableCell>
                                     <TableCell>{item.habitacion_reservada}</TableCell>
-                                    {/* Ahora usamos la función segura que funciona con el formato de la API */}
                                     <TableCell>{formatDate(item.check_in_date)}</TableCell>
                                     <TableCell>{formatDate(item.check_out_date)}</TableCell>
                                     <TableCell className="text-right">

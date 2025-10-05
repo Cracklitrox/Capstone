@@ -1,5 +1,3 @@
-// backend/src/api/reservation_history/reservation_history.controller.js
-
 const historyService = require('./reservation_history.service');
 
 /**
