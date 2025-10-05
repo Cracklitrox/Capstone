@@ -34,7 +34,7 @@ router.use("/rooms", authenticate, roomsRoutes);
 router.use('/reservation_history', cummonLimiter, authenticate, reservationHistoryRoutes); 
 router.use('/admin/rooms', adminRoomsRoutes);
 router.use("/staff", cummonLimiter, authenticate, staffRoutes);
-router.use("/planning", authenticate, planningRoutes);
+router.use("/planning", cummonLimiter, authenticate, planningRoutes);
 router.use('/notifications', cummonLimiter, authenticate, notificationsRoutes);
 router.use("/guests", authenticate, guestsRoutes);
 router.use("/reservations", cummonLimiter, authenticate, reservationsRoutes);
