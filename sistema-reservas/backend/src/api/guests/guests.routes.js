@@ -15,6 +15,13 @@ const guestUpdateLimiter = rateLimit({
   message: "Too many update requests from this IP, please try again later."
 });
 
+// Define rate limiter for guest search route
+const guestSearchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Limit each IP to 50 search requests per 15 minutes
+  message: "Too many search requests from this IP, please try again later."
+});
+
 // Define rate limiter for guest creation route
 const guestCreateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -23,7 +30,7 @@ const guestCreateLimiter = rateLimit({
 });
 
 // Buscar huésped por identificación
-router.get("/search/:identificationNumber", authenticate, searchGuest);
+router.get("/search/:identificationNumber", authenticate, guestSearchLimiter, searchGuest);
 
 // Crear nuevo huésped
 router.post("/", authenticate, guestCreateLimiter, createGuest);
