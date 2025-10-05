@@ -158,21 +158,35 @@ const updateProfile = async (userId, profileData) => {
   try {
     if (profileData.first_name === "" || !profileData.first_name)
       throw new Error("El nombre es obligatorio.");
-    if (
-      profileData.paternal_last_name === "" ||
-      !profileData.paternal_last_name
-    )
+    
+    if (profileData.paternal_last_name === "" || !profileData.paternal_last_name)
       throw new Error("El apellido paterno es obligatorio.");
-    if (profileData.email === "" || !profileData.email)
-      throw new Error("El correo electrónico es obligatorio.");
-    if (!/\S+@\S+\.\S+/.test(profileData.email))
+    
+    if (profileData.maternal_last_name === "" || !profileData.maternal_last_name)
+      throw new Error("El apellido materno es obligatorio.");
+    
+    if (profileData.phone_number === "" || !profileData.phone_number)
+      throw new Error("El teléfono es obligatorio.");
+    
+    if (profileData.country === "" || !profileData.country)
+      throw new Error("El país es obligatorio.");
+    
+    if (profileData.region === "" || !profileData.region)
+      throw new Error("La región es obligatoria.");
+    
+    if (profileData.city === "" || !profileData.city)
+      throw new Error("La ciudad es obligatoria.");
+    
+    if (profileData.email && !/\S+@\S+\.\S+/.test(profileData.email))
       throw new Error("El formato del correo es inválido.");
 
-    const existingUserByEmail = await prisma.users.findFirst({
-      where: { email: profileData.email, id: { not: userId } },
-    });
-    if (existingUserByEmail) {
-      throw new Error("El correo electrónico ya está en uso por otro usuario.");
+    if (profileData.email) {
+      const existingUserByEmail = await prisma.users.findFirst({
+        where: { email: profileData.email, id: { not: userId } },
+      });
+      if (existingUserByEmail) {
+        throw new Error("El correo electrónico ya está en uso por otro usuario.");
+      }
     }
 
     if (profileData.phone_number && profileData.phone_number.trim()) {
@@ -183,9 +197,7 @@ const updateProfile = async (userId, profileData) => {
         },
       });
       if (existingUserByPhone) {
-        throw new Error(
-          "El número de teléfono ya está en uso por otro usuario."
-        );
+        throw new Error("El número de teléfono ya está en uso por otro usuario.");
       }
     }
 
@@ -201,10 +213,14 @@ const updateProfile = async (userId, profileData) => {
       "region",
       "city",
     ];
+    
     allowedFields.forEach((field) => {
       if (profileData[field] !== undefined) {
-        dataToUpdate[field] =
-          profileData[field] === "" ? null : profileData[field];
+        if (field === 'email') {
+          dataToUpdate[field] = profileData[field] === "" ? null : profileData[field];
+        } else {
+          dataToUpdate[field] = profileData[field];
+        }
       }
     });
 

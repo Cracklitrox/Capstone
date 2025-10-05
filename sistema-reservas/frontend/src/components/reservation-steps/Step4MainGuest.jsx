@@ -310,7 +310,9 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
       !formData.region ||
       !formData.city
     ) {
-      toast.error("Complete todos los campos obligatorios del huésped principal");
+      toast.error(
+        "Complete todos los campos obligatorios del huésped principal"
+      );
       return;
     }
 
@@ -608,15 +610,22 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Apellido Materno *</Label>
-                {getCharacterCount("maternalLastName", MAX_LENGTHS.maternalLastName)}
+                {getCharacterCount(
+                  "maternalLastName",
+                  MAX_LENGTHS.maternalLastName
+                )}
               </div>
               <Input
                 value={formData.maternalLastName}
-                onChange={(e) => updateFormField("maternalLastName", e.target.value)}
+                onChange={(e) =>
+                  updateFormField("maternalLastName", e.target.value)
+                }
                 onBlur={() => handleFieldBlur("maternalLastName")}
                 placeholder="González"
                 maxLength={MAX_LENGTHS.maternalLastName}
-                className={validationErrors.maternalLastName ? "border-destructive" : ""}
+                className={
+                  validationErrors.maternalLastName ? "border-destructive" : ""
+                }
               />
               {validationErrors.maternalLastName && (
                 <div className="flex items-center gap-1 text-destructive text-sm">
@@ -658,11 +667,15 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
                 </div>
                 <Input
                   value={formData.phoneNumber}
-                  onChange={(e) => updateFormField("phoneNumber", e.target.value)}
+                  onChange={(e) =>
+                    updateFormField("phoneNumber", e.target.value)
+                  }
                   onBlur={() => handleFieldBlur("phoneNumber")}
                   placeholder="+56 9 1234 5678"
                   maxLength={MAX_LENGTHS.phoneNumber}
-                  className={validationErrors.phoneNumber ? "border-destructive" : ""}
+                  className={
+                    validationErrors.phoneNumber ? "border-destructive" : ""
+                  }
                 />
                 {validationErrors.phoneNumber && (
                   <div className="flex items-center gap-1 text-destructive text-sm">
@@ -675,7 +688,9 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
 
             {/* Datos Adicionales Obligatorios */}
             <Separator />
-            <h4 className="font-medium text-foreground">Datos Adicionales Obligatorios</h4>
+            <h4 className="font-medium text-foreground">
+              Datos Adicionales Obligatorios
+            </h4>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -686,7 +701,9 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
                   onChange={(e) => updateFormField("birthDate", e.target.value)}
                   onBlur={() => handleFieldBlur("birthDate")}
                   max={new Date().toISOString().split("T")[0]}
-                  className={validationErrors.birthDate ? "border-destructive" : ""}
+                  className={
+                    validationErrors.birthDate ? "border-destructive" : ""
+                  }
                 />
                 {validationErrors.birthDate && (
                   <div className="flex items-center gap-1 text-destructive text-sm">
@@ -701,7 +718,11 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
                   value={formData.gender}
                   onValueChange={(val) => updateFormField("gender", val)}
                 >
-                  <SelectTrigger className={validationErrors.gender ? "border-destructive" : ""}>
+                  <SelectTrigger
+                    className={
+                      validationErrors.gender ? "border-destructive" : ""
+                    }
+                  >
                     <SelectValue placeholder="Seleccionar" />
                   </SelectTrigger>
                   <SelectContent>
@@ -726,7 +747,12 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
                 options={countries}
                 value={formData.country}
                 onChange={(value) => {
-                  setFormData((p) => ({ ...p, country: value, region: "", city: "" }));
+                  setFormData((p) => ({
+                    ...p,
+                    country: value,
+                    region: "",
+                    city: "",
+                  }));
                   handleFieldBlur("country");
                 }}
                 placeholder="País"

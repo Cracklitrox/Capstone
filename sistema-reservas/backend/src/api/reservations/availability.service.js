@@ -17,7 +17,13 @@ async function searchAvailableRooms(checkInDate, checkOutDate, guests, filters =
     throw new Error('La fecha de check-in debe ser anterior a la fecha de check-out');
   }
 
-  if (checkIn < new Date()) {
+  // Normalizar a inicio del día para comparar solo fechas
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkInNormalized = new Date(checkIn);
+  checkInNormalized.setHours(0, 0, 0, 0);
+
+  if (checkInNormalized < today) {
     throw new Error('La fecha de check-in no puede ser en el pasado');
   }
 

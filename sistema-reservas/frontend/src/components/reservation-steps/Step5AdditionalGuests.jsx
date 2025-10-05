@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
+import { Separator } from "@/components/ui/Separator";
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { CheckCircle2, User, Search, AlertCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +21,6 @@ import {
   validateRutFormat,
   validateRutDv,
   formatRutInput,
-  validatePassport,
   cleanRut,
 } from "@/lib/rutValidator";
 
@@ -43,12 +43,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
   const [identificationSearch, setIdentificationSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [guestFound, setGuestFound] = useState(null);
-  const [creating, setCreating] = useState(false);
 
-  const totalGuests = data.guests;
-  const remainingGuests = totalGuests - 1; // -1 por el huésped principal
-
-  // Validaciones en tiempo real
   const [validationErrors, setValidationErrors] = useState({});
   const [touched, setTouched] = useState({});
 
@@ -66,7 +61,9 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     city: "",
   });
 
-  // Países, estados y ciudades
+  const totalGuests = data.guests;
+  const remainingGuests = totalGuests - 1;
+
   const countries = useMemo(
     () =>
       Country.getAllCountries().map((c) => ({
@@ -98,7 +95,6 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     [formData.country, formData.region]
   );
 
-  // Validación en tiempo real
   useEffect(() => {
     const errors = {};
 
@@ -109,13 +105,14 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
         const dvPart = cleaned.slice(-1);
 
         if (!validateRutFormat(rutPart)) {
-          errors.identificationNumber = "RUT debe tener 7-8 dígitos";
+          errors.identificationNumber = "RUT ingresado erróneo";
         } else if (!validateRutDv(rutPart, dvPart)) {
-          errors.identificationNumber = "Dígito verificador incorrecto";
+          errors.identificationNumber = "RUT ingresado erróneo";
         }
       } else {
         if (!/^[A-Z0-9]{8,15}$/i.test(formData.identificationNumber)) {
-          errors.identificationNumber = "Pasaporte inválido (8-15 caracteres)";
+          errors.identificationNumber =
+            "Pasaporte debe tener 8-15 caracteres alfanuméricos";
         }
       }
     }
@@ -128,32 +125,26 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       errors.paternalLastName = "Apellido paterno es obligatorio";
     }
 
-    // NUEVO: Apellido materno obligatorio
     if (touched.maternalLastName && !formData.maternalLastName) {
       errors.maternalLastName = "Apellido materno es obligatorio";
     }
 
-    // NUEVO: Teléfono obligatorio
     if (touched.phoneNumber && !formData.phoneNumber) {
       errors.phoneNumber = "Teléfono es obligatorio";
     }
 
-    // NUEVO: País obligatorio
     if (touched.country && !formData.country) {
       errors.country = "País es obligatorio";
     }
 
-    // NUEVO: Región obligatoria
     if (touched.region && !formData.region) {
       errors.region = "Región es obligatoria";
     }
 
-    // NUEVO: Ciudad obligatoria
     if (touched.city && !formData.city) {
       errors.city = "Ciudad es obligatoria";
     }
 
-    // Email opcional para adicionales
     if (touched.email && formData.email) {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailPattern.test(formData.email)) {
@@ -172,7 +163,6 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
 
     const cleaned = cleanRut(identificationSearch);
 
-    // Validar que no sea el huésped principal
     if (
       data.mainGuest &&
       cleaned === cleanRut(data.mainGuest.identificationNumber)
@@ -181,7 +171,6 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       return;
     }
 
-    // Validar que no esté duplicado en la lista
     const isDuplicate = additionalGuests.some(
       (guest) => cleanRut(guest.identificationNumber) === cleaned
     );
@@ -195,7 +184,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       const dvPart = cleaned.slice(-1);
 
       if (!validateRutFormat(rutPart) || !validateRutDv(rutPart, dvPart)) {
-        toast.error("RUT inválido");
+        toast.error("RUT ingresado erróneo");
         return;
       }
     }
@@ -242,12 +231,10 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     newGuests[currentGuestIndex] = guestFound;
     setAdditionalGuests(newGuests);
 
-    toast.success(`Huésped ${currentGuestIndex + 2} agregado`);
+    toast.success(`Huésped adicional ${currentGuestIndex + 1} agregado`);
 
-    // Reset
     resetForm();
 
-    // Mover al siguiente si hay más
     if (currentGuestIndex < remainingGuests - 1) {
       setCurrentGuestIndex(currentGuestIndex + 1);
     }
@@ -265,7 +252,6 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       city: true,
     });
 
-    // Validar campos obligatorios
     if (
       !formData.identificationNumber ||
       !formData.firstName ||
@@ -318,24 +304,13 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     newGuests[currentGuestIndex] = guestData;
     setAdditionalGuests(newGuests);
 
-    toast.success(`Huésped ${currentGuestIndex + 2} guardado`);
+    toast.success(`Huésped adicional ${currentGuestIndex + 1} guardado`);
 
     resetForm();
 
     if (currentGuestIndex < remainingGuests - 1) {
       setCurrentGuestIndex(currentGuestIndex + 1);
     }
-  };
-
-  const canSkip = () => {
-    if (
-      formData.identificationNumber ||
-      formData.firstName ||
-      formData.paternalLastName
-    ) {
-      return false;
-    }
-    return true;
   };
 
   const resetForm = () => {
@@ -363,7 +338,6 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     const newGuests = additionalGuests.filter((_, i) => i !== index);
     setAdditionalGuests(newGuests);
 
-    // Ajustar currentGuestIndex si es necesario
     if (currentGuestIndex >= newGuests.length && currentGuestIndex > 0) {
       setCurrentGuestIndex(currentGuestIndex - 1);
     }
@@ -372,19 +346,13 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
   };
 
   const handleContinue = () => {
-    onUpdate({ additionalGuests });
-    onNext();
-  };
-
-  const handleSkip = () => {
-    if (!canSkip()) {
-      toast.error("Completa los datos del huésped actual antes de continuar");
+    if (additionalGuests.length < remainingGuests) {
+      toast.error(
+        `Debe registrar los ${remainingGuests} huéspedes adicionales`
+      );
       return;
     }
 
-    if (additionalGuests.length === 0) {
-      toast.info("Los huéspedes pueden registrarse después en el check-in");
-    }
     onUpdate({ additionalGuests });
     onNext();
   };
@@ -436,6 +404,16 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     );
   };
 
+  const canContinue = () => {
+    return additionalGuests.length === remainingGuests;
+  };
+
+  const hasPartialData = () => {
+    return Object.values(formData).some(
+      (value) => value && value.trim() !== ""
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -443,11 +421,10 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
           Huéspedes Adicionales
         </h2>
         <p className="text-muted-foreground">
-          Registre los {remainingGuests} huéspedes restantes (opcional)
+          Registre los {remainingGuests} huéspedes restantes
         </p>
       </div>
 
-      {/* Progress con opción de eliminar */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-2 flex-wrap">
@@ -467,7 +444,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                   ) : (
                     <User className="h-3 w-3 mr-1" />
                   )}
-                  Huésped {index + 2}
+                  Adicional {index + 1}
                   {additionalGuests[index] && " ✓"}
                 </Badge>
                 {additionalGuests[index] && (
@@ -487,12 +464,12 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
         </CardContent>
       </Card>
 
-      {/* Lista de huéspedes agregados */}
       {additionalGuests.length > 0 && (
         <Card>
           <CardContent className="pt-6">
             <h3 className="font-semibold mb-3">
-              Huéspedes Agregados ({additionalGuests.length})
+              Huéspedes Agregados ({additionalGuests.length} de{" "}
+              {remainingGuests})
             </h3>
             <div className="space-y-2">
               {additionalGuests.map((guest, index) => (
@@ -502,11 +479,11 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                 >
                   <div className="flex-1">
                     <p className="font-medium">
-                      {guest.firstName} {guest.paternalLastName}{" "}
-                      {guest.maternalLastName}
+                      Adicional {index + 1}: {guest.firstName}{" "}
+                      {guest.paternalLastName} {guest.maternalLastName}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {guest.email}
+                      {guest.email || "Sin email"}
                     </p>
                   </div>
                   <Button
@@ -523,12 +500,11 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
         </Card>
       )}
 
-      {/* Formulario para huésped actual */}
-      {currentGuestIndex < remainingGuests && (
+      {additionalGuests.length < remainingGuests && (
         <Card>
           <CardContent className="pt-6 space-y-4">
             <h3 className="font-semibold text-foreground">
-              Huésped {currentGuestIndex + 2} de {totalGuests}
+              Huésped Adicional {currentGuestIndex + 1} de {remainingGuests}
             </h3>
 
             {searchMode ? (
@@ -688,7 +664,6 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                     </div>
                   </div>
 
-                  {/* Apellido Materno - Campo individual */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Apellido Materno *</Label>
@@ -841,7 +816,6 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                     </div>
                   )}
 
-                  {/* Datos Opcionales */}
                   <Separator />
                   <h4 className="font-medium text-foreground">
                     Datos Opcionales
@@ -879,12 +853,10 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
 
                   <Button
                     onClick={handleCreateGuest}
-                    disabled={
-                      creating || Object.keys(validationErrors).length > 0
-                    }
+                    disabled={Object.keys(validationErrors).length > 0}
                     className="w-full"
                   >
-                    {creating ? "Guardando..." : "Guardar Huésped"}
+                    Guardar Huésped
                   </Button>
                 </div>
               </>
@@ -893,21 +865,17 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
         </Card>
       )}
 
-      {/* Navigation */}
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
           Volver
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleSkip} disabled={!canSkip()}>
-            {additionalGuests.length > 0
-              ? "Continuar sin más huéspedes"
-              : "Omitir huéspedes adicionales"}
-          </Button>
-          {additionalGuests.length === remainingGuests && (
-            <Button onClick={handleContinue}>Continuar</Button>
-          )}
-        </div>
+
+        <Button
+          onClick={handleContinue}
+          disabled={!canContinue() || hasPartialData()}
+        >
+          Continuar
+        </Button>
       </div>
     </div>
   );

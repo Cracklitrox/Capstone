@@ -8,7 +8,7 @@ async function searchGuestByIdentification(identificationNumber) {
   const guest = await prisma.users.findFirst({
     where: {
       identification_number: identificationNumber,
-      deleted_at: null, // Excluir eliminados
+      deleted_at: null,
       user_roles: {
         some: {
           roles: {
@@ -59,7 +59,7 @@ async function searchGuestByIdentification(identificationNumber) {
  */
 async function createOrUpdateGuest(
   guestData,
-  isMainGuest = true, // NUEVO parámetro
+  isMainGuest = true,
   isUpdate = false,
   guestId = null
 ) {
@@ -81,23 +81,22 @@ async function createOrUpdateGuest(
     observations,
   } = guestData;
 
-  // Convertir campos vacíos a NULL
   const cleanData = {
     identificationNumber,
     firstName,
     paternalLastName,
-    maternalLastName: maternalLastName || null,
-    email: email || null,
-    phoneNumber: phoneNumber || null,
-    birthDate: birthDate || null,
-    gender: gender || null,
-    country: country || null,
-    region: region || null,
-    city: city || null,
+    maternalLastName,
+    email: email && email.trim() !== '' ? email : null,
+    phoneNumber,
+    birthDate: birthDate && birthDate.trim() !== '' ? birthDate : null,
+    gender: gender && gender.trim() !== '' ? gender : null,
+    country,
+    region,
+    city,
     travelsWithChildren,
     childrenUnderFour,
-    specialRequests: specialRequests || null,
-    observations: observations || null,
+    specialRequests: specialRequests && specialRequests.trim() !== '' ? specialRequests : null,
+    observations: observations && observations.trim() !== '' ? observations : null,
   };
 
   // Calcular is_fully_registered dinámicamente
@@ -106,7 +105,6 @@ async function createOrUpdateGuest(
     "firstName",
     "paternalLastName",
     "maternalLastName",
-    "email",
     "phoneNumber",
     "birthDate",
     "gender",
@@ -115,7 +113,7 @@ async function createOrUpdateGuest(
     "city",
   ];
   const isFullyRegistered = allRequiredFields.every(
-    (field) => cleanData[field]
+    (field) => cleanData[field] && cleanData[field].trim() !== ''
   );
 
   if (isUpdate && guestId) {
@@ -172,7 +170,7 @@ async function createOrUpdateGuest(
       city: cleanData.city,
       password_hash: "GUEST_NO_PASSWORD",
       status: "active",
-      is_fully_registered: isFullyRegistered, // Calculado dinámicamente
+      is_fully_registered: isFullyRegistered,
       user_roles: {
         create: {
           roles: {
