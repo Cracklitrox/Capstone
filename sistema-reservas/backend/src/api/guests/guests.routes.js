@@ -30,7 +30,7 @@ const guestCreateLimiter = rateLimit({
 });
 
 // Buscar huésped por identificación
-router.get("/search/:identificationNumber", authenticate, guestSearchLimiter, searchGuest);
+router.get("/search/:identificationNumber", guestSearchLimiter, authenticate, searchGuest);
 
 // Crear nuevo huésped
 router.post("/", authenticate, guestCreateLimiter, createGuest);
