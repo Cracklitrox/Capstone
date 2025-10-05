@@ -209,24 +209,37 @@ const ReservationStepper = () => {
 
   const handleCreateReservation = async () => {
     try {
-      // PASO 1: Crear huésped principal
-      const mainGuestPayload = {
-        ...reservationData.mainGuest,
-        isMainGuest: true,
-      };
+      // PASO 1: Obtener/Crear huésped principal
+      let mainGuestId;
+      
+      if (reservationData.mainGuest.id) {
+        // El huésped YA EXISTE (fue encontrado y actualizado)
+        mainGuestId = reservationData.mainGuest.id;
+      } else {
+        // El huésped NO EXISTE, crear uno nuevo
+        const mainGuestPayload = {
+          ...reservationData.mainGuest,
+          isMainGuest: true,
+        };
+        const mainGuestResult = await guestsService.createGuest(mainGuestPayload);
+        mainGuestId = mainGuestResult.guest.id;
+      }
 
-      const mainGuestResult = await guestsService.createGuest(mainGuestPayload);
-      const mainGuestId = mainGuestResult.guest.id;
-
-      // PASO 2: Crear huéspedes adicionales
+      // PASO 2: Obtener/Crear huéspedes adicionales
       const additionalGuestIds = [];
       for (const guestData of reservationData.additionalGuests) {
-        const payload = {
-          ...guestData,
-          isMainGuest: false,
-        };
-        const result = await guestsService.createGuest(payload);
-        additionalGuestIds.push(result.guest.id);
+        if (guestData.id) {
+          // El huésped YA EXISTE
+          additionalGuestIds.push(guestData.id);
+        } else {
+          // El huésped NO EXISTE, crear uno nuevo
+          const payload = {
+            ...guestData,
+            isMainGuest: false,
+          };
+          const result = await guestsService.createGuest(payload);
+          additionalGuestIds.push(result.guest.id);
+        }
       }
 
       // PASO 3: Crear reserva

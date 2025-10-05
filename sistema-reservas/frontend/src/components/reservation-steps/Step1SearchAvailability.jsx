@@ -183,6 +183,7 @@ const Step1SearchAvailability = ({ data, onUpdate, onNext }) => {
               }
             }
           }}
+          onFocus={(e) => e.target.select()}
           placeholder="Número de huéspedes (1-10)"
           className="text-center"
         />

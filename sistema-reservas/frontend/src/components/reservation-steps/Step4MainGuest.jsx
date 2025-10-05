@@ -49,6 +49,7 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
   const [searching, setSearching] = useState(false);
   const [guestFound, setGuestFound] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [isEditingExisting, setIsEditingExisting] = useState(false);
 
   const [validationErrors, setValidationErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -278,11 +279,26 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
   };
 
   const handleUseFoundGuest = () => {
+    const missingFields = [];
+    if (!guestFound.email) missingFields.push('Email');
+    if (!guestFound.birthDate) missingFields.push('Fecha de nacimiento');
+    if (!guestFound.gender) missingFields.push('Género');
+    
+    if (missingFields.length > 0) {
+      setSearchMode(false);
+      setIsEditingExisting(true);
+      setFormData({
+        ...guestFound,
+      });
+      toast.warning(`Complete los campos faltantes: ${missingFields.join(', ')}`);
+      return;
+    }
+    
     onUpdate({ mainGuest: guestFound });
     onNext();
   };
 
-  const handleCreateGuest = async () => {
+  const handleSaveGuest = async () => {
     setTouched({
       identificationNumber: true,
       firstName: true,
@@ -310,9 +326,7 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
       !formData.region ||
       !formData.city
     ) {
-      toast.error(
-        "Complete todos los campos obligatorios del huésped principal"
-      );
+      toast.error("Complete todos los campos obligatorios del huésped principal");
       return;
     }
 
@@ -321,24 +335,36 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
       return;
     }
 
-    const countryName =
-      countries.find((c) => c.value === formData.country)?.label || "";
-    const stateName =
-      states.find((s) => s.value === formData.region)?.label || "";
+    setCreating(true);
 
-    const guestData = {
-      ...formData,
-      country: countryName,
-      region: stateName,
-      isMainGuest: true,
-    };
+    try {
+      const countryName = countries.find((c) => c.value === formData.country)?.label || "";
+      const stateName = states.find((s) => s.value === formData.region)?.label || "";
 
-    toast.success("Datos del huésped principal guardados");
+      const guestData = {
+        ...formData,
+        country: countryName,
+        region: stateName,
+        isMainGuest: true,
+      };
 
-    onUpdate({
-      mainGuest: guestData,
-    });
-    onNext();
+      if (isEditingExisting && guestFound?.id) {
+        await guestsService.updateGuest(guestFound.id, guestData);
+        toast.success("Datos del huésped actualizados correctamente");
+        
+        guestData.id = guestFound.id;
+      } else {
+        toast.success("Datos del huésped principal guardados");
+      }
+
+      onUpdate({ mainGuest: guestData });
+      onNext();
+    } catch (error) {
+      console.error("Error al guardar huésped:", error);
+      toast.error(error.response?.data?.message || "Error al guardar huésped");
+    } finally {
+      setCreating(false);
+    }
   };
 
   const updateFormField = (field, value) => {
@@ -513,7 +539,10 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSearchMode(true)}
+                onClick={() => {
+                  setSearchMode(true);
+                  setIsEditingExisting(false);
+                }}
               >
                 ← Volver a búsqueda
               </Button>
@@ -819,9 +848,11 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
                   type="checkbox"
                   id="travelsWithChildren"
                   checked={formData.travelsWithChildren}
-                  onChange={(e) =>
-                    updateFormField("travelsWithChildren", e.target.checked)
-                  }
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    updateFormField("travelsWithChildren", isChecked);
+                    updateFormField("childrenUnderFour", isChecked ? 1 : 0);
+                  }}
                   className="h-4 w-4"
                 />
                 <Label htmlFor="travelsWithChildren" className="cursor-pointer">
@@ -916,11 +947,11 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
             </div>
 
             <Button
-              onClick={handleCreateGuest}
+              onClick={handleSaveGuest}
               disabled={creating || Object.keys(validationErrors).length > 0}
               className="w-full"
             >
-              {creating ? "Registrando..." : "Guardar y Continuar"}
+              {creating ? "Guardando..." : "Guardar y Continuar"}
             </Button>
           </CardContent>
         </Card>
