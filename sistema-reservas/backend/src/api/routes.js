@@ -37,7 +37,7 @@ router.use("/staff", cummonLimiter, authenticate, staffRoutes);
 router.use("/planning", authenticate, planningRoutes);
 router.use('/notifications', cummonLimiter, authenticate, notificationsRoutes);
 router.use("/guests", authenticate, guestsRoutes);
-router.use("/reservations", authenticate, reservationsRoutes);
+router.use("/reservations", cummonLimiter, authenticate, reservationsRoutes);
 router.use("/system", cummonLimiter, authenticate, systemRoutes);
 
 module.exports = router;
