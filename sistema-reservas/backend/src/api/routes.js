@@ -31,7 +31,7 @@ router.get("/", (req, res) => {
 
 router.use("/auth", authRoutes);
 router.use("/rooms", authenticate, roomsRoutes);
-router.use('/reservation_history', authenticate, reservationHistoryRoutes); 
+router.use('/reservation_history', cummonLimiter, authenticate, reservationHistoryRoutes); 
 router.use('/admin/rooms', adminRoomsRoutes);
 router.use("/staff", cummonLimiter, authenticate, staffRoutes);
 router.use("/planning", authenticate, planningRoutes);
