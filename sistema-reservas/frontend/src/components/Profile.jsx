@@ -562,6 +562,7 @@ const Profile = () => {
                 </DialogFooter>
               </form>
             </DialogContent>
+            
           </Dialog>
         </TabsContent>
 
@@ -619,7 +620,6 @@ const Profile = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="security">
           <Dialog
             open={isPasswordModalOpen}
@@ -760,7 +760,6 @@ const Profile = () => {
             </DialogContent>
           </Dialog>
         </TabsContent>
-
         <TabsContent value="preferences">
           <Card>
             <CardHeader>

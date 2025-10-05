@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import { useAuth } from '../services/authContext';
+import { useAlertTime } from '../hooks/useCheckoutNotifications';
 import { Toaster } from 'sonner';
 
 const Layout = () => {
   // El estado 'sidebarOpen' sigue viviendo aquí, como el "cerebro" del layout.
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  useAuth();
+  const { markAsRead } = useAlertTime(9);
   // Creamos una función 'toggle' para que sea más fácil de entender.
   const toggleSidebar = () => {
     setSidebarOpen(prev => !prev);
@@ -23,7 +27,7 @@ const Layout = () => {
       <div className="flex flex-1 flex-col overflow-hidden">
         
         {/* El Navbar ahora recibe la función para "alternar" el estado del Sidebar. */}
-        <Navbar toggleSidebar={toggleSidebar} />
+        <Navbar toggleSidebar={toggleSidebar} markAsRead={markAsRead} />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {/* El contenido de la página se mostrará aquí */}

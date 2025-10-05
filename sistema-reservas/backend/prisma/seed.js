@@ -11,7 +11,6 @@ const prisma = new PrismaClient();
 async function cleanDatabase() {
   console.log("🧹 Limpiando la base de datos...");
 
-  // Orden correcto de eliminación por dependencias
   await prisma.notification_read_status.deleteMany({});
   await prisma.notifications.deleteMany({});
   await prisma.alert_read_status.deleteMany({});
@@ -48,7 +47,7 @@ async function cleanDatabase() {
 async function createCoreData() {
   console.log("🌱 Creando datos fundamentales...");
 
-  // Roles - Buscar o crear
+  // Roles
   let adminRole = await prisma.roles.findUnique({
     where: { name: "administrator" },
   });
@@ -292,11 +291,12 @@ async function createCoreData() {
       cuadrupleType,
       dobleAdicionalType,
     },
+    services: [desayunoService, lavanderiaService],
   };
 }
 
-async function createUsers(faker, roles) {
-  console.log("👤 Creando usuarios...");
+async function createUsers(roles) {
+  console.log("👤 Creando usuarios staff...");
   const password = await bcrypt.hash("password123", 10);
 
   // Usuario Administrador
@@ -327,8 +327,9 @@ async function createUsers(faker, roles) {
   const existingCarlos = await prisma.users.findUnique({
     where: { email: "carlos.recepcionista@hotel.com" },
   });
+  let carlos;
   if (!existingCarlos) {
-    await prisma.users.create({
+    carlos = await prisma.users.create({
       data: {
         identification_number: "22222222-2",
         first_name: "Carlos",
@@ -345,13 +346,16 @@ async function createUsers(faker, roles) {
         user_roles: { create: { role_id: roles.receptionistRole.id } },
       },
     });
+  } else {
+    carlos = existingCarlos;
   }
 
   const existingJuan = await prisma.users.findUnique({
     where: { email: "juan.recepcionista@hotel.com" },
   });
+  let juan;
   if (!existingJuan) {
-    await prisma.users.create({
+    juan = await prisma.users.create({
       data: {
         identification_number: "33333333-3",
         first_name: "Juan",
@@ -368,63 +372,137 @@ async function createUsers(faker, roles) {
         user_roles: { create: { role_id: roles.receptionistRole.id } },
       },
     });
+  } else {
+    juan = existingJuan;
   }
 
-  console.log(`✅ Usuarios staff creados`);
+  console.log(`✅ Usuarios staff creados: 1 admin, 2 recepcionistas`);
 
-  // Huéspedes
-  const guestCount = await prisma.users.count({
-    where: {
-      user_roles: { some: { role_id: roles.guestRole.id } },
-    },
-  });
+  return { carlos, juan };
+}
 
-  if (guestCount === 0) {
-    for (let i = 0; i < 20; i++) {
-      const rut = faker.string.numeric(8);
-      const dv = faker.helpers.arrayElement([
-        "0","1","2","3","4","5","6","7","8","9","K",
-      ]);
+async function createGuests(faker, guestRole) {
+  console.log("👥 Creando huéspedes...");
+  const password = await bcrypt.hash("password123", 10);
 
-      await prisma.users.create({
-        data: {
-          identification_number: `${rut}-${dv}`,
-          first_name: faker.person.firstName(),
-          paternal_last_name: faker.person.lastName(),
-          maternal_last_name: faker.person.lastName(),
-          email: faker.internet.email().toLowerCase(),
-          phone_number: `+569${faker.string.numeric(8)}`,
-          country: "Chile",
-          region: faker.helpers.arrayElement(["Metropolitana", "Valparaíso", "Biobío"]),
-          city: faker.helpers.arrayElement(["Santiago", "Viña del Mar", "Concepción"]),
-          password_hash: password,
-          status: "active",
-          is_fully_registered: true,
-          user_roles: { create: { role_id: roles.guestRole.id } },
-          guest_details: {
-            create: {
-              special_requests: faker.helpers.arrayElement([
-                "Piso alto",
-                "Cerca del ascensor",
-                "Habitación tranquila",
-                null,
-              ]),
-              travels_with_children: faker.datatype.boolean(),
-              children_under_four: faker.datatype.boolean()
-                ? faker.number.int({ min: 0, max: 2 })
-                : 0,
-            },
+  const completeGuests = [];
+  const incompleteGuests = [];
+
+  // 10 Huéspedes COMPLETOS (pueden ser principales)
+  for (let i = 0; i < 10; i++) {
+    const identNumber = `${faker.string.numeric(
+      8
+    )}-${faker.helpers.arrayElement([
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "K",
+    ])}`;
+
+    const guest = await prisma.users.create({
+      data: {
+        identification_number: identNumber,
+        first_name: faker.person.firstName(),
+        paternal_last_name: faker.person.lastName(),
+        maternal_last_name: faker.person.lastName(),
+        email: faker.internet.email().toLowerCase(),
+        phone_number: `+569${faker.string.numeric(8)}`,
+        birth_date: faker.date.birthdate({ min: 18, max: 65, mode: "age" }),
+        gender: faker.helpers.arrayElement(["male", "female", "other"]),
+        country: "Chile",
+        region: faker.helpers.arrayElement([
+          "Metropolitana",
+          "Valparaíso",
+          "Biobío",
+        ]),
+        city: faker.helpers.arrayElement([
+          "Santiago",
+          "Viña del Mar",
+          "Concepción",
+        ]),
+        password_hash: password,
+        status: "active",
+        is_fully_registered: true,
+        user_roles: { create: { role_id: guestRole.id } },
+        guest_details: {
+          create: {
+            special_requests: faker.helpers.arrayElement([
+              "Piso alto",
+              "Cerca del ascensor",
+              "Habitación tranquila",
+              null,
+            ]),
+            travels_with_children: faker.datatype.boolean(),
+            children_under_four: faker.datatype.boolean()
+              ? faker.number.int({ min: 1, max: 2 })
+              : 0,
           },
         },
-      });
-    }
+      },
+    });
+    completeGuests.push(guest);
   }
 
-  const totalGuests = await prisma.users.count({
-    where: { user_roles: { some: { role_id: roles.guestRole.id } } },
-  });
+  // 10 Huéspedes INCOMPLETOS (solo adicionales)
+  for (let i = 0; i < 10; i++) {
+    const identNumber = `${faker.string.numeric(
+      8
+    )}-${faker.helpers.arrayElement([
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "K",
+    ])}`;
 
-  console.log(`✅ Total huéspedes: ${totalGuests}`);
+    const guest = await prisma.users.create({
+      data: {
+        identification_number: identNumber,
+        first_name: faker.person.firstName(),
+        paternal_last_name: faker.person.lastName(),
+        maternal_last_name: faker.person.lastName(),
+        email: null, // SIN email
+        phone_number: `+569${faker.string.numeric(8)}`,
+        birth_date: null, // SIN birthDate
+        gender: null, // SIN gender
+        country: "Chile",
+        region: faker.helpers.arrayElement([
+          "Metropolitana",
+          "Valparaíso",
+          "Biobío",
+        ]),
+        city: faker.helpers.arrayElement([
+          "Santiago",
+          "Viña del Mar",
+          "Concepción",
+        ]),
+        password_hash: password,
+        status: "active",
+        is_fully_registered: false,
+        user_roles: { create: { role_id: guestRole.id } },
+      },
+    });
+    incompleteGuests.push(guest);
+  }
+
+  console.log(
+    `✅ Huéspedes creados: ${completeGuests.length} completos, ${incompleteGuests.length} incompletos`
+  );
+
+  return { completeGuests, incompleteGuests };
 }
 
 async function createRooms(roomTypes) {
@@ -642,8 +720,250 @@ async function createRooms(roomTypes) {
     }
   }
 
-  const totalRooms = await prisma.rooms.count();
-  console.log(`✅ ${totalRooms} Habitaciones creadas`);
+  const allRooms = await prisma.rooms.findMany();
+  console.log(`✅ ${allRooms.length} Habitaciones creadas`);
+
+  return allRooms;
+}
+
+async function createComplexScenarios(
+  faker,
+  { completeGuests, incompleteGuests, receptionists, rooms, services }
+) {
+  console.log("🏨 Creando escenarios complejos...");
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // RESERVAS CON CHECK-OUT HOY (5 reservas)
+  console.log("📅 Creando reservas con check-out HOY...");
+  const occupiedRooms = rooms
+    .filter((r) => r.status === "occupied")
+    .slice(0, 5);
+
+  for (let i = 0; i < Math.min(5, occupiedRooms.length); i++) {
+    const room = occupiedRooms[i];
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const receptionist = faker.helpers.arrayElement(receptionists);
+
+    const stayDays = faker.number.int({ min: 1, max: 3 });
+    const checkInDate = new Date(today);
+    checkInDate.setDate(today.getDate() - stayDays);
+    checkInDate.setHours(8, 0, 0, 0);
+
+    const checkOutToday = new Date(today);
+    checkOutToday.setHours(11, 0, 0, 0);
+
+    const subtotalRoom = room.base_price * stayDays;
+    const service = faker.helpers.arrayElement(services);
+    const serviceQuantity = faker.number.int({ min: 1, max: 3 });
+    const subtotalService = service.price * serviceQuantity;
+    const totalAmount = subtotalRoom + subtotalService;
+
+    await prisma.reservations.create({
+      data: {
+        code: `CHECKOUT-TODAY-${String(i + 1).padStart(3, "0")}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: receptionist.id,
+        channel: faker.helpers.arrayElement(["reception", "web", "chatbot"]),
+        status: "in_progress",
+        check_in_date: checkInDate,
+        check_out_date: checkOutToday,
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: totalAmount,
+        paid_amount: totalAmount,
+        reservation_rooms: {
+          create: {
+            room_id: room.id,
+            start_date: checkInDate,
+            end_date: checkOutToday,
+            unit_price: room.base_price,
+            subtotal: subtotalRoom,
+          },
+        },
+        reservation_services: {
+          create: {
+            service_id: service.id,
+            quantity: serviceQuantity,
+            unit_price: service.price,
+            subtotal: subtotalService,
+          },
+        },
+        payments: {
+          create: {
+            amount: totalAmount,
+            payment_method: faker.helpers.arrayElement([
+              "credit_card",
+              "debit_card",
+              "cash",
+            ]),
+            status: "confirmed",
+            is_deposit: false,
+          },
+        },
+      },
+    });
+  }
+
+  console.log(
+    `✅ ${Math.min(5, occupiedRooms.length)} reservas con check-out HOY creadas`
+  );
+
+  // 50 RESERVAS ADICIONALES (pasadas, futuras)
+  console.log("📋 Creando 50 reservas adicionales...");
+
+  const availableRooms = rooms.filter((r) =>
+    ["available", "pending", "occupied"].includes(r.status)
+  );
+
+  for (let i = 0; i < 50; i++) {
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const receptionist = faker.helpers.arrayElement(receptionists);
+
+    // Rango: últimas 2 semanas O próximas 2 semanas
+    const isPast = faker.datatype.boolean();
+    let checkIn;
+
+    if (isPast) {
+      // Pasadas: últimas 2 semanas
+      checkIn = faker.date.recent({ days: 14, refDate: today });
+    } else {
+      // Futuras: próximas 2 semanas
+      checkIn = faker.date.soon({ days: 14, refDate: today });
+    }
+
+    const stayDays = faker.number.int({ min: 1, max: 7 });
+    const checkOut = new Date(checkIn);
+    checkOut.setDate(checkIn.getDate() + stayDays);
+
+    const reservedRoom = faker.helpers.arrayElement(availableRooms);
+    const subtotalRoom = reservedRoom.base_price * stayDays;
+
+    const service = faker.helpers.arrayElement(services);
+    const serviceQuantity = faker.number.int({ min: 1, max: 2 });
+    const subtotalService = service.price * serviceQuantity;
+    const totalAmount = subtotalRoom + subtotalService;
+
+    const guestCount = faker.number.int({ min: 1, max: reservedRoom.capacity });
+
+    // Crear reservation_guests con mix de completos e incompletos
+    const additionalGuestsData = [];
+    const numAdditional = Math.min(guestCount - 1, 2);
+
+    for (let j = 0; j < numAdditional; j++) {
+      const useIncomplete = faker.datatype.boolean();
+      const additionalGuest = useIncomplete
+        ? faker.helpers.arrayElement(incompleteGuests)
+        : faker.helpers.arrayElement(
+            completeGuests.filter((g) => g.id !== mainGuest.id)
+          );
+
+      additionalGuestsData.push({ guest_id: additionalGuest.id });
+    }
+
+    await prisma.reservations.create({
+      data: {
+        code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: receptionist.id,
+        channel: faker.helpers.arrayElement(["reception", "chatbot", "web"]),
+        status: isPast
+          ? "completed"
+          : faker.helpers.arrayElement(["pending", "confirmed", "in_progress"]),
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        guest_count: guestCount,
+        total_amount: totalAmount,
+        paid_amount: isPast
+          ? totalAmount
+          : faker.helpers.arrayElement([0, totalAmount / 2, totalAmount]),
+        reservation_rooms: {
+          create: {
+            room_id: reservedRoom.id,
+            start_date: checkIn,
+            end_date: checkOut,
+            unit_price: reservedRoom.base_price,
+            subtotal: subtotalRoom,
+          },
+        },
+        reservation_services: {
+          create: {
+            service_id: service.id,
+            quantity: serviceQuantity,
+            unit_price: service.price,
+            subtotal: subtotalService,
+          },
+        },
+        payments: {
+          create: {
+            amount: totalAmount / 2,
+            payment_method: faker.helpers.arrayElement([
+              "credit_card",
+              "bank_transfer",
+              "debit_card",
+              "cash",
+            ]),
+            status: "confirmed",
+            is_deposit: true,
+          },
+        },
+        reservation_guests:
+          additionalGuestsData.length > 0
+            ? { create: additionalGuestsData }
+            : undefined,
+      },
+    });
+  }
+
+  console.log("✅ 50 reservas adicionales creadas");
+
+  // ALERTAS, MANTENIMIENTO, LIMPIEZA
+  console.log("🔧 Creando mantenimiento y alertas...");
+
+  const maintenanceRooms = rooms.filter((r) => r.status === "maintenance");
+  for (const room of maintenanceRooms) {
+    await prisma.maintenance_tasks.create({
+      data: {
+        room_id: room.id,
+        category: "room",
+        description: faker.helpers.arrayElement([
+          "Fuga de agua en el lavamanos",
+          "Problema eléctrico en lámpara",
+          "Puerta del baño no cierra",
+          "Aire acondicionado no funciona",
+        ]),
+        start_date: faker.date.recent({ days: 10 }),
+        status: faker.helpers.arrayElement([
+          "in_progress",
+          "pending",
+          "delayed",
+        ]),
+        priority: faker.helpers.arrayElement(["high", "medium", "critical"]),
+        created_by_id: faker.helpers.arrayElement(receptionists).id,
+      },
+    });
+  }
+
+  const cleaningRooms = rooms.filter((r) => r.status === "cleaning");
+  for (const room of cleaningRooms) {
+    await prisma.cleaning_records.create({
+      data: {
+        room_id: room.id,
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        record_date: faker.date.recent({ days: 7 }),
+        observations: faker.helpers.arrayElement([
+          "Limpieza profunda realizada",
+          "Toallas y sábanas cambiadas",
+          "Baño desinfectado",
+          null,
+        ]),
+        is_completed: faker.datatype.boolean(),
+        completed_at: faker.datatype.boolean() ? new Date() : null,
+      },
+    });
+  }
+
+  console.log("✅ Mantenimiento, alertas y limpieza creados");
 }
 
 async function main() {
@@ -652,13 +972,23 @@ async function main() {
 
   await cleanDatabase();
   const coreData = await createCoreData();
-  await createUsers(faker, coreData.roles);
-  await createRooms(coreData.roomTypes);
+  const receptionists = await createUsers(coreData.roles);
+  const guests = await createGuests(faker, coreData.roles.guestRole);
+  const rooms = await createRooms(coreData.roomTypes);
+
+  await createComplexScenarios(faker, {
+    completeGuests: guests.completeGuests,
+    incompleteGuests: guests.incompleteGuests,
+    receptionists: [receptionists.carlos, receptionists.juan],
+    rooms,
+    services: coreData.services,
+  });
 
   console.log("\n🎉 Seed completado exitosamente!");
   console.log("\n🔑 Credenciales:");
   console.log("   Admin: super.admin@hotel.com / password123");
   console.log("   Recepcionista: carlos.recepcionista@hotel.com / password123");
+  console.log("   Recepcionista: juan.recepcionista@hotel.com / password123");
 }
 
 module.exports = { main };

@@ -3,6 +3,26 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function checkAndSeed() {
+  // Retry logic para asegurar conexión estable
+  let retries = 5;
+  let connected = false;
+  
+  while (retries > 0 && !connected) {
+    try {
+      await prisma.$connect();
+      connected = true;
+      console.log('✅ Conexión a base de datos establecida.');
+    } catch (error) {
+      retries--;
+      console.log(`⏳ Esperando conexión estable a la base de datos... (intentos restantes: ${retries})`);
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      } else {
+        throw error;
+      }
+    }
+  }
+
   const userCount = await prisma.users.count();
 
   if (userCount === 0) {

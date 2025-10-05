@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../services/authContext.jsx";
+import { fetchCheckoutAlertsCount } from "../services/notifications.js";
 import { Button } from "@/components/ui/Button.jsx";
 import {
   HomeIcon,
@@ -8,10 +9,12 @@ import {
   UserGroupIcon,
   Cog6ToothIcon,
   ViewColumnsIcon,
+  BellAlertIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { PlusCircle } from "lucide-react";
 
+// Menú principal con submenú para habitaciones
 const navLinks = [
   {
     href: "/",
@@ -24,6 +27,32 @@ const navLinks = [
     label: "Planning",
     icon: ViewColumnsIcon,
     roles: ["administrator", "receptionist"],
+  },
+  {
+    href: "/checkout-alerts",
+    label: "Check-outs Hoy",
+    icon: BellAlertIcon,
+    roles: ["administrator", "receptionist"],
+    showBadge: true, // Indicador para mostrar badge
+  },
+  {
+    label: "Gestionar Habitaciones",
+    icon: ViewColumnsIcon,
+    roles: ["administrator"],
+    submenu: [
+      {
+        href: "/admin/rooms-crud",
+        label: "Habitaciones",
+        icon: ViewColumnsIcon,
+        roles: ["administrator"],
+      },
+      {
+        href: "/admin/room-types-crud",
+        label: "Tipo de habitaciones",
+        icon: ViewColumnsIcon,
+        roles: ["administrator"],
+      },
+    ],
   },
   {
     href: "/reservations/new",
@@ -57,7 +86,8 @@ const navLinks = [
   },
 ];
 
-const NavLink = ({ href, label, icon: Icon, onClick }) => {
+// NavLink ahora acepta className y style para el label, más el badge
+const NavLink = ({ href, label, icon: Icon, onClick, className = "", style = {}, badge = null }) => {
   const location = useLocation();
   const isActive = location.pathname === href;
 
@@ -68,17 +98,51 @@ const NavLink = ({ href, label, icon: Icon, onClick }) => {
       className="w-full justify-start text-md"
       onClick={onClick}
     >
-      <Link to={href} className="flex items-center">
-        {Icon && <Icon className="h-5 w-5 mr-3" />}
-        <span>{label}</span>
+      <Link to={href} className="flex items-center min-w-0">
+        {Icon && <Icon className="h-5 w-5 mr-3 flex-shrink-0" />}
+        <span
+          className={cn("flex-1 text-left break-words whitespace-normal", className)}
+          style={{ wordBreak: 'break-word', whiteSpace: 'normal', ...style }}
+        >
+          {label}
+        </span>
+        {badge !== null && badge > 0 && (
+          <span className="ml-2 flex-shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 text-xs font-bold text-white bg-orange-500 rounded-full">
+            {badge}
+          </span>
+        )}
       </Link>
     </Button>
   );
 };
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const closeSidebar = () => setSidebarOpen(false);
+  // Estado para abrir/cerrar el submenú de habitaciones
+  const [roomsOpen, setRoomsOpen] = useState(false);
+  // Estado para el contador de check-outs
+  const [checkoutCount, setCheckoutCount] = useState(0);
+
+  // Cargar el contador de check-outs
+  useEffect(() => {
+    const loadCheckoutCount = async () => {
+      if (!token) return;
+      try {
+        const response = await fetchCheckoutAlertsCount(token);
+        setCheckoutCount(response.count || 0);
+      } catch (error) {
+        console.error('Error al cargar conteo de check-outs:', error);
+        setCheckoutCount(0);
+      }
+    };
+
+    loadCheckoutCount();
+
+    // Auto-refresh cada 10 minutos
+    const interval = setInterval(loadCheckoutCount, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   return (
     <>
@@ -103,19 +167,64 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-primary">Hotel Don Teo</h2>
           </div>
-          <nav className="flex-grow">
+          {/* Navegación con scroll para mostrar todas las secciones, incluyendo Habitaciones y Tipos de habitación */}
+          <nav className="flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-primary/40 scrollbar-track-card/40 pr-2">
             <ul className="space-y-2">
               {navLinks
                 .filter((link) => link.roles.includes(user.role))
                 .map((link) => (
-                  <li key={link.href}>
-                    <NavLink
-                      href={link.href}
-                      label={link.label}
-                      icon={link.icon}
-                      onClick={closeSidebar}
-                    />
-                  </li>
+                  link.submenu ? (
+                    <li key={link.label} className="group">
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 font-semibold text-[var(--secondary)] mb-1 w-full focus:outline-none px-2"
+                        onClick={() => setRoomsOpen((open) => !open)}
+                        aria-expanded={roomsOpen}
+                        aria-controls="submenu-habitaciones"
+                        style={{ minHeight: '40px' }}
+                      >
+                        {link.icon && <link.icon className="h-5 w-5 mr-2 flex-shrink-0" />}
+                        <span className="flex-1 text-left">{link.label}</span>
+                        <svg className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${roomsOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      </button>
+                      <ul
+                        id="submenu-habitaciones"
+                        className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${roomsOpen ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}
+                        style={{ maxHeight: roomsOpen ? '200px' : '0px' }}
+                      >
+                        {link.submenu
+                          .filter((sub) => sub.roles.includes(user.role))
+                          .map((sub) => (
+                            <li key={sub.label} className="w-full">
+                              <NavLink
+                                href={sub.href}
+                                label={sub.label}
+                                icon={sub.icon}
+                                onClick={closeSidebar}
+                                className="px-2 py-2 rounded-md hover:bg-[var(--card)] transition text-sm min-w-0 flex-1 text-left break-words whitespace-normal sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg 2xl:max-w-xl"
+                                style={{
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'normal',
+                                  maxWidth: '100%',
+                                  overflowWrap: 'break-word',
+                                  hyphens: 'auto',
+                                }}
+                              />
+                            </li>
+                          ))}
+                      </ul>
+                    </li>
+                  ) : (
+                    <li key={link.href}>
+                      <NavLink
+                        href={link.href}
+                        label={link.label}
+                        icon={link.icon}
+                        onClick={closeSidebar}
+                        badge={link.showBadge ? checkoutCount : null}
+                      />
+                    </li>
+                  )
                 ))}
             </ul>
           </nav>
