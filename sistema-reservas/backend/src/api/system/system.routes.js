@@ -16,7 +16,7 @@ const adminLimiter = rateLimit({
 });
 
 // Solo administradores pueden ver los logs
-router.get("/errors", authenticate, authorize(["admin"]), getErrors);
+router.get("/errors", adminLimiter, authenticate, authorize(["admin"]), getErrors);
 
 // Marcar error como resuelto
 router.patch(
