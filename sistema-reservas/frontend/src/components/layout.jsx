@@ -4,14 +4,14 @@ import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import { useAuth } from '../services/authContext';
 import { useAlertTime } from '../hooks/useCheckoutNotifications';
+import { Toaster } from 'sonner';
 
 const Layout = () => {
   // El estado 'sidebarOpen' sigue viviendo aquí, como el "cerebro" del layout.
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
   useAuth();
   const { markAsRead } = useAlertTime(9);
-
   // Creamos una función 'toggle' para que sea más fácil de entender.
   const toggleSidebar = () => {
     setSidebarOpen(prev => !prev);
@@ -19,6 +19,7 @@ const Layout = () => {
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      <Toaster richColors position="top-right" />
       
       {/* El Sidebar ahora recibe el estado y la función para cerrarse. */}
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />

@@ -25,4 +25,11 @@ router.put('/profile', authLimiter, authenticate, authController.updateProfile);
 // POST /api/v1/auth/logout (Protegida)
 router.post('/logout', authLimiter, authenticate, authController.logoutUser);
 
+// PUT /api/v1/auth/change-password (Protegida)
+router.put('/change-password', authLimiter, authenticate, authController.changePassword);
+
+// GET /api/v1/auth/login-history (Protegida)
+router.get('/login-history', authLimiter, authenticate, authController.getLoginHistory);
+
+
 module.exports = router;

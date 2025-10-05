@@ -9,9 +9,11 @@ import {
   UserGroupIcon,
   Cog6ToothIcon,
   ViewColumnsIcon,
+  ClockIcon,
   BellAlertIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
+import { PlusCircle } from "lucide-react";
 
 // Menú principal con submenú para habitaciones
 const navLinks = [
@@ -31,7 +33,7 @@ const navLinks = [
     href: "/checkout-alerts",
     label: "Check-outs Hoy",
     icon: BellAlertIcon,
-    roles: ["receptionist"], // Solo recepcionistas
+    roles: ["administrator", "receptionist"],
     showBadge: true, // Indicador para mostrar badge
   },
   {
@@ -54,6 +56,12 @@ const navLinks = [
     ],
   },
   {
+    href: "/reservations/new",
+    label: "Nueva Reserva",
+    icon: PlusCircle,
+    roles: ["receptionist", "administrator"],
+  },
+  {
     href: "/reservations",
     label: "Gestionar Reservas",
     icon: CalendarDaysIcon,
@@ -64,6 +72,12 @@ const navLinks = [
     label: "Gestionar Usuarios",
     icon: UserGroupIcon,
     roles: ["administrator"],
+  },
+  {
+    href: "/history",
+    label: "Historial de Reservas",
+    icon: ClockIcon, 
+    roles: ["administrator", "receptionist"],
   },
   {
     href: "/settings",
@@ -208,7 +222,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       </ul>
                     </li>
                   ) : (
-                    <li key={link.label}>
+                    <li key={link.href}>
                       <NavLink
                         href={link.href}
                         label={link.label}

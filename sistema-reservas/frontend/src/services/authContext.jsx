@@ -1,6 +1,14 @@
-import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import { useNavigate } from 'react-router-dom';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import { jwtDecode } from "jwt-decode";
+import { useNavigate } from "react-router-dom";
+import { profileService } from "./profileService";
 
 const AuthContext = createContext();
 
@@ -10,38 +18,70 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem('token') || null);
+  const [token, setToken] = useState(
+    () => localStorage.getItem("token") || null
+  );
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) return savedTheme === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) return savedTheme === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle('dark', isDarkMode);
-    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-    
+    root.classList.toggle("dark", isDarkMode);
+    localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+
     if (user && user.role) {
-      root.setAttribute('data-theme', user.role);
+      root.setAttribute("data-theme", user.role);
     } else {
-      root.removeAttribute('data-theme');
+      root.removeAttribute("data-theme");
     }
   }, [isDarkMode, user]);
 
-  // 1. Estabilizamos la función toggleTheme con useCallback.
   const toggleTheme = useCallback(() => {
-    setIsDarkMode(prev => !prev);
+    setIsDarkMode((prev) => !prev);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setToken(null);
     setUser(null);
-    navigate('/login');
+    navigate("/login");
+  }, [navigate]);
+
+  // Función para aplicar preferencias del usuario
+  const applyUserPreferences = useCallback(async () => {
+    try {
+      const preferences = await profileService.getMyPreferences();
+
+      if (preferences.defaultTheme) {
+        if (preferences.defaultTheme === "system") {
+          const systemPrefersDark = window.matchMedia(
+            "(prefers-color-scheme: dark)"
+          ).matches;
+          setIsDarkMode(systemPrefersDark);
+        } else {
+          setIsDarkMode(preferences.defaultTheme === "dark");
+        }
+      }
+
+      if (
+        preferences.defaultDashboard &&
+        preferences.defaultDashboard !== "main"
+      ) {
+        navigate(`/${preferences.defaultDashboard}`);
+      }
+    } catch (error) {
+      if (error.response?.status === 400) {
+        console.log('Usuario sin preferencias configuradas, usando valores por defecto');
+      } else {
+        console.error("Error al aplicar preferencias:", error);
+      }
+    }
   }, [navigate]);
 
   useEffect(() => {
@@ -51,36 +91,79 @@ export const AuthProvider = ({ children }) => {
     }
     try {
       const decodedUser = jwtDecode(token);
-      const isValidRole = decodedUser.role && (decodedUser.role === 'administrator' || decodedUser.role === 'receptionist');
+      const isValidRole =
+        decodedUser.role &&
+        (decodedUser.role === "administrator" ||
+          decodedUser.role === "receptionist");
       const isTokenAlive = decodedUser.exp * 1000 > Date.now();
-      if (isTokenAlive && isValidRole) setUser(decodedUser);
-      else logout();
+      if (isTokenAlive && isValidRole) {
+        setUser(decodedUser);
+        // Aplicar preferencias después de validar el usuario
+        applyUserPreferences();
+      } else {
+        logout();
+      }
     } catch {
       logout();
     } finally {
       setLoading(false);
     }
-  }, [token, logout]);
+  }, [token, logout, applyUserPreferences]);
 
-  const login = useCallback((newToken) => {
-    localStorage.setItem('token', newToken);
-    const decodedUser = jwtDecode(newToken);
-    setUser(decodedUser);
-    setToken(newToken);
-    navigate('/');
-  }, [navigate]);
-  
-  // 2. Estabilizamos el objeto 'value' con useMemo.
-  //    Esto asegura que los componentes hijos solo se actualicen cuando los datos realmente cambien.
-  const value = useMemo(() => ({
-    user,
-    token,
-    loading,
-    login,
-    logout,
-    isDarkMode,
-    toggleTheme,
-  }), [user, token, loading, login, logout, isDarkMode, toggleTheme]);
+  const login = useCallback(
+    (newToken) => {
+      localStorage.setItem("token", newToken);
+      const decodedUser = jwtDecode(newToken);
+      setUser(decodedUser);
+      setToken(newToken);
+
+      profileService
+        .getMyPreferences()
+        .then((preferences) => {
+          if (preferences.defaultTheme) {
+            if (preferences.defaultTheme === "system") {
+              const systemPrefersDark = window.matchMedia(
+                "(prefers-color-scheme: dark)"
+              ).matches;
+              setIsDarkMode(systemPrefersDark);
+            } else {
+              setIsDarkMode(preferences.defaultTheme === "dark");
+            }
+          }
+
+          if (
+            preferences.defaultDashboard &&
+            preferences.defaultDashboard !== "main"
+          ) {
+            navigate(`/${preferences.defaultDashboard}`);
+          } else {
+            navigate("/");
+          }
+        })
+        .catch((error) => {
+          if (error.response?.status === 400) {
+            console.log('Usuario sin preferencias, usando valores por defecto');
+          } else {
+            console.error("Error al cargar preferencias:", error);
+          }
+          navigate("/");
+        });
+    },
+    [navigate]
+  );
+
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      loading,
+      login,
+      logout,
+      isDarkMode,
+      toggleTheme,
+    }),
+    [user, token, loading, login, logout, isDarkMode, toggleTheme]
+  );
 
   return (
     <AuthContext.Provider value={value}>

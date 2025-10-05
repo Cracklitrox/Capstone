@@ -16,7 +16,7 @@ const limiter = RateLimit({
 // Aplica el rate limiter a todas las rutas de este router
 router.use(limiter);
 
-// --- Definición de Rutas con Capas de Seguridad ---
+// --- Rutas de gestión de usuarios (solo administradores) ---
 
 // POST /: Solo administradores pueden crear personal
 router.post('/', authenticate, authorize(['administrator']), staffController.createNewUser);
@@ -30,8 +30,15 @@ router.get('/:id', authenticate, authorize(['administrator']), staffController.g
 // PUT /:id: Solo administradores pueden actualizar personal
 router.put('/:id', authenticate, authorize(['administrator']), staffController.updateUserInfo);
 
-// Un apunte sobre la ruta para Eliminar:
-// Cuando la crees, seguirá este mismo patrón. Por ejemplo:
-// router.delete('/:id', authenticate, authorize(['administrator']), staffController.deleteUser);
+// --- Rutas de actividad y preferencias (cualquier usuario autenticado) ---
+
+// GET /my-activity: Obtener la actividad reciente del usuario actual
+router.get('/my-activity', authenticate, staffController.getMyActivity);
+
+// GET /my-preferences: Obtener las preferencias del usuario actual
+router.get('/my-preferences', authenticate, staffController.getMyPreferences);
+
+// PUT /my-preferences: Actualizar las preferencias del usuario actual
+router.put('/my-preferences', authenticate, staffController.updateMyPreferences);
 
 module.exports = router;

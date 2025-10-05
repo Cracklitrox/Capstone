@@ -12,7 +12,9 @@ import RoomsCrud from "./pages/Admin/RoomsCrud.jsx";
 import RoomTypesCrud from "./pages/Admin/RoomTypesCrud.jsx";
 import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
 import TapeChart from "./pages/Receptionist/TapeChart.jsx";
+import ReservationHistory from "./pages/Receptionist/ReservationHistory.jsx";
 import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlerts.jsx";
+import NewReservation from "./pages/Reservations/NewReservation.jsx";
 
 import "./index.css";
 
@@ -43,21 +45,21 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
 
-      {/* Rutas Protegidas que usan el Layout principal (Sidebar y Navbar) */}
+      {/* Rutas Protegidas */}
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<DashboardSelector />} />
         <Route path="planning" element={<TapeChart />} />
         <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} />
         <Route path="reservations" element={<ReservationsPage />} />
+        <Route path="history" element={<ReservationHistory />} /> 
+        <Route path="reservations/new" element={<NewReservation />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />
-        {/* Pequeño ajuste: La ruta a Profile ya está protegida por la ruta padre "/" */}
         <Route path="profile" element={<Profile />} />
         <Route path="admin/rooms-crud" element={<RoomsCrud />} />
         <Route path="admin/room-types-crud" element={<RoomTypesCrud />} />
       </Route>
 
-      {/* Ruta para páginas no encontradas */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

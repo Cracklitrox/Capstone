@@ -20,6 +20,10 @@ Capstone
 │  │  │  ├─ migrations                                                     
 │  │  │  │  ├─ 20250909200740_init                                         
 │  │  │  │  │  └─ migration.sql                                            
+│  │  │  │  ├─ 20250928233606_tabla_login_history                          
+│  │  │  │  │  └─ migration.sql                                            
+│  │  │  │  ├─ 20251001022503_creacion_tabla_logs_mas_enum_y_preferencias  
+│  │  │  │  │  └─ migration.sql                                            
 │  │  │  │  └─ migration_lock.toml                                         
 │  │  │  ├─ check-seed.js                                                  
 │  │  │  ├─ schema.prisma                                                  
@@ -30,12 +34,29 @@ Capstone
 │  │  │  │  │  ├─ auth.controller.js                                       
 │  │  │  │  │  ├─ auth.routes.js                                           
 │  │  │  │  │  └─ auth.service.js                                          
+│  │  │  │  ├─ planning                                                    
+│  │  │  │  │  ├─ planning.controller.js                                   
+│  │  │  │  │  ├─ planning.routes.js                                       
+│  │  │  │  │  └─ planning.service.js                                      
+│  │  │  │  ├─ rooms                                                       
+│  │  │  │  │  ├─ rooms.controller.js                                      
+│  │  │  │  │  ├─ rooms.routes.js                                          
+│  │  │  │  │  └─ rooms.service.js                                         
 │  │  │  │  ├─ staff                                                       
 │  │  │  │  │  ├─ staff.controller.js                                      
 │  │  │  │  │  ├─ staff.routes.js                                          
 │  │  │  │  │  └─ staff.service.js                                         
 │  │  │  │  ├─ __tests__                                                   
-│  │  │  │  │  └─ api.test.js                                              
+│  │  │  │  │  ├─ auth                                                     
+│  │  │  │  │  │  ├─ auth-edge-cases.test.js                               
+│  │  │  │  │  │  └─ auth.test.js                                          
+│  │  │  │  │  ├─ rooms                                                    
+│  │  │  │  │  │  └─ rooms.endpoint.test.js                                
+│  │  │  │  │  ├─ staff                                                    
+│  │  │  │  │  │  ├─ staff-error-handling.test.js                          
+│  │  │  │  │  │  └─ staff.test.js                                         
+│  │  │  │  │  ├─ app.test.js                                              
+│  │  │  │  │  └─ test-helpers.js                                          
 │  │  │  │  └─ routes.js                                                   
 │  │  │  ├─ config                                                         
 │  │  │  │  └─ index.js                                                    
@@ -43,21 +64,30 @@ Capstone
 │  │  │  │  ├─ prisma.client.js                                            
 │  │  │  │  └─ redis.client.js                                             
 │  │  │  ├─ middleware                                                     
-│  │  │  │  ├─ auth.middleware.js                                          
-│  │  │  │  └─ authorize.middleware.js                                     
+│  │  │  │  └─ auth.middleware.js                                          
 │  │  │  ├─ utils                                                          
 │  │  │  │  └─ errorHandler.js                                             
 │  │  │  ├─ app.js                                                         
 │  │  │  └─ server.js                                                      
 │  │  ├─ docker-entrypoint.sh                                              
 │  │  ├─ Dockerfile                                                        
-│  │  ├─ jest.config.js                                                    
-│  │  ├─ jest.setup.js                                                     
 │  │  ├─ package-lock.json                                                 
 │  │  ├─ package.json                                                      
 │  │  ├─ pg_hba.conf                                                       
-│  │  └─ vitest.config.js                                                  
+│  │  ├─ vitest.config.js                                                  
+│  │  └─ vitest.setup.js                                                   
 │  ├─ frontend                                                             
+│  │  ├─ dist                                                              
+│  │  │  ├─ assets                                                         
+│  │  │  │  ├─ index-DnUFWUqV.js                                           
+│  │  │  │  └─ index-DtRYe9JB.css                                          
+│  │  │  ├─ favicon.ico                                                    
+│  │  │  ├─ index.html                                                     
+│  │  │  ├─ logo192.png                                                    
+│  │  │  ├─ logo512.png                                                    
+│  │  │  ├─ manifest.json                                                  
+│  │  │  ├─ robots.txt                                                     
+│  │  │  └─ vite.svg                                                       
 │  │  ├─ public                                                            
 │  │  │  ├─ favicon.ico                                                    
 │  │  │  ├─ index.html                                                     
@@ -68,35 +98,78 @@ Capstone
 │  │  │  └─ vite.svg                                                       
 │  │  ├─ src                                                               
 │  │  │  ├─ components                                                     
+│  │  │  │  ├─ ui                                                          
+│  │  │  │  │  ├─ Badge.jsx                                                
+│  │  │  │  │  ├─ Button.jsx                                               
+│  │  │  │  │  ├─ Calendar.jsx                                             
+│  │  │  │  │  ├─ Card.jsx                                                 
+│  │  │  │  │  ├─ Command.jsx                                              
+│  │  │  │  │  ├─ Dialog.jsx                                               
+│  │  │  │  │  ├─ Dropdown-menu.jsx                                        
+│  │  │  │  │  ├─ Input.jsx                                                
+│  │  │  │  │  ├─ Label.jsx                                                
+│  │  │  │  │  ├─ Popover.jsx                                              
+│  │  │  │  │  ├─ Select.jsx                                               
+│  │  │  │  │  ├─ Separator.jsx                                            
+│  │  │  │  │  ├─ Switch.jsx                                               
+│  │  │  │  │  ├─ Tabs.jsx                                                 
+│  │  │  │  │  └─ Tooltip.jsx                                              
 │  │  │  │  ├─ Footer.jsx                                                  
+│  │  │  │  ├─ HistoryDetailViews.jsx                                      
 │  │  │  │  ├─ layout.jsx                                                  
+│  │  │  │  ├─ LocationCombobox.jsx                                        
 │  │  │  │  ├─ Navbar.jsx                                                  
+│  │  │  │  ├─ Profile.jsx                                                 
 │  │  │  │  ├─ ProtectedRoute.jsx                                          
-│  │  │  │  └─ Sidebar.jsx                                                 
+│  │  │  │  ├─ RoomBoard.jsx                                               
+│  │  │  │  ├─ RoomCard.jsx                                                
+│  │  │  │  ├─ RoomHistory.jsx                                             
+│  │  │  │  ├─ Sidebar.jsx                                                 
+│  │  │  │  └─ Validations.jsx                                             
+│  │  │  ├─ lib                                                            
+│  │  │  │  ├─ activityFormatter.js                                        
+│  │  │  │  └─ utils.js                                                    
 │  │  │  ├─ pages                                                          
 │  │  │  │  ├─ Admin                                                       
-│  │  │  │  │  └─ home.jsx                                                 
+│  │  │  │  │  └─ Dashboard.jsx                                            
 │  │  │  │  ├─ Receptionist                                                
-│  │  │  │  │  └─ home.jsx                                                 
+│  │  │  │  │  ├─ Dashboard.jsx                                            
+│  │  │  │  │  └─ TapeChart.jsx                                            
 │  │  │  │  └─ login.jsx                                                   
 │  │  │  ├─ services                                                       
+│  │  │  │  ├─ authContext.jsx                                             
+│  │  │  │  ├─ planning.js                                                 
+│  │  │  │  ├─ profileService.js                                           
+│  │  │  │  ├─ roomDetails.js                                              
+│  │  │  │  ├─ rooms.js                                                    
 │  │  │  │  └─ services.jsx                                                
 │  │  │  ├─ __tests__                                                      
-│  │  │  │  ├─ Admin                                                       
-│  │  │  │  │  ├─ __snapshots__                                            
-│  │  │  │  │  │  └─ Home_Inicial.test.jsx.snap                            
-│  │  │  │  │  └─ Home_Inicial.test.jsx                                    
-│  │  │  │  ├─ Receptionist                                                
-│  │  │  │  │  ├─ __snapshots__                                            
-│  │  │  │  │  │  └─ Home_Inicial.test.jsx.snap                            
-│  │  │  │  │  └─ Home_Inicial.test.jsx                                    
-│  │  │  │  ├─ Footer.test.jsx                                             
-│  │  │  │  ├─ Layout.test.jsx                                             
-│  │  │  │  ├─ Login.test.jsx                                              
-│  │  │  │  ├─ Navbar.test.jsx                                             
-│  │  │  │  ├─ ProtectedRoute.test.jsx                                     
-│  │  │  │  ├─ services.test.jsx                                           
-│  │  │  │  └─ Sidebar.test.jsx                                            
+│  │  │  │  ├─ components                                                  
+│  │  │  │  │  ├─ ui                                                       
+│  │  │  │  │  │  ├─ Button.test.jsx                                       
+│  │  │  │  │  │  ├─ Card.test.jsx                                         
+│  │  │  │  │  │  └─ Input.test.jsx                                        
+│  │  │  │  │  ├─ Layout.test.jsx                                          
+│  │  │  │  │  ├─ Navbar.test.jsx                                          
+│  │  │  │  │  ├─ ProtectedRoute.test.jsx                                  
+│  │  │  │  │  ├─ RoomBoard.test.jsx                                       
+│  │  │  │  │  ├─ RoomCard.test.jsx                                        
+│  │  │  │  │  └─ Sidebar.test.jsx                                         
+│  │  │  │  ├─ pages                                                       
+│  │  │  │  │  ├─ Admin                                                    
+│  │  │  │  │  │  └─ Dashboard.test.jsx                                    
+│  │  │  │  │  ├─ Receptionist                                             
+│  │  │  │  │  │  └─ Dashboard.test.jsx                                    
+│  │  │  │  │  └─ Login.test.jsx                                           
+│  │  │  │  ├─ services                                                    
+│  │  │  │  │  ├─ authContext.test.jsx                                     
+│  │  │  │  │  └─ services.test.jsx                                        
+│  │  │  │  ├─ setup                                                       
+│  │  │  │  │  ├─ mocks.js                                                 
+│  │  │  │  │  └─ setup.test.jsx                                           
+│  │  │  │  ├─ utils                                                       
+│  │  │  │  │  └─ testUtils.jsx                                            
+│  │  │  │  └─ Profile.test.jsx                                            
 │  │  │  ├─ App.jsx                                                        
 │  │  │  ├─ index.css                                                      
 │  │  │  ├─ index.jsx                                                      
@@ -104,18 +177,21 @@ Capstone
 │  │  │  └─ setupTests.js                                                  
 │  │  ├─ tests                                                             
 │  │  │  └─ administrador_login.spec.js                                    
+│  │  ├─ components.json                                                   
 │  │  ├─ Dockerfile                                                        
 │  │  ├─ Dockerfile.dev                                                    
 │  │  ├─ eslint.config.js                                                  
 │  │  ├─ index.html                                                        
+│  │  ├─ jsconfig.json                                                     
 │  │  ├─ nginx.conf                                                        
 │  │  ├─ package-lock.json                                                 
 │  │  ├─ package.json                                                      
 │  │  ├─ playwright.config.js                                              
 │  │  ├─ README.md                                                         
 │  │  ├─ tailwind.config.js                                                
-│  │  └─ vite.config.js                                                    
-│  ├─ build_log.txt                                                        
-│  └─ docker-compose.yml                                                   
+│  │  ├─ vite.config.js                                                    
+│  │  └─ vitest.config.js                                                  
+│  ├─ docker-compose.yml                                                   
+│  └─ Estructura_proyecto.txt                                              
 ├─ CODEOWNERS                                                              
 └─ README.md                                                               
