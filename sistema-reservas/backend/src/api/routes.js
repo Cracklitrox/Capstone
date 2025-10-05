@@ -6,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 
 const staffRoutes = require("./staff/staff.routes");
 const authRoutes = require("./auth/auth.routes");
+const reservationHistoryRoutes = require('./reservation_history/reservation_history.routes'); 
 const roomsRoutes = require("./rooms/rooms.routes");
 const adminRoomsRoutes = require('./rooms/admin/adminRooms.routes');
 const planningRoutes = require("./planning/planning.routes");
@@ -30,6 +31,7 @@ router.get("/", (req, res) => {
 
 router.use("/auth", authRoutes);
 router.use("/rooms", authenticate, roomsRoutes);
+router.use('/reservation_history', authenticate, reservationHistoryRoutes); 
 router.use('/admin/rooms', adminRoomsRoutes);
 router.use("/staff", cummonLimiter, authenticate, staffRoutes);
 router.use("/planning", authenticate, planningRoutes);

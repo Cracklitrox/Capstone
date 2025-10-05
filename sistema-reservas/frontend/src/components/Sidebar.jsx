@@ -9,6 +9,7 @@ import {
   UserGroupIcon,
   Cog6ToothIcon,
   ViewColumnsIcon,
+  ClockIcon,
   BellAlertIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,12 @@ const navLinks = [
     label: "Gestionar Usuarios",
     icon: UserGroupIcon,
     roles: ["administrator"],
+  },
+  {
+    href: "/history",
+    label: "Historial de Reservas",
+    icon: ClockIcon, 
+    roles: ["administrator", "receptionist"],
   },
   {
     href: "/settings",
