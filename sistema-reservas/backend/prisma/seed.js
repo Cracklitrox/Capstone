@@ -8,6 +8,31 @@ async function getFaker() {
 
 const prisma = new PrismaClient();
 
+// -----------------------------------------------------------
+// FUNCIÓN AGREGADA: Lógica para calcular el Dígito Verificador (DV)
+// Basada en rutValidator.js para generar RUTs válidos.
+// -----------------------------------------------------------
+function calculateDv(rut) {
+  if (!rut) return "";
+
+  // Convertir a string y limpiar no-dígitos para el cálculo
+  const cleanRut = String(rut).replace(/[^0-9]/g, "");
+
+  let suma = 0;
+  let multiplicador = 2;
+
+  for (let i = cleanRut.length - 1; i >= 0; i--) {
+    suma += parseInt(cleanRut[i]) * multiplicador;
+    multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
+  }
+
+  const dvEsperado = 11 - (suma % 11);
+
+  if (dvEsperado === 11) return "0";
+  if (dvEsperado === 10) return "K";
+  return dvEsperado.toString();
+}
+
 async function cleanDatabase() {
   console.log("🧹 Limpiando la base de datos...");
 
@@ -300,6 +325,7 @@ async function createUsers(roles) {
   const password = await bcrypt.hash("password123", 10);
 
   // Usuario Administrador
+  // RUT 11.111.111-1 es válido
   const existingAdmin = await prisma.users.findUnique({
     where: { email: "super.admin@hotel.com" },
   });
@@ -324,6 +350,7 @@ async function createUsers(roles) {
   }
 
   // Recepcionistas
+  // RUT 22.222.222-2 es válido
   const existingCarlos = await prisma.users.findUnique({
     where: { email: "carlos.recepcionista@hotel.com" },
   });
@@ -350,6 +377,7 @@ async function createUsers(roles) {
     carlos = existingCarlos;
   }
 
+  // RUT 33.333.333-3 es válido
   const existingJuan = await prisma.users.findUnique({
     where: { email: "juan.recepcionista@hotel.com" },
   });
@@ -390,21 +418,23 @@ async function createGuests(faker, guestRole) {
 
   // 10 Huéspedes COMPLETOS (pueden ser principales)
   for (let i = 0; i < 10; i++) {
-    const identNumber = `${faker.string.numeric(
-      8
-    )}-${faker.helpers.arrayElement([
-      "0",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "K",
-    ])}`;
+    let identNumber;
+    let existingUser;
+
+    do {
+      // MODIFICACIÓN 1: Usar un rango de números más altos (ej: 40 millones a 99 millones)
+      // para evitar colisiones con staff (11111111, 22222222, 33333333) y valores muy bajos.
+      const rutBase = faker.number
+        .int({ min: 40000000, max: 99999999 })
+        .toString();
+
+      const dv = calculateDv(rutBase);
+      identNumber = `${rutBase}-${dv}`;
+
+      existingUser = await prisma.users.findUnique({
+        where: { identification_number: identNumber },
+      });
+    } while (existingUser);
 
     const guest = await prisma.users.create({
       data: {
@@ -452,21 +482,24 @@ async function createGuests(faker, guestRole) {
 
   // 10 Huéspedes INCOMPLETOS (solo adicionales)
   for (let i = 0; i < 10; i++) {
-    const identNumber = `${faker.string.numeric(
-      8
-    )}-${faker.helpers.arrayElement([
-      "0",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "K",
-    ])}`;
+    // MODIFICACIÓN 2: Aplicar el bucle DO/WHILE faltante en esta sección
+    let identNumber;
+    let existingUser;
+
+    do {
+      // Generar RUT base (entre 40 millones y 99 millones)
+      const rutBase = faker.number
+        .int({ min: 40000000, max: 99999999 })
+        .toString();
+
+      // Calcular DV
+      const dv = calculateDv(rutBase);
+      identNumber = `${rutBase}-${dv}`;
+
+      existingUser = await prisma.users.findUnique({
+        where: { identification_number: identNumber },
+      });
+    } while (existingUser);
 
     const guest = await prisma.users.create({
       data: {

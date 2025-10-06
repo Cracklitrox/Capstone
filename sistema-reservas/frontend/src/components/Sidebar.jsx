@@ -61,18 +61,18 @@ const navLinks = [
     icon: PlusCircle,
     roles: ["receptionist", "administrator"],
   },
-  {
-    href: "/reservations",
-    label: "Gestionar Reservas",
-    icon: CalendarDaysIcon,
-    roles: ["administrator", "receptionist"],
-  },
-  {
-    href: "/users",
-    label: "Gestionar Usuarios",
-    icon: UserGroupIcon,
-    roles: ["administrator"],
-  },
+  // {
+  //   href: "/reservations",
+  //   label: "Gestionar Reservas",
+  //   icon: CalendarDaysIcon,
+  //   roles: ["administrator", "receptionist"],
+  // },
+  // {
+  //   href: "/users",
+  //   label: "Gestionar Usuarios",
+  //   icon: UserGroupIcon,
+  //   roles: ["administrator"],
+  // },
   {
     href: "/history",
     label: "Historial de Reservas",
@@ -80,15 +80,9 @@ const navLinks = [
     roles: ["administrator", "receptionist"],
   },
   {
-    href: "/settings",
-    label: "Configuración",
-    icon: Cog6ToothIcon,
-    roles: ["administrator"],
-  },
-  {
     href: "/profile",
-    label: "Mi Perfil",
-    icon: null,
+    label: "Configuración de Perfil",
+    icon: Cog6ToothIcon,
     roles: ["administrator", "receptionist"],
   },
 ];

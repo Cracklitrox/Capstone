@@ -130,28 +130,55 @@ async function getRoomById(roomId) {
     return null;
   }
 
-  const pastReservations = await prisma.reservation_rooms.findMany({
+  // Obtener reservas pasadas COMPLETAS con todos sus datos
+  const pastReservations = await prisma.reservations.findMany({
     where: {
-      room_id: id,
-      reservations: {
-        status: "completed",
+      status: "completed",
+      reservation_rooms: {
+        some: {
+          room_id: id,
+        },
       },
     },
     orderBy: {
-      reservations: {
-        check_out_date: "desc",
-      },
+      check_out_date: "desc",
     },
     take: 5,
     include: {
-      reservations: {
+      users_reservations_main_guest_idTousers: {
+        select: {
+          first_name: true,
+          paternal_last_name: true,
+          maternal_last_name: true,
+          identification_number: true,
+          email: true,
+          phone_number: true,
+        },
+      },
+      reservation_rooms: {
         include: {
-          users_reservations_main_guest_idTousers: {
+          rooms: {
             select: {
-              first_name: true,
-              paternal_last_name: true,
+              room_number: true,
+              room_types: {
+                select: { name: true },
+              },
             },
           },
+        },
+      },
+      reservation_services: {
+        include: {
+          services: {
+            select: { name: true },
+          },
+        },
+      },
+      payments: {
+        select: {
+          amount: true,
+          payment_method: true,
+          status: true,
         },
       },
     },
@@ -160,6 +187,92 @@ async function getRoomById(roomId) {
   const activeReservationData = room.reservation_rooms?.[0]?.reservations;
   const mainGuestData =
     activeReservationData?.users_reservations_main_guest_idTousers;
+
+  let currentReservation = null;
+  if (activeReservationData) {
+    const fullReservation = await prisma.reservations.findUnique({
+      where: { id: activeReservationData.id },
+      include: {
+        users_reservations_main_guest_idTousers: {
+          select: {
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true,
+            email: true,
+            phone_number: true,
+            guest_details: true,
+          },
+        },
+        reservation_rooms: {
+          include: {
+            rooms: {
+              select: {
+                room_number: true,
+                room_types: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
+        },
+        reservation_services: {
+          include: {
+            services: {
+              select: { name: true },
+            },
+          },
+        },
+        payments: {
+          select: {
+            amount: true,
+            payment_method: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (fullReservation) {
+      currentReservation = {
+        reservationId: fullReservation.id,
+        code: fullReservation.code,
+        guestName: `${fullReservation.users_reservations_main_guest_idTousers.first_name} ${fullReservation.users_reservations_main_guest_idTousers.paternal_last_name} ${fullReservation.users_reservations_main_guest_idTousers.maternal_last_name || ""}`.trim(),
+        guestIdentification:
+          fullReservation.users_reservations_main_guest_idTousers
+            .identification_number,
+        guestEmail:
+          fullReservation.users_reservations_main_guest_idTousers.email,
+        guestPhone:
+          fullReservation.users_reservations_main_guest_idTousers.phone_number,
+        special_requests:
+          fullReservation.users_reservations_main_guest_idTousers
+            .guest_details?.special_requests,
+        observations:
+          fullReservation.users_reservations_main_guest_idTousers
+            .guest_details?.observations,
+        checkIn: fullReservation.check_in_date,
+        checkOut: fullReservation.check_out_date,
+        guestCount: fullReservation.guest_count,
+        totalAmount: fullReservation.total_amount,
+        paidAmount: fullReservation.paid_amount,
+        rooms: fullReservation.reservation_rooms.map((rr) => ({
+          number: rr.rooms.room_number,
+          type: rr.rooms.room_types.name,
+        })),
+        services: fullReservation.reservation_services.map((rs) => ({
+          name: rs.services.name,
+          quantity: rs.quantity,
+          unitPrice: rs.unit_price,
+        })),
+        payments: fullReservation.payments.map((p) => ({
+          amount: p.amount,
+          method: p.payment_method,
+          status: p.status,
+        })),
+      };
+    }
+  }
 
   return {
     id: room.id,
@@ -171,16 +284,7 @@ async function getRoomById(roomId) {
     base_price: room.base_price,
     description: room.description,
 
-    currentGuest: mainGuestData
-      ? {
-          fullName: `${mainGuestData.first_name} ${mainGuestData.paternal_last_name}`,
-          rut: `${mainGuestData.rut}-${mainGuestData.rut_dv}`,
-          email: mainGuestData.email,
-          phone: mainGuestData.phone_number,
-          special_requests: mainGuestData.guest_details?.special_requests,
-          observations: mainGuestData.guest_details?.observations,
-        }
-      : null,
+    currentReservation: currentReservation,
 
     cleaningHistory: room.cleaning_records.map((record) => ({
       id: record.id,
@@ -191,11 +295,33 @@ async function getRoomById(roomId) {
 
     maintenanceHistory: room.maintenance_tasks,
 
-    reservationHistory: pastReservations.map((rr) => ({
-      reservationId: rr.reservations.id,
-      guestName: `${rr.reservations.users_reservations_main_guest_idTousers.first_name} ${rr.reservations.users_reservations_main_guest_idTousers.paternal_last_name}`,
-      checkIn: rr.reservations.check_in_date,
-      checkOut: rr.reservations.check_out_date,
+    reservationHistory: pastReservations.map((res) => ({
+      reservationId: res.id,
+      code: res.code,
+      guestName: `${res.users_reservations_main_guest_idTousers.first_name} ${res.users_reservations_main_guest_idTousers.paternal_last_name} ${res.users_reservations_main_guest_idTousers.maternal_last_name || ""}`.trim(),
+      guestIdentification:
+        res.users_reservations_main_guest_idTousers.identification_number,
+      guestEmail: res.users_reservations_main_guest_idTousers.email,
+      guestPhone: res.users_reservations_main_guest_idTousers.phone_number,
+      checkIn: res.check_in_date,
+      checkOut: res.check_out_date,
+      guestCount: res.guest_count,
+      totalAmount: res.total_amount,
+      paidAmount: res.paid_amount,
+      rooms: res.reservation_rooms.map((rr) => ({
+        number: rr.rooms.room_number,
+        type: rr.rooms.room_types.name,
+      })),
+      services: res.reservation_services.map((rs) => ({
+        name: rs.services.name,
+        quantity: rs.quantity,
+        unitPrice: rs.unit_price,
+      })),
+      payments: res.payments.map((p) => ({
+        amount: p.amount,
+        method: p.payment_method,
+        status: p.status,
+      })),
     })),
   };
 }
@@ -224,7 +350,7 @@ async function updateRoomStatus(roomId, newStatus, userId, userRole) {
   }
 
   // Actualizar el estado
-  const updatedRoom = await prisma.rooms.update({
+  await prisma.rooms.update({
     where: { id },
     data: { status: newStatus },
   });
@@ -236,7 +362,57 @@ async function updateRoomStatus(roomId, newStatus, userId, userRole) {
     new_status: newStatus,
   });
 
-  return updatedRoom;
+  // 🔥 AQUÍ ESTÁ EL FIX: Retornar con el mismo formato que getAllRooms
+  const room = await prisma.rooms.findUnique({
+    where: { id },
+    include: {
+      room_types: { select: { name: true } },
+      reservation_rooms: {
+        where: {
+          reservations: {
+            status: { in: ["confirmed", "in_progress", "pending"] },
+          },
+        },
+        orderBy: { start_date: "asc" },
+        take: 1,
+        include: {
+          reservations: {
+            include: {
+              users_reservations_main_guest_idTousers: {
+                select: { first_name: true, paternal_last_name: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const activeReservation = room.reservation_rooms?.[0]?.reservations;
+  const guest = activeReservation?.users_reservations_main_guest_idTousers;
+
+  return {
+    id: room.id,
+    number: room.room_number,
+    type: room.room_types?.name || "N/A",
+    floor: room.floor,
+    status: room.status,
+    capacity: room.capacity,
+    base_price: room.base_price,
+    reservation: activeReservation
+      ? {
+          id: activeReservation.id,
+          check_in_date: activeReservation.check_in_date,
+          check_out_date: activeReservation.check_out_date,
+          guest: guest
+            ? {
+                first_name: guest.first_name,
+                paternal_last_name: guest.paternal_last_name,
+              }
+            : null,
+        }
+      : null,
+  };
 }
 
 module.exports = {
