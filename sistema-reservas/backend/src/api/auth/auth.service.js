@@ -289,6 +289,10 @@ const changePassword = async (
     if (!isPasswordValid) {
       throw new Error("La contraseña actual es incorrecta.");
     }
+    const isSamePassword = await bcrypt.compare(newPassword, user.password_hash);
+    if (isSamePassword) {
+      throw new Error("La nueva contraseña debe ser diferente a la actual.");
+    }
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 

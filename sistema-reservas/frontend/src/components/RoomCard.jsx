@@ -111,29 +111,31 @@ function RoomCard({ room, onDetails, onStatusChange, onCheckIn, onCheckOut }) {
             <div />
           )}
 
-          {/* --- CAMBIO PRINCIPAL AQUÍ --- */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Badge
-                variant={variant}
-                className="cursor-pointer hover:brightness-90 transition-all"
-              >
-                {label}
-              </Badge>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {menuOptions
-                .filter((opt) => opt.value !== room.status)
-                .map((opt) => (
-                  <DropdownMenuItem
-                    key={opt.value}
-                    onSelect={() => onStatusChange(room.id, opt.value)}
-                  >
-                    {opt.label}
-                  </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* 🔥 FIX: Detener propagación del evento */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Badge
+                  variant={variant}
+                  className="cursor-pointer hover:brightness-90 transition-all"
+                >
+                  {label}
+                </Badge>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {menuOptions
+                  .filter((opt) => opt.value !== room.status)
+                  .map((opt) => (
+                    <DropdownMenuItem
+                      key={opt.value}
+                      onSelect={() => onStatusChange(room.id, opt.value)}
+                    >
+                      {opt.label}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

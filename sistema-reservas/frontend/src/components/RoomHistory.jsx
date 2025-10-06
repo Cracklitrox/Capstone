@@ -1,5 +1,3 @@
-// ruta: frontend/src/components/RoomHistory.jsx
-
 import React, { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { Badge } from "@/components/ui/Badge";
@@ -13,6 +11,8 @@ import {
   CalendarDaysIcon,
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
+// ✅ AGREGAR ESTE IMPORT
+import { ReservationDetailView } from "./HistoryDetailViews.jsx";
 
 const InfoRow = ({ icon: Icon, label, value }) => (
   <div className="flex items-start gap-3 py-2">
@@ -24,28 +24,17 @@ const InfoRow = ({ icon: Icon, label, value }) => (
   </div>
 );
 
-const GuestTab = ({ guest }) => (
-  <div className="space-y-2 pt-2">
-    <InfoRow
-      icon={UserCircleIcon}
-      label="Nombre Completo"
-      value={guest?.fullName}
-    />
-    <InfoRow icon={IdentificationIcon} label="RUT" value={guest?.rut} />
-    <InfoRow icon={EnvelopeIcon} label="Email" value={guest?.email} />
-    <InfoRow icon={PhoneIcon} label="Teléfono" value={guest?.phone} />
-    <InfoRow
-      icon={ChatBubbleBottomCenterTextIcon}
-      label="Peticiones Especiales"
-      value={guest?.special_requests}
-    />
-    <InfoRow
-      icon={ClipboardDocumentListIcon}
-      label="Observaciones"
-      value={guest?.observations}
-    />
-  </div>
-);
+// Tab para reserva actual (Ocupado/Pendiente)
+const CurrentReservationTab = ({ reservation }) => {
+  if (!reservation) {
+    return (
+      <div className="text-center py-8 text-muted-foreground text-sm">
+        No hay información de reserva disponible
+      </div>
+    );
+  }
+  return <ReservationDetailView item={reservation} hideBackButton />;
+};
 
 const CleaningHistoryTab = ({ history = [], onShowDetail }) => (
   <div className="max-h-60 overflow-y-auto space-y-3 pt-2 pr-2">
@@ -158,65 +147,183 @@ const ReservationHistoryTab = ({ history = [], onShowDetail }) => (
 
 function RoomHistory({ roomDetails, onShowDetail }) {
   const {
-    currentGuest,
+    currentReservation,
     cleaningHistory,
     maintenanceHistory,
     reservationHistory,
     status,
   } = roomDetails;
 
-  const tabsConfig = useMemo(
-    () => [
-      {
-        id: "guest",
-        label: "Huésped Actual",
-        shouldShow:
-          !!currentGuest && (status === "occupied" || status === "pending"),
-        component: <GuestTab guest={currentGuest} />,
-      },
-      {
-        id: "history",
-        label: "Historial",
-        shouldShow: status === "available",
-        component: (
-          <ReservationHistoryTab
-            history={reservationHistory}
-            onShowDetail={onShowDetail}
-          />
-        ),
-      },
-      {
-        id: "cleaning",
-        label: "Limpieza",
-        shouldShow: true,
-        component: (
-          <CleaningHistoryTab
-            history={cleaningHistory}
-            onShowDetail={onShowDetail}
-          />
-        ),
-      },
-      {
-        id: "maintenance",
-        label: "Mantenimiento",
-        shouldShow: true,
-        component: (
-          <MaintenanceHistoryTab
-            history={maintenanceHistory}
-            onShowDetail={onShowDetail}
-          />
-        ),
-      },
-    ],
-    [roomDetails, onShowDetail]
-  );
+  const tabsConfig = useMemo(() => {
+    const configs = {
+      // Estado: Ocupado
+      occupied: [
+        {
+          id: "current",
+          label: "Reserva Actual",
+          component: <CurrentReservationTab reservation={currentReservation} />,
+        },
+        {
+          id: "cleaning",
+          label: "Limpieza",
+          component: (
+            <CleaningHistoryTab
+              history={cleaningHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "maintenance",
+          label: "Mantenimiento",
+          component: (
+            <MaintenanceHistoryTab
+              history={maintenanceHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+      ],
+      // Estado: Pendiente
+      pending: [
+        {
+          id: "current",
+          label: "Reserva Pendiente",
+          component: <CurrentReservationTab reservation={currentReservation} />,
+        },
+        {
+          id: "cleaning",
+          label: "Limpieza",
+          component: (
+            <CleaningHistoryTab
+              history={cleaningHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "maintenance",
+          label: "Mantenimiento",
+          component: (
+            <MaintenanceHistoryTab
+              history={maintenanceHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+      ],
+      // Estado: Disponible
+      available: [
+        {
+          id: "history",
+          label: "Historial Reservas",
+          component: (
+            <ReservationHistoryTab
+              history={reservationHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "cleaning",
+          label: "Limpieza",
+          component: (
+            <CleaningHistoryTab
+              history={cleaningHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "maintenance",
+          label: "Mantenimiento",
+          component: (
+            <MaintenanceHistoryTab
+              history={maintenanceHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+      ],
+      // Estado: Limpieza
+      cleaning: [
+        {
+          id: "cleaning",
+          label: "Limpieza Actual",
+          component: (
+            <CleaningHistoryTab
+              history={cleaningHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "history",
+          label: "Historial Reservas",
+          component: (
+            <ReservationHistoryTab
+              history={reservationHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "maintenance",
+          label: "Mantenimiento",
+          component: (
+            <MaintenanceHistoryTab
+              history={maintenanceHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+      ],
+      // Estado: Mantenimiento
+      maintenance: [
+        {
+          id: "maintenance",
+          label: "Mantenimiento Activo",
+          component: (
+            <MaintenanceHistoryTab
+              history={maintenanceHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "history",
+          label: "Historial Reservas",
+          component: (
+            <ReservationHistoryTab
+              history={reservationHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+        {
+          id: "cleaning",
+          label: "Limpieza",
+          component: (
+            <CleaningHistoryTab
+              history={cleaningHistory}
+              onShowDetail={onShowDetail}
+            />
+          ),
+        },
+      ],
+    };
 
-  const visibleTabs = useMemo(
-    () => tabsConfig.filter((tab) => tab.shouldShow),
-    [tabsConfig]
-  );
+    return configs[status] || configs.available;
+  }, [
+    status,
+    currentReservation,
+    cleaningHistory,
+    maintenanceHistory,
+    reservationHistory,
+    onShowDetail,
+  ]);
 
-  const defaultTab = visibleTabs.length > 0 ? visibleTabs[0].id : undefined;
+  const defaultTab = tabsConfig.length > 0 ? tabsConfig[0].id : undefined;
 
   const getGridColsClass = (count) => {
     switch (count) {
@@ -239,17 +346,15 @@ function RoomHistory({ roomDetails, onShowDetail }) {
 
   return (
     <Tabs defaultValue={defaultTab} className="w-full">
-      <TabsList
-        className={`grid w-full ${getGridColsClass(visibleTabs.length)}`}
-      >
-        {visibleTabs.map((tab) => (
+      <TabsList className={`grid w-full ${getGridColsClass(tabsConfig.length)}`}>
+        {tabsConfig.map((tab) => (
           <TabsTrigger key={tab.id} value={tab.id}>
             {tab.label}
           </TabsTrigger>
         ))}
       </TabsList>
 
-      {visibleTabs.map((tab) => (
+      {tabsConfig.map((tab) => (
         <TabsContent key={tab.id} value={tab.id}>
           {tab.component}
         </TabsContent>

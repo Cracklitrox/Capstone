@@ -160,8 +160,13 @@ const Profile = () => {
         const activityData = await profileService.getMyActivity(15);
         setActivityLog(activityData);
       } catch (err) {
-        console.error("Error al obtener actividad:", err);
-        toast.error("No se pudo cargar la actividad reciente.");
+        if (err.response?.status === 400) {
+          console.log("Sin actividades disponibles");
+          setActivityLog([]);
+        } else {
+          console.error("Error al obtener actividad:", err);
+          toast.error("No se pudo cargar la actividad reciente.");
+        }
       } finally {
         setIsActivityLoading(false);
       }
@@ -219,6 +224,54 @@ const Profile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormErrors({});
+
+    if (!formData.first_name || !formData.first_name.trim()) {
+      setFormErrors({ general: "El nombre es obligatorio" });
+      toast.error("El nombre es obligatorio");
+      return;
+    }
+    if (!formData.paternal_last_name || !formData.paternal_last_name.trim()) {
+      setFormErrors({ general: "El apellido paterno es obligatorio" });
+      toast.error("El apellido paterno es obligatorio");
+      return;
+    }
+    if (!formData.maternal_last_name || !formData.maternal_last_name.trim()) {
+      setFormErrors({ general: "El apellido materno es obligatorio" });
+      toast.error("El apellido materno es obligatorio");
+      return;
+    }
+    if (!formData.email || !formData.email.trim()) {
+      setFormErrors({ general: "El correo electrónico es obligatorio" });
+      toast.error("El correo electrónico es obligatorio");
+      return;
+    }
+    if (!formData.phone_number || !formData.phone_number.trim()) {
+      setFormErrors({ general: "El teléfono es obligatorio" });
+      toast.error("El teléfono es obligatorio");
+      return;
+    }
+    if (!formData.gender) {
+      setFormErrors({ general: "El género es obligatorio" });
+      toast.error("Debes seleccionar un género");
+      return;
+    }
+    if (!formData.country) {
+      setFormErrors({ general: "El país es obligatorio" });
+      toast.error("Debes seleccionar un país");
+      return;
+    }
+    if (!formData.region) {
+      setFormErrors({ general: "La región es obligatoria" });
+      toast.error("Debes seleccionar una región");
+      return;
+    }
+    if (!formData.city) {
+      setFormErrors({ general: "La ciudad es obligatoria" });
+      toast.error("Debes seleccionar una ciudad");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
       const countryName =
@@ -236,12 +289,53 @@ const Profile = () => {
       );
       setProfile(response.data);
       setIsModalOpen(false);
+      setFormErrors({});
       toast.success("Datos actualizados correctamente");
     } catch (err) {
+      const errorMessage = err.response?.data?.message || "Error del servidor.";
       console.error("Error al actualizar perfil:", err.response);
-      setFormErrors({
-        general: err.response?.data?.message || "Error del servidor.",
-      });
+      
+      if (errorMessage.includes("nombre") && errorMessage.includes("obligatorio")) {
+        setFormErrors({ general: errorMessage });
+        toast.error("El nombre es obligatorio");
+      } else if (errorMessage.includes("apellido paterno")) {
+        setFormErrors({ general: errorMessage });
+        toast.error("El apellido paterno es obligatorio");
+      } else if (errorMessage.includes("apellido materno")) {
+        setFormErrors({ general: errorMessage });
+        toast.error("El apellido materno es obligatorio");
+      } else if (errorMessage.includes("teléfono")) {
+        if (errorMessage.includes("en uso")) {
+          setFormErrors({ general: errorMessage });
+          toast.error("Este número de teléfono ya está en uso");
+        } else {
+          setFormErrors({ general: errorMessage });
+          toast.error("El teléfono es obligatorio");
+        }
+      } else if (errorMessage.includes("correo") || errorMessage.includes("email")) {
+        if (errorMessage.includes("en uso")) {
+          setFormErrors({ general: errorMessage });
+          toast.error("Este correo electrónico ya está en uso");
+        } else if (errorMessage.includes("formato") || errorMessage.includes("inválido")) {
+          setFormErrors({ general: errorMessage });
+          toast.error("El formato del correo electrónico es inválido");
+        } else {
+          setFormErrors({ general: errorMessage });
+          toast.error("El correo electrónico es obligatorio");
+        }
+      } else if (errorMessage.includes("país")) {
+        setFormErrors({ general: errorMessage });
+        toast.error("El país es obligatorio");
+      } else if (errorMessage.includes("región")) {
+        setFormErrors({ general: errorMessage });
+        toast.error("La región es obligatoria");
+      } else if (errorMessage.includes("ciudad")) {
+        setFormErrors({ general: errorMessage });
+        toast.error("La ciudad es obligatoria");
+      } else {
+        setFormErrors({ general: errorMessage });
+        toast.error("Error al actualizar el perfil");
+      }
     }
   };
 
@@ -264,12 +358,14 @@ const Profile = () => {
       setPasswordFormErrors({
         newPassword: "La nueva contraseña debe tener al menos 8 caracteres.",
       });
+      toast.error("La nueva contraseña debe tener al menos 8 caracteres");
       return;
     }
     if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
       setPasswordFormErrors({
         confirmPassword: "Las contraseñas no coinciden.",
       });
+      toast.error("Las contraseñas no coinciden");
       return;
     }
 
@@ -281,14 +377,27 @@ const Profile = () => {
         newPassword: "",
         confirmPassword: "",
       });
+      setPasswordFormErrors({});
       toast.success(response.message || "Contraseña actualizada con éxito.");
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Error del servidor.";
       console.error("Error al cambiar contraseña:", err.response);
+      
       if (errorMessage.includes("actual es incorrecta")) {
         setPasswordFormErrors({ currentPassword: errorMessage });
+        toast.error("La contraseña actual es incorrecta");
+      } else if (errorMessage.includes("diferente")) {
+        setPasswordFormErrors({ newPassword: errorMessage });
+        toast.error("La nueva contraseña debe ser diferente a la actual");
+      } else if (errorMessage.includes("coinciden")) {
+        setPasswordFormErrors({ confirmPassword: errorMessage });
+        toast.error("Las contraseñas no coinciden");
+      } else if (errorMessage.includes("8 caracteres")) {
+        setPasswordFormErrors({ newPassword: errorMessage });
+        toast.error("La nueva contraseña debe tener al menos 8 caracteres");
       } else {
         setPasswordFormErrors({ general: errorMessage });
+        toast.error("Error al cambiar la contraseña");
       }
     }
   };
@@ -374,10 +483,10 @@ const Profile = () => {
                   <li className="flex items-center">
                     <IdentificationIcon className="h-5 w-5 text-muted-foreground mr-3" />
                     <span className="font-medium text-muted-foreground">
-                      RUT:
+                      Identificación:
                     </span>
                     <span className="ml-auto font-mono">
-                      {checkEmpty(profile.rut)}
+                      {checkEmpty(profile.identification_number)}
                     </span>
                   </li>
                   <li className="flex items-center">
@@ -802,7 +911,7 @@ const Profile = () => {
                     </Select>
                   </div>
 
-                  <div className="space-y-3 p-4 border rounded-lg">
+                  {/* <div className="space-y-3 p-4 border rounded-lg">
                     <div>
                       <h3 className="font-semibold">Vista Inicial</h3>
                       <p className="text-sm text-muted-foreground">
@@ -835,7 +944,7 @@ const Profile = () => {
                         )}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </div> */}
                 </>
               )}
             </CardContent>

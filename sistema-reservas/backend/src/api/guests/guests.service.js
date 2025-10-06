@@ -1,13 +1,47 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
+
+/**
+ * Limpiar RUT (eliminar puntos, espacios y guiones)
+ */
+const cleanRut = (rutString) => {
+  if (!rutString) return "";
+  return rutString.replace(/[.\s-]/g, "");
+};
+
+/**
+ * Separar RUT y DV desde un string
+ */
+const parseRut = (rutString) => {
+  if (!rutString) return { rut: "", dv: "" };
+
+  // Usa cleanRut (local) para eliminar todos los caracteres de formato
+  const cleanedAll = cleanRut(rutString);
+  
+  // Separa el número base del DV
+  const rutBase = cleanedAll.slice(0, -1);
+  const dv = cleanedAll.slice(-1);
+
+  return {
+    rut: rutBase || "",
+    dv: dv || "",
+  };
+};
+
+
 /**
  * Buscar huésped por número de identificación
  */
 async function searchGuestByIdentification(identificationNumber) {
+  // 2. Limpiar el RUT de puntos y obtener el formato limpio XXXXXXXX-X
+  const { rut: rutBase, dv } = parseRut(identificationNumber);
+  const cleanIdNumber = `${rutBase}-${dv}`;
+
   const guest = await prisma.users.findFirst({
     where: {
-      identification_number: identificationNumber,
+      // Usar el valor limpio
+      identification_number: cleanIdNumber,
       deleted_at: null,
       user_roles: {
         some: {
@@ -81,22 +115,29 @@ async function createOrUpdateGuest(
     observations,
   } = guestData;
 
+  // 3. Limpiar y formatear el RUT para el almacenamiento en la BD (XXXXXXXX-X)
+  const { rut: rutBase, dv } = parseRut(identificationNumber);
+  const formattedIdNumber = `${rutBase}-${dv}`;
+
   const cleanData = {
-    identificationNumber,
+    // Usar el RUT limpio y formateado
+    identificationNumber: formattedIdNumber,
     firstName,
     paternalLastName,
     maternalLastName,
-    email: email && email.trim() !== '' ? email : null,
+    email: email && email.trim() !== "" ? email : null,
     phoneNumber,
-    birthDate: birthDate && birthDate.trim() !== '' ? birthDate : null,
-    gender: gender && gender.trim() !== '' ? gender : null,
+    birthDate: birthDate && birthDate.trim() !== "" ? birthDate : null,
+    gender: gender && gender.trim() !== "" ? gender : null,
     country,
     region,
     city,
     travelsWithChildren,
     childrenUnderFour,
-    specialRequests: specialRequests && specialRequests.trim() !== '' ? specialRequests : null,
-    observations: observations && observations.trim() !== '' ? observations : null,
+    specialRequests:
+      specialRequests && specialRequests.trim() !== "" ? specialRequests : null,
+    observations:
+      observations && observations.trim() !== "" ? observations : null,
   };
 
   // Calcular is_fully_registered dinámicamente
@@ -113,7 +154,7 @@ async function createOrUpdateGuest(
     "city",
   ];
   const isFullyRegistered = allRequiredFields.every(
-    (field) => cleanData[field] && cleanData[field].trim() !== ''
+    (field) => cleanData[field] && cleanData[field].trim() !== ""
   );
 
   if (isUpdate && guestId) {
@@ -121,6 +162,7 @@ async function createOrUpdateGuest(
     const updatedGuest = await prisma.users.update({
       where: { id: guestId },
       data: {
+        // ... (el identification_number no se actualiza aquí)
         first_name: cleanData.firstName,
         paternal_last_name: cleanData.paternalLastName,
         maternal_last_name: cleanData.maternalLastName,
@@ -157,6 +199,7 @@ async function createOrUpdateGuest(
   // Crear nuevo huésped
   const newGuest = await prisma.users.create({
     data: {
+      // Usar el RUT limpio y formateado
       identification_number: cleanData.identificationNumber,
       first_name: cleanData.firstName,
       paternal_last_name: cleanData.paternalLastName,
