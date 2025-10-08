@@ -6,6 +6,9 @@ const {
   searchGuest,
   createGuest,
   updateGuest,
+  getGuestProfile,
+  getGuestReservations,
+  searchAllGuests,
 } = require("./guests.controller");
 
 // Define rate limiter for guest update route
@@ -31,6 +34,15 @@ const guestCreateLimiter = rateLimit({
 
 // Buscar huésped por identificación
 router.get("/search/:identificationNumber", guestSearchLimiter, authenticate, searchGuest);
+
+// Obtener perfil completo de huésped
+router.get("/:id/profile", authenticate, getGuestProfile);
+
+// Obtener historial de reservas de huésped
+router.get("/:id/reservations", authenticate, getGuestReservations);
+
+// Buscar todos los huéspedes (para lista/búsqueda)
+router.get("/", guestSearchLimiter, authenticate, searchAllGuests);
 
 // Crear nuevo huésped
 router.post("/", authenticate, guestCreateLimiter, createGuest);

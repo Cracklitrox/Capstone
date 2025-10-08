@@ -80,6 +80,12 @@ const navLinks = [
     roles: ["administrator", "receptionist"],
   },
   {
+    href: "/guest-history",
+    label: "Historial de Huéspedes",
+    icon: UserGroupIcon,
+    roles: ["administrator", "receptionist"],
+  },
+  {
     href: "/profile",
     label: "Configuración de Perfil",
     icon: Cog6ToothIcon,

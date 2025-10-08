@@ -13,6 +13,7 @@ import RoomTypesCrud from "./pages/Admin/RoomTypesCrud.jsx";
 import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
 import TapeChart from "./pages/Receptionist/TapeChart.jsx";
 import ReservationHistory from "./pages/Receptionist/ReservationHistory.jsx";
+import GuestHistory from "./pages/Receptionist/GuestHistory.jsx";
 import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlerts.jsx";
 import NewReservation from "./pages/Reservations/NewReservation.jsx";
 
@@ -52,6 +53,7 @@ const AppRoutes = () => {
         <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} />
         <Route path="reservations" element={<ReservationsPage />} />
         <Route path="history" element={<ReservationHistory />} /> 
+        <Route path="guest-history" element={<GuestHistory />} />
         <Route path="reservations/new" element={<NewReservation />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />

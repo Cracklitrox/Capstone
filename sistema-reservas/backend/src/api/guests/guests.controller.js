@@ -1,6 +1,9 @@
 const {
   searchGuestByIdentification,
   createOrUpdateGuest,
+  getGuestProfileById,
+  getGuestReservationsHistory,
+  searchAllGuestsService,
 } = require("./guests.service");
 const { logError } = require("../../utils/errorLogger");
 
@@ -170,8 +173,137 @@ async function updateGuest(req, res) {
   }
 }
 
+/**
+ * Obtener perfil completo de huésped por ID
+ */
+async function getGuestProfile(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({
+        message: "ID de huésped inválido",
+      });
+    }
+
+    const profile = await getGuestProfileById(parseInt(id));
+
+    if (!profile.found) {
+      return res.status(404).json({
+        message: "Huésped no encontrado",
+      });
+    }
+
+    return res.status(200).json(profile);
+  } catch (error) {
+    console.error("Error al obtener perfil de huésped:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener perfil de huésped: ${error.message}`,
+      originModule: "guests.controller - getGuestProfile",
+      severity: "medium",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al obtener perfil de huésped",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Obtener historial de reservas de huésped
+ */
+async function getGuestReservations(req, res) {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 10, status, startDate, endDate } = req.query;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({
+        message: "ID de huésped inválido",
+      });
+    }
+
+    const filters = {
+      status: status || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+    };
+
+    const pagination = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+    };
+
+    const reservations = await getGuestReservationsHistory(
+      parseInt(id), 
+      filters, 
+      pagination
+    );
+
+    return res.status(200).json(reservations);
+  } catch (error) {
+    console.error("Error al obtener historial de reservas:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener historial de reservas: ${error.message}`,
+      originModule: "guests.controller - getGuestReservations",
+      severity: "medium",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al obtener historial de reservas",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Buscar todos los huéspedes (lista/búsqueda)
+ */
+async function searchAllGuests(req, res) {
+  try {
+    const { search = "", page = 1, limit = 20 } = req.query;
+
+    const pagination = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+    };
+
+    const guests = await searchAllGuestsService(search.trim(), pagination);
+
+    return res.status(200).json(guests);
+  } catch (error) {
+    console.error("Error al buscar huéspedes:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al buscar huéspedes: ${error.message}`,
+      originModule: "guests.controller - searchAllGuests",
+      severity: "medium",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al buscar huéspedes",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   searchGuest,
   createGuest,
   updateGuest,
+  getGuestProfile,
+  getGuestReservations,
+  searchAllGuests,
 };
