@@ -278,7 +278,7 @@ async function getGuestProfileById(guestId) {
           }
         ],
         status: {
-          in: ['confirmed', 'in_progress']
+          in: ['confirmed', 'in_progress', 'pending']
         },
         deleted_at: null
       },
@@ -361,8 +361,30 @@ async function getGuestProfileById(guestId) {
       }
     });
 
-    // Calcular estadísticas financieras
-    const financialStats = allReservations.reduce((acc, reservation) => {
+    // Calcular estadísticas financieras separadas por estado
+    const completedReservations = allReservations.filter(r => r.status === 'completed');
+    const activeReservations = allReservations.filter(r => ['confirmed', 'in_progress', 'pending'].includes(r.status));
+    const canceledReservations = allReservations.filter(r => r.status === 'canceled');
+
+    // Estadísticas de reservas completadas
+    const completedStats = completedReservations.reduce((acc, reservation) => {
+      const totalAmount = reservation.total_amount || 0;
+      // Para reservas completadas, si paid_amount es 0 o null, asumir que se pagó todo
+      const paidAmount = reservation.status === 'completed' 
+        ? (reservation.paid_amount || totalAmount)
+        : (reservation.paid_amount || 0);
+
+      acc.totalReservationAmount += totalAmount;
+      acc.totalPaidAmount += paidAmount;
+      
+      return acc;
+    }, {
+      totalReservationAmount: 0,
+      totalPaidAmount: 0
+    });
+
+    // Estadísticas de reservas activas/pendientes
+    const activeStats = activeReservations.reduce((acc, reservation) => {
       const totalAmount = reservation.total_amount || 0;
       const paidAmount = reservation.paid_amount || 0;
       const pendingAmount = totalAmount - paidAmount;
@@ -378,9 +400,12 @@ async function getGuestProfileById(guestId) {
       totalPendingAmount: 0
     });
 
-    // Calcular estadísticas generales
-    const completedReservations = allReservations.filter(r => r.status === 'completed');
-    const canceledReservations = allReservations.filter(r => r.status === 'canceled');
+    // Estadísticas financieras totales (para compatibilidad)
+    const financialStats = {
+      totalReservationAmount: completedStats.totalReservationAmount + activeStats.totalReservationAmount,
+      totalPaidAmount: completedStats.totalPaidAmount + activeStats.totalPaidAmount,
+      totalPendingAmount: activeStats.totalPendingAmount
+    };
     
     // Verificar si viaja con niños basado en reservas históricas
     const travelsWithChildren = allReservations.some(reservation => {
@@ -409,11 +434,20 @@ async function getGuestProfileById(guestId) {
       stats: {
         totalReservations: allReservations.length,
         completedReservations: completedReservations.length,
+        pendingReservations: activeReservations.filter(r => r.status === 'pending').length,
+        inProgressReservations: activeReservations.filter(r => ['confirmed', 'in_progress'].includes(r.status)).length,
         canceledReservations: canceledReservations.length,
         totalSpent: financialStats.totalPaidAmount,
         totalReservationAmount: financialStats.totalReservationAmount,
         totalPaidAmount: financialStats.totalPaidAmount,
-        totalPendingAmount: financialStats.totalPendingAmount
+        totalPendingAmount: financialStats.totalPendingAmount,
+        // Estadísticas de reservas completadas
+        completedReservationAmount: completedStats.totalReservationAmount,
+        completedPaidAmount: completedStats.totalPaidAmount,
+        // Estadísticas de reservas activas/pendientes
+        activeReservationAmount: activeStats.totalReservationAmount,
+        activePaidAmount: activeStats.totalPaidAmount,
+        activePendingAmount: activeStats.totalPendingAmount
       },
       activeReservation: activeReservation ? {
         id: activeReservation.id,

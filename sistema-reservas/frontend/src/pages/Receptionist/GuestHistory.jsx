@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/services/authContext.jsx';
 import { guestHistoryService } from '@/services/guestHistory.js';
 import { format, parseISO, differenceInYears, differenceInMonths, differenceInDays } from "date-fns";
@@ -31,6 +32,7 @@ import {
 
 const GuestHistory = () => {
   const { token } = useAuth();
+  const navigate = useNavigate();
   
   // Estados principales
   const [guests, setGuests] = useState([]);
@@ -267,6 +269,19 @@ const GuestHistory = () => {
     'pending': 'Pendiente',
     'canceled': 'Cancelada',
     'no_show': 'No se Presentó',
+  };
+
+  // Función para redirigir al historial de reservas
+  const handleViewFullHistory = (guestIdentification, reservationId = null) => {
+    const params = new URLSearchParams({
+      guestRut: guestIdentification
+    });
+    
+    if (reservationId) {
+      params.append('reservationId', reservationId);
+    }
+    
+    navigate(`/history?${params.toString()}`);
   };
 
   // Efecto para búsqueda automática
@@ -663,7 +678,7 @@ const GuestHistory = () => {
                       {guestProfile.birthDate && (
                         <div>
                           <Label className="text-xs text-muted-foreground">Edad</Label>
-                          <p className="font-medium text-primary">
+                          <p className="font-medium">
                             {calculateAge(guestProfile.birthDate)}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -762,7 +777,7 @@ const GuestHistory = () => {
                     <CardTitle className="text-lg">Estadísticas Generales</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                       <div className="text-center p-4 bg-muted/50 rounded-lg">
                         <p className="text-2xl font-bold text-primary">
                           {guestProfile.stats.totalReservations}
@@ -776,6 +791,12 @@ const GuestHistory = () => {
                         <p className="text-sm text-muted-foreground">Completadas</p>
                       </div>
                       <div className="text-center p-4 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold text-blue-600">
+                          {(guestProfile.stats.pendingReservations || 0) + (guestProfile.stats.inProgressReservations || 0)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Activas/Pendientes</p>
+                      </div>
+                      <div className="text-center p-4 bg-muted/50 rounded-lg">
                         <p className="text-2xl font-bold text-red-600">
                           {guestProfile.stats.canceledReservations || 0}
                         </p>
@@ -786,322 +807,176 @@ const GuestHistory = () => {
                     <Separator className="my-4" />
                     
                     <div className="space-y-2 mb-4">
-                      <h4 className="font-medium text-sm">Información Financiera Total</h4>
+                      <h4 className="font-medium text-sm">Información Financiera - Resumen General</h4>
+                      <p className="text-xs text-muted-foreground">Total cobrado de reservas completadas vs. saldo pendiente de reservas activas</p>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-2xl font-bold text-blue-600">
-                          ${(guestProfile.stats.totalReservationAmount || 0).toLocaleString()}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Saldo Total de Reservas</p>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-2xl font-bold text-green-600">
-                          ${(guestProfile.stats.totalPaidAmount || 0).toLocaleString()}
+                          ${(guestProfile.stats.completedPaidAmount || 0).toLocaleString()}
                         </p>
-                        <p className="text-sm text-muted-foreground">Saldo Total Abonado</p>
+                        <p className="text-sm text-muted-foreground">Total Cobrado (Completadas)</p>
                       </div>
                       <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
                         <p className="text-2xl font-bold text-orange-600">
-                          ${(guestProfile.stats.totalPendingAmount || 0).toLocaleString()}
+                          ${(guestProfile.stats.activePendingAmount || 0).toLocaleString()}
                         </p>
-                        <p className="text-sm text-muted-foreground">Saldo Total Pendiente</p>
+                        <p className="text-sm text-muted-foreground">Saldo Pendiente (Activas)</p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
 
-                {/* Información del sistema */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Información del Sistema</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Estado</Label>
-                      <Badge variant={guestProfile.status === 'active' ? 'default' : 'secondary'}>
-                        {guestProfile.status === 'active' ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </div>
+                    {/* Información financiera de reservas activas/pendientes */}
+                    {guestProfile.activeReservation && (
+                      <>
+                        <Separator className="my-4" />
+                        
+                        <div className="space-y-2 mb-4">
+                          <h4 className="font-medium text-sm">Información Financiera - Reserva Activa</h4>
+                          <p className="text-xs text-muted-foreground">Información de la reserva en curso o pendiente</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-2xl font-bold text-blue-600">
+                              ${(guestProfile.activeReservation.totalAmount || 0).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Saldo Total</p>
+                          </div>
+                          <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-2xl font-bold text-green-600">
+                              ${(guestProfile.activeReservation.paidAmount || 0).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Saldo Abonado</p>
+                          </div>
+                          <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                            <p className="text-2xl font-bold text-orange-600">
+                              ${(guestProfile.activeReservation.pendingAmount || 0).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Saldo Pendiente</p>
+                          </div>
+                        </div>
+
+                        {/* Formas de pago utilizadas en reserva activa */}
+                        {guestProfile.activeReservation.payments && guestProfile.activeReservation.payments.length > 0 && (
+                          <div className="mt-4">
+                            <h5 className="font-medium text-sm mb-2">Formas de Pago Utilizadas</h5>
+                            <div className="flex flex-wrap gap-2">
+                              {[...new Set(guestProfile.activeReservation.payments.map(p => p.method))].map((method, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {method}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              {/* Tab 3: Historial de Reservas */}
+              {/* Tab 3: Historial de Reservas - Vista Resumida */}
               <TabsContent value="reservations" className="space-y-4">
-                {/* Filtros para reservas */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Filtros</CardTitle>
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      Historial de Reservas
+                      <Button
+                        onClick={() => handleViewFullHistory(selectedGuest?.identificationNumber)}
+                        className="text-sm"
+                      >
+                        Ver Historial Completo
+                      </Button>
+                    </CardTitle>
+                    <CardDescription>
+                      Últimas reservas del huésped. Haz clic en "Ver Historial Completo" para más detalles.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label>Fecha desde</Label>
-                        <Input
-                          type="date"
-                          value={reservationFilters.startDate}
-                          onChange={(e) => 
-                            setReservationFilters(prev => ({ ...prev, startDate: e.target.value, page: 1 }))
-                          }
-                        />
+                    {reservationsLoading ? (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">Cargando reservas...</p>
                       </div>
-                      <div>
-                        <Label>Fecha hasta</Label>
-                        <Input
-                          type="date"
-                          value={reservationFilters.endDate}
-                          onChange={(e) => 
-                            setReservationFilters(prev => ({ ...prev, endDate: e.target.value, page: 1 }))
-                          }
-                        />
+                    ) : guestReservations.length > 0 ? (
+                      <div className="space-y-4">
+                        {guestReservations.slice(0, 5).map((reservation) => (
+                          <Card key={reservation.id} className="border-l-4 border-l-primary">
+                            <CardContent className="pt-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <Badge variant={getStatusVariant(reservation.status)}>
+                                    {statusTranslations[reservation.status] || reservation.status}
+                                  </Badge>
+                                  <span className="font-mono text-sm font-medium">{reservation.code}</span>
+                                  {reservation.currentGuestRole && (
+                                    <Badge variant={reservation.currentGuestRole === 'principal' ? 'default' : 'secondary'}>
+                                      {reservation.currentGuestRole === 'principal' ? 'Huésped Principal' : 'Huésped Adicional'}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleViewFullHistory(selectedGuest?.identificationNumber, reservation.id)}
+                                >
+                                  Ver Detalles
+                                </Button>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">Fechas</Label>
+                                  <p>{formatDate(reservation.checkInDate)} - {formatDate(reservation.checkOutDate)}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">Total</Label>
+                                  <p className="font-medium">${(reservation.totalAmount || 0).toLocaleString()}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">Huéspedes</Label>
+                                  <p>{reservation.guestCount} persona{reservation.guestCount !== 1 ? 's' : ''}</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        
+                        {guestReservations.length > 5 && (
+                          <Card className="border-dashed">
+                            <CardContent className="pt-6 text-center">
+                              <p className="text-sm text-muted-foreground mb-3">
+                                Y {guestReservations.length - 5} reserva{guestReservations.length - 5 !== 1 ? 's' : ''} más...
+                              </p>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleViewFullHistory(selectedGuest?.identificationNumber)}
+                              >
+                                Ver Todas las Reservas
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        )}
                       </div>
-                      <div className="flex items-end">
-                        <Button
-                          variant="outline"
-                          onClick={() => setReservationFilters({ startDate: '', endDate: '', page: 1 })}
-                        >
-                          <XCircleIcon className="h-4 w-4 mr-2" />
-                          Limpiar
-                        </Button>
-                      </div>
-                    </div>
+                    ) : (
+                      <Card>
+                        <CardContent className="pt-6 text-center">
+                          <CalendarIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-medium mb-2">Sin reservas</h3>
+                          <p className="text-muted-foreground mb-4">
+                            Este huésped no tiene reservas registradas.
+                          </p>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleViewFullHistory(selectedGuest?.identificationNumber)}
+                          >
+                            Ir al Historial Completo
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
                   </CardContent>
                 </Card>
-
-                {/* Lista de reservas */}
-                {reservationsLoading ? (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <p className="text-center text-muted-foreground">Cargando reservas...</p>
-                    </CardContent>
-                  </Card>
-                ) : guestReservations.length > 0 ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Historial de Reservas</CardTitle>
-                      <CardDescription>
-                        {reservationsMeta.totalCount || guestReservations.length} reserva{(reservationsMeta.totalCount || guestReservations.length) !== 1 ? 's' : ''} encontrada{(reservationsMeta.totalCount || guestReservations.length) !== 1 ? 's' : ''}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {guestReservations.map((reservation) => (
-                        <Card key={reservation.id} className="border-l-4 border-l-primary">
-                          <CardContent className="pt-4 space-y-4">
-                            {/* Encabezado de la reserva */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                <Badge variant={getStatusVariant(reservation.status)}>
-                                  {statusTranslations[reservation.status] || reservation.status}
-                                </Badge>
-                                <span className="font-mono text-sm font-medium">{reservation.code}</span>
-                                {reservation.currentGuestRole && (
-                                  <Badge variant={reservation.currentGuestRole === 'principal' ? 'default' : 'secondary'}>
-                                    {reservation.currentGuestRole === 'principal' ? 'Huésped Principal' : 'Huésped Adicional'}
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-right text-sm text-muted-foreground">
-                                {formatDate(reservation.checkInDate)} - {formatDate(reservation.checkOutDate)}
-                              </div>
-                            </div>
-
-                            {/* Información financiera destacada */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
-                              <div className="text-center">
-                                <p className="text-xl font-bold text-primary">
-                                  ${(reservation.totalAmount || 0).toLocaleString()}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Total Reserva</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-xl font-bold text-green-600">
-                                  ${(reservation.paidAmount || 0).toLocaleString()}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Saldo Abonado</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-xl font-bold text-orange-600">
-                                  ${(reservation.pendingAmount || 0).toLocaleString()}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Saldo Pendiente</p>
-                              </div>
-                            </div>
-
-                            {/* Detalles en grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Huéspedes */}
-                              <div className="space-y-3">
-                                <Label className="text-sm font-medium">Huéspedes ({reservation.guestCount})</Label>
-                                <div className="space-y-2">
-                                  {reservation.allGuests?.map((guest, index) => (
-                                    <div key={guest.id} className="flex items-center justify-between p-2 rounded border">
-                                      <div className="flex-1">
-                                        <p className="font-medium text-sm">{guest.name}</p>
-                                        <p className="text-xs text-muted-foreground">{guest.identificationNumber}</p>
-                                        {guest.isCurrentGuest && (
-                                          <Badge variant="outline" className="mt-1">Huésped Actual</Badge>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant={guest.role === 'principal' ? 'default' : 'outline'}>
-                                          {guest.role === 'principal' ? 'Principal' : 'Adicional'}
-                                        </Badge>
-                                        {guest.role === 'adicional' && (
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleSelectAdditionalGuest({
-                                              id: guest.id,
-                                              name: guest.name,
-                                              identificationNumber: guest.identificationNumber,
-                                              firstName: guest.name.split(' ')[0],
-                                              paternalLastName: guest.name.split(' ')[1] || '',
-                                              maternalLastName: guest.name.split(' ')[2] || '',
-                                              email: 'Sin datos',
-                                              phone: 'Sin datos',
-                                              gender: 'Sin datos',
-                                              nationality: 'Sin datos',
-                                              birthDate: null,
-                                              registrationDate: null
-                                            })}
-                                            className="h-6 text-xs"
-                                          >
-                                            <EyeIcon className="h-3 w-3 mr-1" />
-                                            Ver
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )) || (
-                                    <div className="p-2 border rounded">
-                                      <p className="text-sm">{reservation.mainGuest?.name}</p>
-                                      <Badge variant="default">Principal</Badge>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Habitaciones */}
-                              <div className="space-y-3">
-                                <Label className="text-sm font-medium">Habitaciones ({reservation.rooms?.length || 0})</Label>
-                                <div className="space-y-2">
-                                  {reservation.rooms?.map((room, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 border rounded">
-                                      <div>
-                                        <p className="font-medium text-sm">{room.roomNumber}</p>
-                                        <p className="text-xs text-muted-foreground">{room.roomType}</p>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="font-medium text-sm">${room.subtotal?.toLocaleString()}</p>
-                                        <p className="text-xs text-muted-foreground">${room.unitPrice?.toLocaleString()}/noche</p>
-                                      </div>
-                                    </div>
-                                  )) || (
-                                    <p className="text-sm text-muted-foreground">Sin habitaciones registradas</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Servicios detallados */}
-                            {reservation.services && reservation.services.length > 0 && (
-                              <div className="space-y-3">
-                                <Label className="text-sm font-medium">Servicios ({reservation.services.length})</Label>
-                                <div className="space-y-2">
-                                  {reservation.services.map((service, index) => (
-                                    <div key={index} className="flex items-center justify-between p-3 border rounded">
-                                      <div className="flex-1">
-                                        <p className="font-medium text-sm">{service.name}</p>
-                                        <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                                          <span>Cantidad: {service.quantity}</span>
-                                          <span>Precio unitario: ${service.unitPrice?.toLocaleString()}</span>
-                                          {service.dailyRate && <span>Tarifa diaria: ${service.dailyRate.toLocaleString()}</span>}
-                                          {service.specificDates && <span>Fechas: {service.specificDates}</span>}
-                                        </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="font-bold text-sm">${service.subtotal?.toLocaleString()}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Pagos realizados */}
-                            {reservation.payments && reservation.payments.length > 0 && (
-                              <div className="space-y-3">
-                                <Label className="text-sm font-medium">Historial de Pagos</Label>
-                                <div className="space-y-2">
-                                  {reservation.payments.map((payment, index) => (
-                                    <div key={payment.id || index} className="flex items-center justify-between p-2 border rounded">
-                                      <div>
-                                        <p className="font-medium text-sm">${payment.amount?.toLocaleString()}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {payment.method} • {payment.createdAt ? format(parseISO(payment.createdAt), 'PPp', { locale: es }) : 'Fecha no disponible'}
-                                          {payment.isDeposit && ' • Depósito'}
-                                          {payment.sequence && ` • Pago #${payment.sequence}`}
-                                        </p>
-                                        {payment.transactionId && (
-                                          <p className="text-xs text-muted-foreground">ID: {payment.transactionId}</p>
-                                        )}
-                                        {payment.notes && (
-                                          <p className="text-xs text-muted-foreground">Notas: {payment.notes}</p>
-                                        )}
-                                      </div>
-                                      <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
-                                        {payment.status === 'completed' ? 'Completado' : payment.status}
-                                      </Badge>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-
-                      {/* Paginación de reservas */}
-                      {reservationsMeta.totalPages > 1 && (
-                        <div className="flex justify-center items-center gap-2 mt-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!reservationsMeta.hasPrevPage}
-                            onClick={() => 
-                              setReservationFilters(prev => ({ ...prev, page: reservationsMeta.page - 1 }))
-                            }
-                          >
-                            Anterior
-                          </Button>
-                          <span className="text-sm text-muted-foreground">
-                            Página {reservationsMeta.page} de {reservationsMeta.totalPages}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!reservationsMeta.hasNextPage}
-                            onClick={() => 
-                              setReservationFilters(prev => ({ ...prev, page: reservationsMeta.page + 1 }))
-                            }
-                          >
-                            Siguiente
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <p className="text-center text-muted-foreground">
-                        No se encontraron reservas para este huésped
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
               </TabsContent>
             </Tabs>
           ) : (
@@ -1158,7 +1033,7 @@ const GuestHistory = () => {
                   {selectedAdditionalGuest.birthDate && (
                     <div>
                       <Label className="text-xs text-muted-foreground">Edad</Label>
-                      <p className="font-medium text-primary">
+                      <p className="font-medium">
                         {calculateAge(selectedAdditionalGuest.birthDate)}
                       </p>
                       <p className="text-xs text-muted-foreground">
