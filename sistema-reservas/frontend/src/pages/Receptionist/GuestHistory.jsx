@@ -510,7 +510,7 @@ const GuestHistory = () => {
                           <Label className="text-sm font-medium mb-2 block">Huéspedes en esta reserva ({guestProfile.activeReservation.guestCount})</Label>
                           <div className="space-y-2">
                             {/* Huésped principal */}
-                            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-center justify-between p-3 border rounded-lg">
                               <div>
                                 <p className="font-medium">{guestProfile.activeReservation.mainGuest.name}</p>
                                 <p className="text-sm text-muted-foreground">
@@ -529,7 +529,7 @@ const GuestHistory = () => {
                                     {formatData(guest.email)} • {formatData(guest.phone)}
                                   </p>
                                   {guest.isCurrentGuest && (
-                                    <Badge variant="secondary" className="mt-1">Huésped Actual</Badge>
+                                    <Badge variant="outline" className="mt-1">Huésped Actual</Badge>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -688,6 +688,14 @@ const GuestHistory = () => {
                         <Label className="text-xs text-muted-foreground">País</Label>
                         <p>{formatData(guestProfile.nationality)}</p>
                       </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Región</Label>
+                        <p>{formatData(guestProfile.region)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Ciudad</Label>
+                        <p>{formatData(guestProfile.city)}</p>
+                      </div>
                       <Separator />
                       <div>
                         <Label className="text-xs text-muted-foreground">Viaja con niños</Label>
@@ -811,10 +819,6 @@ const GuestHistory = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
-                      <Label className="text-xs text-muted-foreground">Fecha de registro</Label>
-                      <p>{guestProfile.createdAt ? formatDate(guestProfile.createdAt) : 'No disponible'}</p>
-                    </div>
-                    <div>
                       <Label className="text-xs text-muted-foreground">Estado</Label>
                       <Badge variant={guestProfile.status === 'active' ? 'default' : 'secondary'}>
                         {guestProfile.status === 'active' ? 'Activo' : 'Inactivo'}
@@ -932,12 +936,12 @@ const GuestHistory = () => {
                                 <Label className="text-sm font-medium">Huéspedes ({reservation.guestCount})</Label>
                                 <div className="space-y-2">
                                   {reservation.allGuests?.map((guest, index) => (
-                                    <div key={guest.id} className={`flex items-center justify-between p-2 rounded border ${guest.isCurrentGuest ? 'bg-blue-50 border-blue-200' : ''}`}>
+                                    <div key={guest.id} className="flex items-center justify-between p-2 rounded border">
                                       <div className="flex-1">
                                         <p className="font-medium text-sm">{guest.name}</p>
                                         <p className="text-xs text-muted-foreground">{guest.identificationNumber}</p>
                                         {guest.isCurrentGuest && (
-                                          <Badge variant="secondary" className="mt-1">Huésped Actual</Badge>
+                                          <Badge variant="outline" className="mt-1">Huésped Actual</Badge>
                                         )}
                                       </div>
                                       <div className="flex items-center gap-2">
@@ -1169,6 +1173,14 @@ const GuestHistory = () => {
                   <div>
                     <Label className="text-xs text-muted-foreground">País</Label>
                     <p>{formatData(selectedAdditionalGuest.nationality)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Región</Label>
+                    <p>{formatData(selectedAdditionalGuest.region)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Ciudad</Label>
+                    <p>{formatData(selectedAdditionalGuest.city)}</p>
                   </div>
                 </CardContent>
               </Card>

@@ -398,6 +398,8 @@ async function getGuestProfileById(guestId) {
       phone: guest.phone_number,
       identificationNumber: guest.identification_number,
       nationality: guest.country,
+      region: guest.region,
+      city: guest.city,
       gender: guest.gender || 'Sin datos',
       birthDate: guest.birth_date,
       registrationDate: guest.created_at,
