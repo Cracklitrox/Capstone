@@ -9,6 +9,7 @@ const {
   getGuestProfile,
   getGuestReservations,
   searchAllGuests,
+  updateGuestObservations,
 } = require("./guests.controller");
 
 // Define rate limiter for guest update route
@@ -49,5 +50,8 @@ router.post("/", authenticate, guestCreateLimiter, createGuest);
 
 // Actualizar huésped
 router.put("/:id", authenticate, guestUpdateLimiter, updateGuest);
+
+// Actualizar observaciones de huésped
+router.put("/:id/observations", authenticate, guestUpdateLimiter, updateGuestObservations);
 
 module.exports = router;

@@ -236,104 +236,270 @@ async function createOrUpdateGuest(
 }
 
 /**
- * Obtener perfil completo de huésped por ID
+ * Obtener perfil completo del huésped con información financiera y huéspedes adicionales
  */
 async function getGuestProfileById(guestId) {
-  const guest = await prisma.users.findFirst({
-    where: {
-      id: guestId,
-      deleted_at: null,
-      user_roles: {
-        some: {
-          roles: {
-            name: "guest",
-          },
-        },
+  try {
+    // Obtener información básica del huésped
+    const guest = await prisma.users.findUnique({
+      where: { 
+        id: parseInt(guestId),
+        deleted_at: null 
       },
-    },
-    include: {
-      guest_details: true,
-      user_roles: {
-        include: {
-          roles: true,
+      include: {
+        guest_details: true,
+        user_roles: {
+          include: {
+            roles: true
+          }
+        }
+      }
+    });
+
+    if (!guest) {
+      throw new Error('Huésped no encontrado');
+    }
+
+    // Verificar que es un huésped
+    const isGuest = guest.user_roles.some(ur => ur.roles.name === 'guest');
+    if (!isGuest) {
+      throw new Error('Usuario no es un huésped');
+    }
+
+    // Obtener reserva activa (si existe)
+    const activeReservation = await prisma.reservations.findFirst({
+      where: {
+        OR: [
+          { main_guest_id: parseInt(guestId) },
+          { 
+            reservation_guests: {
+              some: { guest_id: parseInt(guestId) }
+            }
+          }
+        ],
+        status: {
+          in: ['confirmed', 'in_progress']
         },
+        deleted_at: null
       },
-      reservations_reservations_main_guest_idTousers: {
-        select: {
-          id: true,
-          code: true,
-          status: true,
-          check_in_date: true,
-          check_out_date: true,
-          total_amount: true,
+      include: {
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true
+              }
+            }
+          }
         },
-        where: {
-          deleted_at: null,
+        reservation_services: {
+          include: {
+            services: true
+          }
         },
+        reservation_guests: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+                email: true,
+                phone_number: true,
+                country: true,
+                gender: true,
+                birth_date: true,
+                created_at: true
+              }
+            }
+          }
+        },
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true
+          }
+        },
+        payments: true
+      }
+    });
+
+    // Obtener estadísticas completas de reservas
+    const allReservations = await prisma.reservations.findMany({
+      where: {
+        OR: [
+          { main_guest_id: parseInt(guestId) },
+          { 
+            reservation_guests: {
+              some: { guest_id: parseInt(guestId) }
+            }
+          }
+        ],
+        deleted_at: null
       },
-    },
-  });
+      include: {
+        payments: true,
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true
+              }
+            }
+          }
+        },
+        reservation_services: {
+          include: {
+            services: true
+          }
+        }
+      }
+    });
 
-  if (!guest) {
-    return { found: false };
-  }
+    // Calcular estadísticas financieras
+    const financialStats = allReservations.reduce((acc, reservation) => {
+      const totalAmount = reservation.total_amount || 0;
+      const paidAmount = reservation.paid_amount || 0;
+      const pendingAmount = totalAmount - paidAmount;
 
-  // Calcular estadísticas básicas
-  const totalReservations = guest.reservations_reservations_main_guest_idTousers.length;
-  const completedReservations = guest.reservations_reservations_main_guest_idTousers.filter(
-    r => r.status === "completed"
-  ).length;
-  const totalSpent = guest.reservations_reservations_main_guest_idTousers
-    .filter(r => r.status === "completed")
-    .reduce((sum, r) => sum + (r.total_amount || 0), 0);
+      acc.totalReservationAmount += totalAmount;
+      acc.totalPaidAmount += paidAmount;
+      acc.totalPendingAmount += pendingAmount;
+      
+      return acc;
+    }, {
+      totalReservationAmount: 0,
+      totalPaidAmount: 0,
+      totalPendingAmount: 0
+    });
 
-  return {
-    found: true,
-    guest: {
+    // Calcular estadísticas generales
+    const completedReservations = allReservations.filter(r => r.status === 'completed');
+    const canceledReservations = allReservations.filter(r => r.status === 'canceled');
+    
+    // Verificar si viaja con niños basado en reservas históricas
+    const travelsWithChildren = allReservations.some(reservation => {
+      return reservation.reservation_rooms.some(room => room.children_count > 0);
+    });
+
+    const profile = {
       id: guest.id,
-      identificationNumber: guest.identification_number,
       firstName: guest.first_name,
+      lastName: guest.paternal_last_name + (guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ''),
       paternalLastName: guest.paternal_last_name,
       maternalLastName: guest.maternal_last_name,
+      fullName: `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ''}`,
       email: guest.email,
-      phoneNumber: guest.phone_number,
+      phone: guest.phone_number,
+      identificationNumber: guest.identification_number,
+      nationality: guest.country,
+      gender: guest.gender || 'Sin datos',
       birthDate: guest.birth_date,
-      gender: guest.gender,
-      country: guest.country,
-      region: guest.region,
-      city: guest.city,
-      status: guest.status,
-      createdAt: guest.created_at,
-      lastLoginAt: guest.last_login_at,
-      // Detalles adicionales
-      travelsWithChildren: guest.guest_details?.travels_with_children,
-      childrenUnderFour: guest.guest_details?.children_under_four || 0,
-      specialRequests: guest.guest_details?.special_requests,
-      observations: guest.guest_details?.observations,
-      // Estadísticas
+      registrationDate: guest.created_at,
+      travelsWithChildren: travelsWithChildren,
+      specialRequests: guest.guest_details?.special_requests || 'Sin datos',
+      observations: guest.guest_details?.observations || 'Sin datos',
       stats: {
-        totalReservations,
-        completedReservations,
-        totalSpent,
+        totalReservations: allReservations.length,
+        completedReservations: completedReservations.length,
+        canceledReservations: canceledReservations.length,
+        totalSpent: financialStats.totalPaidAmount,
+        totalReservationAmount: financialStats.totalReservationAmount,
+        totalPaidAmount: financialStats.totalPaidAmount,
+        totalPendingAmount: financialStats.totalPendingAmount
       },
-    },
-  };
+      activeReservation: activeReservation ? {
+        id: activeReservation.id,
+        code: activeReservation.code,
+        status: activeReservation.status,
+        checkInDate: activeReservation.check_in_date,
+        checkOutDate: activeReservation.check_out_date,
+        guestCount: activeReservation.guest_count,
+        totalAmount: activeReservation.total_amount,
+        paidAmount: activeReservation.paid_amount,
+        pendingAmount: (activeReservation.total_amount || 0) - (activeReservation.paid_amount || 0),
+        mainGuest: {
+          id: activeReservation.users_reservations_main_guest_idTousers.id,
+          name: `${activeReservation.users_reservations_main_guest_idTousers.first_name} ${activeReservation.users_reservations_main_guest_idTousers.paternal_last_name}${activeReservation.users_reservations_main_guest_idTousers.maternal_last_name ? ` ${activeReservation.users_reservations_main_guest_idTousers.maternal_last_name}` : ''}`,
+          isMainGuest: activeReservation.main_guest_id === parseInt(guestId)
+        },
+        additionalGuests: activeReservation.reservation_guests
+          .filter(rg => rg.guest_id !== activeReservation.main_guest_id)
+          .map(rg => ({
+            id: rg.users.id,
+            name: `${rg.users.first_name} ${rg.users.paternal_last_name}${rg.users.maternal_last_name ? ` ${rg.users.maternal_last_name}` : ''}`,
+            firstName: rg.users.first_name,
+            paternalLastName: rg.users.paternal_last_name,
+            maternalLastName: rg.users.maternal_last_name,
+            email: rg.users.email || 'Sin datos',
+            phone: rg.users.phone_number || 'Sin datos',
+            identificationNumber: rg.users.identification_number || 'Sin datos',
+            nationality: rg.users.country || 'Sin datos',
+            gender: rg.users.gender || 'Sin datos',
+            birthDate: rg.users.birth_date,
+            registrationDate: rg.users.created_at,
+            isCurrentGuest: rg.guest_id === parseInt(guestId)
+          })),
+        rooms: activeReservation.reservation_rooms.map(rr => ({
+          roomNumber: rr.rooms.room_number,
+          roomType: rr.rooms.room_types.name,
+          unitPrice: rr.unit_price,
+          subtotal: rr.subtotal
+        })),
+        services: activeReservation.reservation_services.map(rs => ({
+          name: rs.services.name,
+          quantity: rs.quantity,
+          unitPrice: rs.unit_price,
+          subtotal: rs.subtotal
+        })),
+        payments: activeReservation.payments.map(p => ({
+          id: p.id,
+          amount: p.amount,
+          method: p.payment_method,
+          status: p.status,
+          isDeposit: p.is_deposit,
+          createdAt: p.created_at
+        }))
+      } : null
+    };
+
+    return profile;
+  } catch (error) {
+    console.error('Error al obtener perfil del huésped:', error);
+    throw error;
+  }
 }
 
 /**
- * Obtener historial de reservas de huésped con filtros y paginación
+ * Obtener historial de reservas de huésped con filtros y paginación mejorado
  */
 async function getGuestReservationsHistory(guestId, filters = {}, pagination = {}) {
   const { page = 1, limit = 10 } = pagination;
   const offset = (page - 1) * limit;
 
-  // Construir filtros dinámicos
+  // Valores válidos del enum de status
+  const validStatuses = ['pending', 'confirmed', 'in_progress', 'canceled', 'completed', 'no_show'];
+
+  // Construir filtros dinámicos - buscar tanto como huésped principal como adicional
   const whereConditions = {
-    main_guest_id: guestId,
+    OR: [
+      { main_guest_id: parseInt(guestId) },
+      { 
+        reservation_guests: {
+          some: { guest_id: parseInt(guestId) }
+        }
+      }
+    ],
     deleted_at: null,
   };
 
-  if (filters.status) {
+  // Solo agregar filtro de status si es válido
+  if (filters.status && validStatuses.includes(filters.status)) {
     whereConditions.status = filters.status;
   }
 
@@ -378,12 +544,31 @@ async function getGuestReservationsHistory(guestId, filters = {}, pagination = {
         },
         reservation_guests: {
           include: {
-            users: true,
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+                email: true,
+                phone_number: true
+              }
+            },
           },
           where: {
             deleted_at: null,
           },
         },
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true
+          }
+        }
       },
       orderBy: {
         check_in_date: "desc",
@@ -396,56 +581,93 @@ async function getGuestReservationsHistory(guestId, filters = {}, pagination = {
     }),
   ]);
 
-  // Formatear datos de respuesta
-  const formattedReservations = reservations.map(reservation => ({
-    id: reservation.id,
-    code: reservation.code,
-    status: reservation.status,
-    channel: reservation.channel,
-    checkInDate: reservation.check_in_date,
-    checkOutDate: reservation.check_out_date,
-    guestCount: reservation.guest_count,
-    totalAmount: reservation.total_amount,
-    paidAmount: reservation.paid_amount,
-    bookingType: reservation.booking_type,
-    stayType: reservation.stay_type,
-    createdAt: reservation.created_at,
-    // Habitaciones
-    rooms: reservation.reservation_rooms.map(rr => ({
-      id: rr.rooms.id,
-      roomNumber: rr.rooms.room_number,
-      roomType: rr.rooms.room_types.name,
-      unitPrice: rr.unit_price,
-      subtotal: rr.subtotal,
-      startDate: rr.start_date,
-      endDate: rr.end_date,
-    })),
-    // Servicios
-    services: reservation.reservation_services.map(rs => ({
-      id: rs.services.id,
-      name: rs.services.name,
-      quantity: rs.quantity,
-      unitPrice: rs.unit_price,
-      subtotal: rs.subtotal,
-    })),
-    // Pagos
-    payments: reservation.payments.map(p => ({
-      id: p.id,
-      method: p.payment_method,
-      status: p.status,
-      amount: p.amount,
-      isDeposit: p.is_deposit,
-      createdAt: p.created_at,
-    })),
-    // Huéspedes adicionales
-    additionalGuests: reservation.reservation_guests
-      .filter(rg => rg.guest_id !== guestId)
-      .map(rg => ({
-        id: rg.users.id,
-        name: `${rg.users.first_name} ${rg.users.paternal_last_name}`,
-        email: rg.users.email,
+  // Formatear datos de respuesta con información financiera completa
+  const formattedReservations = reservations.map(reservation => {
+    const totalAmount = reservation.total_amount || 0;
+    const paidAmount = reservation.paid_amount || 0;
+    const pendingAmount = totalAmount - paidAmount;
+
+    // Identificar el rol del huésped actual en esta reserva
+    const isMainGuest = reservation.main_guest_id === parseInt(guestId);
+    const additionalGuestInfo = reservation.reservation_guests.find(rg => rg.guest_id === parseInt(guestId));
+
+    return {
+      id: reservation.id,
+      code: reservation.code,
+      status: reservation.status,
+      channel: reservation.channel,
+      checkInDate: reservation.check_in_date,
+      checkOutDate: reservation.check_out_date,
+      guestCount: reservation.guest_count,
+      totalAmount: totalAmount,
+      paidAmount: paidAmount,
+      pendingAmount: pendingAmount,
+      currentGuestRole: isMainGuest ? 'principal' : 'adicional',
+      mainGuest: {
+        id: reservation.users_reservations_main_guest_idTousers.id,
+        name: `${reservation.users_reservations_main_guest_idTousers.first_name} ${reservation.users_reservations_main_guest_idTousers.paternal_last_name}${reservation.users_reservations_main_guest_idTousers.maternal_last_name ? ` ${reservation.users_reservations_main_guest_idTousers.maternal_last_name}` : ''}`,
+        identificationNumber: reservation.users_reservations_main_guest_idTousers.identification_number
+      },
+      additionalGuests: reservation.reservation_guests
+        .filter(rg => rg.guest_id !== reservation.main_guest_id)
+        .map(rg => ({
+          id: rg.users.id,
+          name: `${rg.users.first_name} ${rg.users.paternal_last_name}${rg.users.maternal_last_name ? ` ${rg.users.maternal_last_name}` : ''}`,
+          identificationNumber: rg.users.identification_number,
+          email: rg.users.email,
+          phone: rg.users.phone_number,
+          isCurrentGuest: rg.guest_id === parseInt(guestId)
+        })),
+      allGuests: [
+        {
+          id: reservation.users_reservations_main_guest_idTousers.id,
+          name: `${reservation.users_reservations_main_guest_idTousers.first_name} ${reservation.users_reservations_main_guest_idTousers.paternal_last_name}${reservation.users_reservations_main_guest_idTousers.maternal_last_name ? ` ${reservation.users_reservations_main_guest_idTousers.maternal_last_name}` : ''}`,
+          identificationNumber: reservation.users_reservations_main_guest_idTousers.identification_number,
+          role: 'principal',
+          isCurrentGuest: reservation.main_guest_id === parseInt(guestId)
+        },
+        ...reservation.reservation_guests
+          .filter(rg => rg.guest_id !== reservation.main_guest_id)
+          .map(rg => ({
+            id: rg.users.id,
+            name: `${rg.users.first_name} ${rg.users.paternal_last_name}${rg.users.maternal_last_name ? ` ${rg.users.maternal_last_name}` : ''}`,
+            identificationNumber: rg.users.identification_number,
+            role: 'adicional',
+            isCurrentGuest: rg.guest_id === parseInt(guestId)
+          }))
+      ],
+      rooms: reservation.reservation_rooms.map(room => ({
+        id: room.id,
+        roomNumber: room.rooms.room_number,
+        roomType: room.rooms.room_types.name,
+        unitPrice: room.unit_price,
+        subtotal: room.subtotal,
+        startDate: room.start_date,
+        endDate: room.end_date
       })),
-  }));
+      services: reservation.reservation_services.map(service => ({
+        id: service.id,
+        name: service.services.name,
+        quantity: service.quantity,
+        unitPrice: service.unit_price,
+        subtotal: service.subtotal,
+        specificDates: service.specific_dates,
+        dailyRate: service.daily_rate
+      })),
+      payments: reservation.payments.map(payment => ({
+        id: payment.id,
+        amount: payment.amount,
+        method: payment.payment_method,
+        status: payment.status,
+        isDeposit: payment.is_deposit,
+        sequence: payment.payment_sequence,
+        transactionId: payment.transaction_id,
+        createdAt: payment.created_at,
+        notes: payment.notes
+      })),
+      createdAt: reservation.created_at
+    };
+  });
 
   const totalPages = Math.ceil(totalCount / limit);
 
@@ -486,31 +708,26 @@ async function searchAllGuestsService(searchTerm = "", pagination = {}) {
       {
         identification_number: {
           contains: searchTerm,
-          mode: "insensitive",
         },
       },
       {
         first_name: {
           contains: searchTerm,
-          mode: "insensitive",
         },
       },
       {
         paternal_last_name: {
           contains: searchTerm,
-          mode: "insensitive",
         },
       },
       {
         maternal_last_name: {
           contains: searchTerm,
-          mode: "insensitive",
         },
       },
       {
         email: {
           contains: searchTerm,
-          mode: "insensitive",
         },
       },
     ];
@@ -578,10 +795,70 @@ async function searchAllGuestsService(searchTerm = "", pagination = {}) {
   };
 }
 
+/**
+ * Actualizar observaciones de huésped
+ */
+async function updateGuestObservationsService(guestId, observations) {
+  // Verificar que el huésped existe
+  const existingGuest = await prisma.users.findFirst({
+    where: {
+      id: guestId,
+      deleted_at: null,
+      user_roles: {
+        some: {
+          roles: {
+            name: "guest",
+          },
+        },
+      },
+    },
+    include: {
+      guest_details: true,
+    },
+  });
+
+  if (!existingGuest) {
+    return { found: false };
+  }
+
+  // Actualizar o crear guest_details
+  let updatedGuestDetails;
+  if (existingGuest.guest_details) {
+    // Actualizar observaciones existentes
+    updatedGuestDetails = await prisma.guest_details.update({
+      where: {
+        user_id: guestId,
+      },
+      data: {
+        observations: observations || null,
+      },
+    });
+  } else {
+    // Crear guest_details si no existe
+    updatedGuestDetails = await prisma.guest_details.create({
+      data: {
+        user_id: guestId,
+        observations: observations || null,
+        travels_with_children: false,
+        children_under_four: 0,
+      },
+    });
+  }
+
+  return {
+    found: true,
+    guest: {
+      id: existingGuest.id,
+      observations: updatedGuestDetails.observations,
+    },
+  };
+}
+
 module.exports = {
   searchGuestByIdentification,
   createOrUpdateGuest,
   getGuestProfileById,
   getGuestReservationsHistory,
   searchAllGuestsService,
+  updateGuestObservationsService,
 };

@@ -67,4 +67,19 @@ export const guestHistoryService = {
       throw new Error(error.response?.data?.message || 'Error al obtener historial de reservas');
     }
   },
+
+  // Actualizar observaciones de huésped
+  updateGuestObservations: async (guestId, observations) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/guests/${guestId}/observations`,
+        { observations },
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error al actualizar observaciones:', error);
+      throw new Error(error.response?.data?.message || 'Error al actualizar observaciones');
+    }
+  },
 };

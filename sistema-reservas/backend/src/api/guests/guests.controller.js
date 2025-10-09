@@ -4,6 +4,7 @@ const {
   getGuestProfileById,
   getGuestReservationsHistory,
   searchAllGuestsService,
+  updateGuestObservationsService,
 } = require("./guests.service");
 const { logError } = require("../../utils/errorLogger");
 
@@ -188,13 +189,10 @@ async function getGuestProfile(req, res) {
 
     const profile = await getGuestProfileById(parseInt(id));
 
-    if (!profile.found) {
-      return res.status(404).json({
-        message: "Huésped no encontrado",
-      });
-    }
-
-    return res.status(200).json(profile);
+    return res.status(200).json({
+      found: true,
+      profile: profile
+    });
   } catch (error) {
     console.error("Error al obtener perfil de huésped:", error);
 
@@ -206,6 +204,13 @@ async function getGuestProfile(req, res) {
       severity: "medium",
       errorObject: error,
     });
+
+    if (error.message === 'Huésped no encontrado') {
+      return res.status(404).json({
+        found: false,
+        message: "Huésped no encontrado",
+      });
+    }
 
     return res.status(500).json({
       message: "Error al obtener perfil de huésped",
@@ -299,6 +304,51 @@ async function searchAllGuests(req, res) {
   }
 }
 
+/**
+ * Actualizar observaciones de huésped
+ */
+async function updateGuestObservations(req, res) {
+  try {
+    const { id } = req.params;
+    const { observations } = req.body;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({
+        message: "ID de huésped inválido",
+      });
+    }
+
+    const updatedGuest = await updateGuestObservationsService(parseInt(id), observations);
+
+    if (!updatedGuest.found) {
+      return res.status(404).json({
+        message: "Huésped no encontrado",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Observaciones actualizadas exitosamente",
+      guest: updatedGuest.guest,
+    });
+  } catch (error) {
+    console.error("Error al actualizar observaciones:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al actualizar observaciones: ${error.message}`,
+      originModule: "guests.controller - updateGuestObservations",
+      severity: "low",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al actualizar observaciones",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   searchGuest,
   createGuest,
@@ -306,4 +356,5 @@ module.exports = {
   getGuestProfile,
   getGuestReservations,
   searchAllGuests,
+  updateGuestObservations,
 };
