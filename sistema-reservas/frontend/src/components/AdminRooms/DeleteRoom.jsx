@@ -1,15 +1,23 @@
 import React, { useState } from "react";
 import { deleteAdminRoom } from "../../services/adminRooms";
 import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/Dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/Dialog";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 const DeleteRoom = ({ token, roomId, roomNumber, onDeleted, roomStatus }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Solo permitir eliminar si el estado es 'Disponible' (soporta inglés y español)
-  const isDeletable = roomStatus === 'Disponible' || roomStatus === 'available';
+  // Solo permitir eliminar si el estado es 'Disponible'
+  const isDeletable = roomStatus === "disponible" || roomStatus === "available";
 
   const handleDelete = async () => {
     setLoading(true);
@@ -30,33 +38,100 @@ const DeleteRoom = ({ token, roomId, roomNumber, onDeleted, roomStatus }) => {
       <Button
         onClick={() => setOpen(true)}
         variant="destructive"
-        className="bg-destructive hover:bg-destructive/80 text-destructive-foreground font-semibold px-4 py-2 rounded shadow"
+        size="sm"
+        className="w-full"
         disabled={!isDeletable}
-        title={!isDeletable ? "Solo se puede eliminar habitaciones en estado Disponible" : "Eliminar"}
+        title={
+          !isDeletable
+            ? "Solo se puede eliminar habitaciones en estado Disponible"
+            : "Eliminar habitación"
+        }
       >
         Eliminar
       </Button>
+
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-gradient-to-br from-card via-card/80 to-card/60 text-card-foreground border border-input rounded-3xl shadow-2xl p-4 md:p-8 max-w-md w-full">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="text-center text-2xl md:text-3xl font-extrabold mb-2 text-destructive">Eliminar habitación</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 items-center justify-center mt-2">
-            <div className="text-destructive text-xl font-bold text-center">
-              ¿Eliminar habitación?
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-destructive/10 rounded-full">
+                <ExclamationTriangleIcon className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-destructive">
+                  Eliminar Habitación
+                </DialogTitle>
+                <DialogDescription>
+                  Esta acción no se puede deshacer
+                </DialogDescription>
+              </div>
             </div>
-            <p className="text-lg font-medium text-card-foreground text-center">
-              ¿Estás seguro que deseas eliminar la habitación <span className="font-bold text-destructive">{roomNumber}</span>?
-            </p>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Información de la habitación */}
+            <div className="p-4 bg-muted/50 rounded-lg border border-input">
+              <p className="text-sm text-muted-foreground mb-2">
+                Estás a punto de eliminar:
+              </p>
+              <p className="text-lg font-bold text-foreground">
+                Habitación Nº {roomNumber}
+              </p>
+            </div>
+
+            {/* Advertencia */}
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-sm text-destructive font-medium">
+                ⚠️ Esta acción eliminará permanentemente la habitación del
+                sistema.
+              </p>
+            </div>
+
+            {/* Mensaje de restricción si no es eliminable */}
             {!isDeletable && (
-              <p className="text-sm text-destructive text-center">Solo se puede eliminar habitaciones en estado <b>Disponible</b>.</p>
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                  ⚠️ Solo se puede eliminar habitaciones en estado{" "}
+                  <strong>Disponible</strong>.
+                </p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                  Estado actual:{" "}
+                  <strong className="capitalize">{roomStatus}</strong>
+                </p>
+              </div>
             )}
-            <p className="text-sm text-muted-foreground text-center">Esta acción <span className="font-bold">no se puede deshacer</span>.</p>
-            {error && <p className="text-destructive text-center mt-2">{error}</p>}
+
+            {/* Mensaje de error */}
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
+            {/* Confirmación */}
+            {isDeletable && (
+              <p className="text-sm text-muted-foreground text-center">
+                ¿Estás seguro de que deseas continuar?
+              </p>
+            )}
           </div>
-          <DialogFooter className="flex flex-row gap-2 justify-center mt-6">
-            <Button onClick={handleDelete} disabled={loading || !isDeletable} variant="destructive" className="bg-destructive hover:bg-destructive/80 text-destructive-foreground font-semibold px-4 py-2 rounded-lg shadow">Eliminar</Button>
-            <Button onClick={() => setOpen(false)} variant="secondary" className="bg-secondary text-primary font-semibold px-4 py-2 rounded-lg shadow">Cancelar</Button>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={loading || !isDeletable}
+              variant="destructive"
+            >
+              {loading ? "Eliminando..." : "Eliminar Habitación"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

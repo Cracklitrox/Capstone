@@ -133,9 +133,11 @@ const Step3AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
     );
   };
 
+  // ✅ FIX: Mejorado para manejar string vacío
   const updateCustomPrice = (serviceId, newPrice) => {
-    const price = parseInt(newPrice) || 0;
-    if (price < 0) return;
+    // Permitir string vacío, convertir solo cuando hay valor
+    const price = newPrice === "" ? "" : parseInt(newPrice, 10) || 0;
+    if (price !== "" && price < 0) return;
 
     setSelectedServices(
       selectedServices.map((s) =>
@@ -203,9 +205,10 @@ const Step3AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
       return;
     }
 
-    const servicesWithPricing = selectedServices.map(service => ({
+    const servicesWithPricing = selectedServices.map((service) => ({
       ...service,
-      customPrice: service.customPrice !== undefined ? service.customPrice : service.price
+      customPrice:
+        service.customPrice !== undefined ? service.customPrice : service.price,
     }));
 
     onUpdate({
@@ -248,7 +251,7 @@ const Step3AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
                   ? "border-primary bg-primary/5"
                   : "hover:border-primary/50"
               }`}
-              onClick={() => !isCustomService && toggleService(service)}
+              onClick={() => toggleService(service)}
             >
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between">
@@ -286,26 +289,6 @@ const Step3AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
                         )}
                       </div>
 
-                      {isCustomService && (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!!isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleService(service);
-                            }}
-                            className="h-4 w-4"
-                          />
-                          <Label
-                            className="text-sm cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Agregar este servicio
-                          </Label>
-                        </div>
-                      )}
-
                       {isSelected && isCustomService && (
                         <div
                           className="space-y-2"
@@ -315,17 +298,31 @@ const Step3AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
                             <DollarSign className="h-4 w-4" />
                             Precio por unidad (definido por recepcionista):
                           </Label>
-                          <Input
-                            type="number"
-                            value={selectedService.customPrice}
-                            onChange={(e) =>
-                              updateCustomPrice(service.id, e.target.value)
-                            }
-                            placeholder="Ingrese precio"
-                            min="0"
-                            className="w-full"
-                            onClick={(e) => e.stopPropagation()}
-                          />
+                          {/* ✅ FIX: Campo mejorado con símbolo $ y centrado */}
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+                              $
+                            </span>
+                            <Input
+                              type="text"
+                              value={
+                                selectedService.customPrice === ""
+                                  ? ""
+                                  : selectedService.customPrice
+                              }
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Solo permitir números
+                                if (/^\d*$/.test(value)) {
+                                  updateCustomPrice(service.id, value);
+                                }
+                              }}
+                              onFocus={(e) => e.target.select()}
+                              placeholder="0"
+                              className="w-full text-center pl-8"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             Este precio se multiplicará por la cantidad
                           </p>

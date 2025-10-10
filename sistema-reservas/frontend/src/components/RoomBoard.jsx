@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/Select.jsx";
 import { Input } from "@/components/ui/Input.jsx";
 import { Label } from "@/components/ui/Label.jsx";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import RoomHistory from "./RoomHistory.jsx";
 import {
   MaintenanceDetailView,
@@ -187,8 +187,31 @@ function RoomBoard() {
 
   const totalPages = Math.ceil(filteredRooms.length / CARDS_PER_PAGE);
 
+  // Verificar si los filtros están en su estado por defecto
+  const isFiltersDefault = useMemo(() => {
+    return (
+      filters.searchTerm === "" &&
+      filters.selectedType === "Todos los tipos" &&
+      filters.selectedCapacity === "Cualquier capacidad" &&
+      filters.selectedFloor === "Todos los pisos" &&
+      filters.selectedStatus === "Todos los estados"
+    );
+  }, [filters]);
+
   const handleFilterChange = (filterName, value) => {
     setFilters((prev) => ({ ...prev, [filterName]: value }));
+    setPage(1);
+  };
+
+  // Función para resetear todos los filtros
+  const resetFilters = () => {
+    setFilters({
+      searchTerm: "",
+      selectedType: "Todos los tipos",
+      selectedCapacity: "Cualquier capacidad",
+      selectedFloor: "Todos los pisos",
+      selectedStatus: "Todos los estados",
+    });
     setPage(1);
   };
 
@@ -410,6 +433,15 @@ function RoomBoard() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                onClick={resetFilters}
+                disabled={isFiltersDefault}
+                className="w-full sm:w-auto"
+              >
+                <XMarkIcon className="h-4 w-4 mr-2" />
+                Limpiar
+              </Button>
             </div>
           </div>
         </CardContent>
