@@ -82,4 +82,19 @@ export const guestHistoryService = {
       throw new Error(error.response?.data?.message || 'Error al actualizar observaciones');
     }
   },
+
+  // Actualizar campo específico del perfil de huésped
+  updateGuestProfile: async (guestId, updateData) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/guests/${guestId}/profile`,
+        updateData,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error al actualizar perfil de huésped:', error);
+      throw new Error(error.response?.data?.message || 'Error al actualizar perfil de huésped');
+    }
+  },
 };

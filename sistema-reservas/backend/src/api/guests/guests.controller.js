@@ -5,6 +5,7 @@ const {
   getGuestReservationsHistory,
   searchAllGuestsService,
   updateGuestObservationsService,
+  updateGuestProfileService,
 } = require("./guests.service");
 const { logError } = require("../../utils/errorLogger");
 
@@ -349,6 +350,116 @@ async function updateGuestObservations(req, res) {
   }
 }
 
+/**
+ * Actualizar perfil completo de huésped
+ * Permite actualizar múltiples campos del perfil de un huésped con validaciones
+ */
+async function updateGuestProfile(req, res) {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Validar que el ID sea válido
+    if (!id || isNaN(parseInt(id))) {
+      return res.status(400).json({
+        message: "ID de huésped inválido",
+      });
+    }
+
+    // Validar que se envíe al menos un campo para actualizar
+    if (!updateData || Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        message: "Debe proporcionar al menos un campo para actualizar",
+      });
+    }
+
+    // Validar campos específicos si están presentes
+    const validationErrors = [];
+
+    // Validar email
+    if (updateData.email !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (updateData.email && !emailRegex.test(updateData.email)) {
+        validationErrors.push("El formato del email es inválido");
+      }
+    }
+
+    // Validar RUT/Pasaporte
+    if (updateData.identificationNumber !== undefined) {
+      if (!updateData.identificationNumber || updateData.identificationNumber.trim().length < 3) {
+        validationErrors.push("El RUT/Pasaporte debe tener al menos 3 caracteres");
+      }
+    }
+
+    // Validar teléfono
+    if (updateData.phoneNumber !== undefined) {
+      const phoneRegex = /^[\+]?[0-9\s\-\(\)]{8,15}$/;
+      if (updateData.phoneNumber && !phoneRegex.test(updateData.phoneNumber)) {
+        validationErrors.push("El formato del teléfono es inválido");
+      }
+    }
+
+    // Validar fecha de nacimiento
+    if (updateData.birthDate !== undefined) {
+      if (updateData.birthDate) {
+        const birthDate = new Date(updateData.birthDate);
+        const today = new Date();
+        const minDate = new Date(today.getFullYear() - 120, today.getMonth(), today.getDate());
+        
+        if (isNaN(birthDate.getTime()) || birthDate > today || birthDate < minDate) {
+          validationErrors.push("La fecha de nacimiento es inválida");
+        }
+      }
+    }
+
+    // Validar género
+    if (updateData.gender !== undefined) {
+      const validGenders = ['male', 'female', 'other'];
+      if (updateData.gender && !validGenders.includes(updateData.gender)) {
+        validationErrors.push("El género debe ser 'male', 'female' o 'other'");
+      }
+    }
+
+    // Si hay errores de validación, retornar
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        message: "Errores de validación",
+        errors: validationErrors,
+      });
+    }
+
+    // Actualizar el perfil
+    const result = await updateGuestProfileService(parseInt(id), updateData);
+
+    if (!result.found) {
+      return res.status(404).json({
+        message: "Huésped no encontrado",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Perfil actualizado exitosamente",
+      guest: result.guest,
+    });
+  } catch (error) {
+    console.error("Error al actualizar perfil de huésped:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al actualizar perfil de huésped: ${error.message}`,
+      originModule: "guests.controller - updateGuestProfile",
+      severity: "medium",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al actualizar perfil de huésped",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   searchGuest,
   createGuest,
@@ -357,4 +468,5 @@ module.exports = {
   getGuestReservations,
   searchAllGuests,
   updateGuestObservations,
+  updateGuestProfile,
 };

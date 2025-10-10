@@ -431,6 +431,7 @@ async function getGuestProfileById(guestId) {
       travelsWithChildren: travelsWithChildren,
       specialRequests: guest.guest_details?.special_requests || 'Sin datos',
       observations: guest.guest_details?.observations || 'Sin datos',
+      status: guest.deleted_at ? 'inactive' : 'active',
       stats: {
         totalReservations: allReservations.length,
         completedReservations: completedReservations.length,
@@ -890,6 +891,175 @@ async function updateGuestObservationsService(guestId, observations) {
   };
 }
 
+/**
+ * Actualizar perfil completo de huésped
+ * Permite actualizar múltiples campos del perfil con validaciones
+ */
+async function updateGuestProfileService(guestId, updateData) {
+  try {
+    // Verificar que el huésped existe
+    const existingGuest = await prisma.users.findUnique({
+      where: { 
+        id: guestId,
+        deleted_at: null 
+      },
+      include: {
+        guest_details: true,
+        user_roles: {
+          include: {
+            roles: true
+          }
+        }
+      }
+    });
+
+    if (!existingGuest) {
+      return { found: false };
+    }
+
+    // Verificar que es un huésped
+    const isGuest = existingGuest.user_roles.some(ur => ur.roles.name === 'guest');
+    if (!isGuest) {
+      throw new Error('Usuario no es un huésped');
+    }
+
+    // Preparar datos de actualización para la tabla users
+    const userUpdateData = {};
+    
+    // Campos de datos personales
+    if (updateData.firstName !== undefined) {
+      userUpdateData.first_name = updateData.firstName.trim();
+    }
+    if (updateData.paternalLastName !== undefined) {
+      userUpdateData.paternal_last_name = updateData.paternalLastName.trim();
+    }
+    if (updateData.maternalLastName !== undefined) {
+      userUpdateData.maternal_last_name = updateData.maternalLastName?.trim() || null;
+    }
+    if (updateData.identificationNumber !== undefined) {
+      userUpdateData.identification_number = updateData.identificationNumber.trim();
+    }
+    if (updateData.email !== undefined) {
+      userUpdateData.email = updateData.email?.trim() || null;
+    }
+    if (updateData.phoneNumber !== undefined) {
+      userUpdateData.phone_number = updateData.phoneNumber?.trim() || null;
+    }
+    if (updateData.gender !== undefined) {
+      userUpdateData.gender = updateData.gender || null;
+    }
+    if (updateData.birthDate !== undefined) {
+      userUpdateData.birth_date = updateData.birthDate ? new Date(updateData.birthDate) : null;
+    }
+    
+    // Campos de ubicación
+    if (updateData.country !== undefined) {
+      userUpdateData.country = updateData.country?.trim() || null;
+    }
+    if (updateData.region !== undefined) {
+      userUpdateData.region = updateData.region?.trim() || null;
+    }
+    if (updateData.city !== undefined) {
+      userUpdateData.city = updateData.city?.trim() || null;
+    }
+
+    // Campos de sistema
+    if (updateData.status !== undefined) {
+      userUpdateData.status = updateData.status;
+    }
+    if (updateData.registrationDate !== undefined) {
+      userUpdateData.created_at = updateData.registrationDate ? new Date(updateData.registrationDate) : null;
+    }
+
+    // Preparar datos de actualización para guest_details
+    const guestDetailsUpdateData = {};
+    
+    if (updateData.specialRequests !== undefined) {
+      guestDetailsUpdateData.special_requests = updateData.specialRequests?.trim() || null;
+    }
+    if (updateData.observations !== undefined) {
+      guestDetailsUpdateData.observations = updateData.observations?.trim() || null;
+    }
+    if (updateData.travelsWithChildren !== undefined) {
+      guestDetailsUpdateData.travels_with_children = updateData.travelsWithChildren;
+    }
+
+    // Iniciar transacción para actualizar ambas tablas
+    const result = await prisma.$transaction(async (prisma) => {
+      // Actualizar tabla users si hay datos
+      if (Object.keys(userUpdateData).length > 0) {
+        await prisma.users.update({
+          where: { id: guestId },
+          data: userUpdateData
+        });
+      }
+
+      // Actualizar o crear guest_details si hay datos
+      if (Object.keys(guestDetailsUpdateData).length > 0) {
+        if (existingGuest.guest_details) {
+          // Actualizar detalles existentes
+          await prisma.guest_details.update({
+            where: { user_id: guestId },
+            data: guestDetailsUpdateData
+          });
+        } else {
+          // Crear nuevos detalles
+          await prisma.guest_details.create({
+            data: {
+              user_id: guestId,
+              ...guestDetailsUpdateData
+            }
+          });
+        }
+      }
+
+      // Obtener el huésped actualizado
+      return await prisma.users.findUnique({
+        where: { id: guestId },
+        include: {
+          guest_details: true,
+          user_roles: {
+            include: {
+              roles: true
+            }
+          }
+        }
+      });
+    });
+
+    // Formatear respuesta
+    const formattedGuest = {
+      id: result.id,
+      firstName: result.first_name,
+      paternalLastName: result.paternal_last_name,
+      maternalLastName: result.maternal_last_name,
+      fullName: `${result.first_name} ${result.paternal_last_name}${result.maternal_last_name ? ` ${result.maternal_last_name}` : ''}`,
+      email: result.email,
+      phone: result.phone_number,
+      identificationNumber: result.identification_number,
+      nationality: result.country,
+      region: result.region,
+      city: result.city,
+      gender: result.gender,
+      birthDate: result.birth_date,
+      registrationDate: result.created_at,
+      status: result.status,
+      specialRequests: result.guest_details?.special_requests,
+      observations: result.guest_details?.observations,
+      travelsWithChildren: result.guest_details?.travels_with_children || false
+    };
+
+    return {
+      found: true,
+      guest: formattedGuest
+    };
+
+  } catch (error) {
+    console.error('Error al actualizar perfil de huésped:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   searchGuestByIdentification,
   createOrUpdateGuest,
@@ -897,4 +1067,5 @@ module.exports = {
   getGuestReservationsHistory,
   searchAllGuestsService,
   updateGuestObservationsService,
+  updateGuestProfileService,
 };

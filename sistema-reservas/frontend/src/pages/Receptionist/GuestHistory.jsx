@@ -4,6 +4,8 @@ import { useAuth } from '@/services/authContext.jsx';
 import { guestHistoryService } from '@/services/guestHistory.js';
 import { format, parseISO, differenceInYears, differenceInMonths, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { Country, State, City } from "country-state-city";
+import { validateRutFormat, validateRutDv, formatRutInput, cleanRut } from "@/lib/rutValidator";
 
 // Importar componentes UI
 import { Button } from "@/components/ui/button.jsx";
@@ -90,6 +92,69 @@ const GuestHistory = () => {
   const [editedObservations, setEditedObservations] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   const [savingObservations, setSavingObservations] = useState(false);
+  
+  // Estados para editar todos los campos del perfil
+  const [editingStates, setEditingStates] = useState({
+    firstName: false,
+    paternalLastName: false,
+    maternalLastName: false,
+    identificationNumber: false,
+    email: false,
+    phoneNumber: false,
+    gender: false,
+    birthDate: false,
+    country: false,
+    region: false,
+    city: false,
+    travelsWithChildren: false,
+    specialRequests: false,
+    status: false,
+    registrationDate: false
+  });
+
+  const [editedValues, setEditedValues] = useState({
+    firstName: '',
+    paternalLastName: '',
+    maternalLastName: '',
+    identificationNumber: '',
+    email: '',
+    phoneNumber: '',
+    gender: '',
+    birthDate: '',
+    country: '',
+    region: '',
+    city: '',
+    travelsWithChildren: false,
+    childrenUnderFour: 0,
+    specialRequests: '',
+    status: '',
+    registrationDate: ''
+  });
+
+  // Estados para selectores geográficos
+  const [countries, setCountries] = useState([]);
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+
+  const [savingStates, setSavingStates] = useState({
+    firstName: false,
+    paternalLastName: false,
+    maternalLastName: false,
+    identificationNumber: false,
+    email: false,
+    phoneNumber: false,
+    gender: false,
+    birthDate: false,
+    country: false,
+    region: false,
+    city: false,
+    travelsWithChildren: false,
+    specialRequests: false,
+    status: false,
+    registrationDate: false
+  });
+
+  const [fieldErrors, setFieldErrors] = useState({});
   
   // Estados para reservas
   const [reservationsLoading, setReservationsLoading] = useState(false);
@@ -201,7 +266,305 @@ const GuestHistory = () => {
     }
   };
 
-  // Formatear moneda
+  // Funciones para manejar edición de campos
+  const handleEditField = (fieldName) => {
+    if (!guestProfile) return;
+    
+    // Establecer el valor actual del campo
+    let currentValue = '';
+    switch (fieldName) {
+      case 'firstName':
+        currentValue = guestProfile.firstName || '';
+        break;
+      case 'paternalLastName':
+        currentValue = guestProfile.paternalLastName || '';
+        break;
+      case 'maternalLastName':
+        currentValue = guestProfile.maternalLastName || '';
+        break;
+      case 'identificationNumber':
+        currentValue = guestProfile.identificationNumber || '';
+        break;
+      case 'email':
+        currentValue = guestProfile.email || '';
+        break;
+      case 'phoneNumber':
+        currentValue = guestProfile.phone || '';
+        break;
+      case 'gender':
+        currentValue = guestProfile.gender || '';
+        break;
+      case 'birthDate':
+        currentValue = guestProfile.birthDate ? guestProfile.birthDate.split('T')[0] : '';
+        break;
+      case 'country':
+        // Buscar el código ISO del país basado en el nombre
+        if (guestProfile.nationality) {
+          const countryItem = countries.find(c => c.label === guestProfile.nationality);
+          currentValue = countryItem ? countryItem.value : '';
+        } else {
+          currentValue = '';
+        }
+        break;
+      case 'region':
+        // Buscar el código ISO de la región basado en el nombre
+        if (guestProfile.region && guestProfile.nationality) {
+          const countryItem = countries.find(c => c.label === guestProfile.nationality);
+          if (countryItem) {
+            const stateList = State.getStatesOfCountry(countryItem.value);
+            const stateItem = stateList.find(s => s.name === guestProfile.region);
+            currentValue = stateItem ? stateItem.isoCode : '';
+          } else {
+            currentValue = '';
+          }
+        } else {
+          currentValue = '';
+        }
+        break;
+      case 'city':
+        currentValue = guestProfile.city || '';
+        break;
+      case 'travelsWithChildren':
+        currentValue = guestProfile.travelsWithChildren || false;
+        break;
+      case 'specialRequests':
+        currentValue = guestProfile.specialRequests || '';
+        break;
+      case 'status':
+        currentValue = guestProfile.status || '';
+        break;
+      case 'registrationDate':
+        currentValue = guestProfile.registrationDate ? guestProfile.registrationDate.split('T')[0] : '';
+        break;
+    }
+
+    setEditedValues(prev => ({
+      ...prev,
+      [fieldName]: currentValue
+    }));
+
+    // Cargar datos dependientes para campos geográficos
+    if (fieldName === 'country' && guestProfile.nationality) {
+      const countryItem = countries.find(c => c.label === guestProfile.nationality);
+      if (countryItem) {
+        const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
+          value: state.isoCode,
+          label: state.name
+        }));
+        setStates(stateList);
+      }
+    }
+
+    if (fieldName === 'region' && guestProfile.region && guestProfile.nationality) {
+      const countryItem = countries.find(c => c.label === guestProfile.nationality);
+      if (countryItem) {
+        // Cargar estados
+        const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
+          value: state.isoCode,
+          label: state.name
+        }));
+        setStates(stateList);
+
+        // Cargar ciudades si hay región
+        const stateItem = stateList.find(s => s.label === guestProfile.region);
+        if (stateItem) {
+          const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+            value: city.name,
+            label: city.name
+          }));
+          setCities(cityList);
+        }
+      }
+    }
+    
+    setEditingStates(prev => ({
+      ...prev,
+      [fieldName]: true
+    }));
+
+    // Limpiar errores previos
+    setFieldErrors(prev => ({
+      ...prev,
+      [fieldName]: null
+    }));
+  };
+
+  const handleCancelEditField = (fieldName) => {
+    setEditingStates(prev => ({
+      ...prev,
+      [fieldName]: false
+    }));
+    
+    setEditedValues(prev => ({
+      ...prev,
+      [fieldName]: ''
+    }));
+
+    setFieldErrors(prev => ({
+      ...prev,
+      [fieldName]: null
+    }));
+  };
+
+  const handleSaveField = async (fieldName) => {
+    if (!selectedGuest) return;
+    
+    const value = editedValues[fieldName];
+    const error = validateField(fieldName, value);
+    
+    if (error) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [fieldName]: error
+      }));
+      return;
+    }
+
+    setSavingStates(prev => ({
+      ...prev,
+      [fieldName]: true
+    }));
+
+    try {
+      // Convertir códigos ISO a nombres para enviar al backend
+      let valueToSend = value;
+      if (fieldName === 'country') {
+        const countryItem = countries.find(c => c.value === value);
+        valueToSend = countryItem ? countryItem.label : value;
+      } else if (fieldName === 'region') {
+        const stateItem = states.find(s => s.value === value);
+        valueToSend = stateItem ? stateItem.label : value;
+      }
+
+      const updateData = { [fieldName]: valueToSend };
+      
+      await guestHistoryService.updateGuestProfile(selectedGuest.id, updateData);
+      
+      // Actualizar el perfil local
+      setGuestProfile(prev => {
+        const updated = { ...prev };
+        
+        switch (fieldName) {
+          case 'firstName':
+            updated.firstName = valueToSend;
+            updated.fullName = `${valueToSend} ${updated.paternalLastName}${updated.maternalLastName ? ` ${updated.maternalLastName}` : ''}`;
+            break;
+          case 'paternalLastName':
+            updated.paternalLastName = valueToSend;
+            updated.fullName = `${updated.firstName} ${valueToSend}${updated.maternalLastName ? ` ${updated.maternalLastName}` : ''}`;
+            break;
+          case 'maternalLastName':
+            updated.maternalLastName = valueToSend;
+            updated.fullName = `${updated.firstName} ${updated.paternalLastName}${valueToSend ? ` ${valueToSend}` : ''}`;
+            break;
+          case 'phoneNumber':
+            updated.phone = valueToSend;
+            break;
+          case 'country':
+            updated.nationality = valueToSend;
+            break;
+          default:
+            updated[fieldName] = valueToSend;
+        }
+        
+        return updated;
+      });
+      
+      setEditingStates(prev => ({
+        ...prev,
+        [fieldName]: false
+      }));
+      
+      setEditedValues(prev => ({
+        ...prev,
+        [fieldName]: undefined
+      }));
+      
+      setFieldErrors(prev => ({
+        ...prev,
+        [fieldName]: undefined
+      }));
+      
+      setError(null);
+    } catch (err) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [fieldName]: err.message
+      }));
+    } finally {
+      setSavingStates(prev => ({
+        ...prev,
+        [fieldName]: false
+      }));
+    }
+  };
+
+  // Función de validación de campos
+  const validateField = (fieldName, value) => {
+    switch (fieldName) {
+      case 'identificationNumber':
+        if (!value) return "RUT es obligatorio";
+        const cleaned = cleanRut(value);
+        const rutPart = cleaned.slice(0, -1);
+        const dvPart = cleaned.slice(-1);
+        if (!validateRutFormat(rutPart) || !validateRutDv(rutPart, dvPart)) {
+          return "RUT ingresado erróneo";
+        }
+        break;
+      
+      case 'firstName':
+        if (!value) return "Nombre es obligatorio";
+        if (value.length < 2) return "Nombre debe tener al menos 2 caracteres";
+        break;
+      
+      case 'paternalLastName':
+        if (!value) return "Apellido paterno es obligatorio";
+        if (value.length < 2) return "Apellido debe tener al menos 2 caracteres";
+        break;
+      
+      case 'email':
+        if (!value) return "Email es obligatorio";
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(value)) return "Email inválido";
+        break;
+      
+      case 'phoneNumber':
+        if (!value) return "Teléfono es obligatorio";
+        if (!/^\+?[\d\s()-]{8,15}$/.test(value)) return "Teléfono inválido";
+        break;
+      
+      case 'birthDate':
+        if (!value) return "Fecha de nacimiento es obligatoria";
+        const birthDate = new Date(value);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+        if (age < 18) return "El huésped debe ser mayor de edad (18+)";
+        break;
+      
+      case 'gender':
+        if (!value) return "Género es obligatorio";
+        break;
+      
+      case 'country':
+        if (!value) return "País es obligatorio";
+        break;
+      
+      case 'region':
+        if (!value) return "Región es obligatoria";
+        break;
+      
+      case 'city':
+        if (!value) return "Ciudad es obligatoria";
+        break;
+    }
+    return null;
+  };
+
+  // Función para manejar cambio en RUT con formato automático
+  const handleRutChange = (value) => {
+    const formatted = formatRutInput(value);
+    setEditedValues(prev => ({ ...prev, identificationNumber: formatted }));
+  };
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
@@ -298,6 +661,336 @@ const GuestHistory = () => {
       loadGuestReservations(selectedGuest.id, reservationFilters);
     }
   }, [reservationFilters, selectedGuest]);
+
+  // Efecto para cargar países e inicializar valores geográficos cuando se carga el perfil
+  useEffect(() => {
+    const countryList = Country.getAllCountries().map((country) => ({
+      value: country.isoCode,
+      label: country.name
+    }));
+    setCountries(countryList);
+
+    // Si hay un perfil cargado, configurar los valores geográficos
+    if (guestProfile) {
+      // Configurar país
+      if (guestProfile.nationality) {
+        const currentCountry = countryList.find(c => c.label === guestProfile.nationality);
+        if (currentCountry) {
+          setEditedValues(prev => ({
+            ...prev,
+            country: currentCountry.value
+          }));
+
+          // Configurar región
+          if (guestProfile.region) {
+            const stateList = State.getStatesOfCountry(currentCountry.value).map((state) => ({
+              value: state.isoCode,
+              label: state.name
+            }));
+            setStates(stateList);
+            
+            const currentState = stateList.find(s => s.label === guestProfile.region);
+            if (currentState) {
+              setEditedValues(prev => ({
+                ...prev,
+                country: currentCountry.value,
+                region: currentState.value
+              }));
+
+              // Configurar ciudad
+              if (guestProfile.city) {
+                const cityList = City.getCitiesOfState(currentCountry.value, currentState.isoCode).map((city) => ({
+                  value: city.name,
+                  label: city.name
+                }));
+                setCities(cityList);
+                
+                setEditedValues(prev => ({
+                  ...prev,
+                  country: currentCountry.value,
+                  region: currentState.isoCode,
+                  city: guestProfile.city
+                }));
+              }
+            }
+          }
+        }
+      }
+    }
+  }, [guestProfile]);
+
+  // Efecto para cargar estados cuando cambia el país
+  useEffect(() => {
+    if (editedValues.country) {
+      const stateList = State.getStatesOfCountry(editedValues.country).map((state) => ({
+        value: state.isoCode,
+        label: state.name
+      }));
+      setStates(stateList);
+    } else {
+      setStates([]);
+    }
+  }, [editedValues.country]);
+
+  // Efecto para cargar ciudades cuando cambia la región
+  useEffect(() => {
+    if (editedValues.country && editedValues.region) {
+      const cityList = City.getCitiesOfState(editedValues.country, editedValues.region).map((city) => ({
+        value: city.name,
+        label: city.name
+      }));
+      setCities(cityList);
+    } else {
+      setCities([]);
+    }
+  }, [editedValues.country, editedValues.region]);
+
+  // Componente helper para renderizar campos editables
+  const renderEditableField = (fieldName, label, value, type = 'text', options = null, readonly = false) => {
+    const isEditing = editingStates[fieldName];
+    const isSaving = savingStates[fieldName];
+    const error = fieldErrors[fieldName];
+    const editedValue = editedValues[fieldName];
+
+    // Campos que no se pueden editar
+    if (readonly || fieldName === 'registrationDate') {
+      return (
+        <div>
+          <Label className="text-xs text-muted-foreground">{label}</Label>
+          <p className="font-medium">
+            {type === 'date' && value ? new Date(value).toLocaleDateString('es-CL') : value || 'No especificado'}
+          </p>
+        </div>
+      );
+    }
+
+    if (isEditing) {
+      return (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-xs text-muted-foreground">{label}</Label>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleSaveField(fieldName)}
+                disabled={isSaving}
+                className="h-6 w-6 p-0 text-green-600"
+              >
+                {isSaving ? '...' : <CheckIcon className="h-3 w-3" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleCancelEditField(fieldName)}
+                disabled={isSaving}
+                className="h-6 w-6 p-0 text-red-600"
+              >
+                <XCircleIcon className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          
+          {type === 'select' && options ? (
+            <select
+              value={editedValue}
+              onChange={(e) => {
+                setEditedValues(prev => ({ ...prev, [fieldName]: e.target.value }));
+                // Si es país, limpiar región y ciudad
+                if (fieldName === 'country') {
+                  setEditedValues(prev => ({ ...prev, region: '', city: '' }));
+                }
+                // Si es región, limpiar ciudad
+                if (fieldName === 'region') {
+                  setEditedValues(prev => ({ ...prev, city: '' }));
+                }
+              }}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              {fieldName !== 'gender' && <option value="">Seleccionar...</option>}
+              {options.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : type === 'countrySelect' ? (
+            <select
+              value={editedValue}
+              onChange={(e) => {
+                setEditedValues(prev => ({ ...prev, country: e.target.value, region: '', city: '' }));
+              }}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Seleccionar país...</option>
+              {countries.map(country => (
+                <option key={country.value} value={country.value}>
+                  {country.label}
+                </option>
+              ))}
+            </select>
+          ) : type === 'stateSelect' ? (
+            <select
+              value={editedValue}
+              onChange={(e) => {
+                setEditedValues(prev => ({ ...prev, region: e.target.value, city: '' }));
+              }}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              disabled={!editedValues.country}
+            >
+              <option value="">Seleccionar región...</option>
+              {states.map(state => (
+                <option key={state.value} value={state.value}>
+                  {state.label}
+                </option>
+              ))}
+            </select>
+          ) : type === 'citySelect' ? (
+            <select
+              value={editedValue}
+              onChange={(e) => setEditedValues(prev => ({ ...prev, city: e.target.value }))}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              disabled={!editedValues.country || !editedValues.region}
+            >
+              <option value="">Seleccionar ciudad...</option>
+              {cities.map(city => (
+                <option key={city.value} value={city.value}>
+                  {city.label}
+                </option>
+              ))}
+            </select>
+          ) : type === 'travelsWithChildren' ? (
+            <div className="space-y-3">
+              <select
+                value={editedValue ? 'true' : 'false'}
+                onChange={(e) => {
+                  const travels = e.target.value === 'true';
+                  setEditedValues(prev => ({ 
+                    ...prev, 
+                    travelsWithChildren: travels,
+                    childrenUnderFour: travels ? (prev.childrenUnderFour || 1) : 0
+                  }));
+                }}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="false">No</option>
+                <option value="true">Sí</option>
+              </select>
+              {editedValues.travelsWithChildren && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Número de niños menores de 4 años</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditedValues(prev => ({ 
+                        ...prev, 
+                        childrenUnderFour: Math.max(0, (prev.childrenUnderFour || 0) - 1)
+                      }))}
+                      className="h-8 w-8 p-0"
+                    >
+                      -
+                    </Button>
+                    <Input
+                      type="number"
+                      value={editedValues.childrenUnderFour || 0}
+                      onChange={(e) => setEditedValues(prev => ({ 
+                        ...prev, 
+                        childrenUnderFour: Math.max(0, parseInt(e.target.value) || 0)
+                      }))}
+                      className="w-16 text-center"
+                      min="0"
+                      max="10"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditedValues(prev => ({ 
+                        ...prev, 
+                        childrenUnderFour: Math.min(10, (prev.childrenUnderFour || 0) + 1)
+                      }))}
+                      className="h-8 w-8 p-0"
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : type === 'textarea' ? (
+            <textarea
+              value={editedValue}
+              onChange={(e) => setEditedValues(prev => ({ ...prev, [fieldName]: e.target.value }))}
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+          ) : type === 'checkbox' ? (
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={editedValue}
+                onChange={(e) => setEditedValues(prev => ({ ...prev, [fieldName]: e.target.checked }))}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <span className="text-sm">{editedValue ? 'Sí' : 'No'}</span>
+            </div>
+          ) : (
+            <Input
+              type={type}
+              value={editedValue}
+              onChange={(e) => {
+                if (fieldName === 'identificationNumber') {
+                  handleRutChange(e.target.value);
+                } else {
+                  setEditedValues(prev => ({ ...prev, [fieldName]: e.target.value }));
+                }
+              }}
+              placeholder={fieldName === 'identificationNumber' ? '12.345.678-9' : undefined}
+              className={error ? "border-destructive" : ""}
+            />
+          )}
+          
+          {error && (
+            <p className="text-xs text-red-500 mt-1">{error}</p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-xs text-muted-foreground">{label}</Label>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEditField(fieldName)}
+            className="h-6 w-6 p-0"
+          >
+            <PencilIcon className="h-3 w-3" />
+          </Button>
+        </div>
+        <p className="font-medium">
+          {type === 'checkbox' 
+            ? (value ? 'Sí' : 'No')
+            : type === 'date' && value
+              ? formatDate(value)
+              : fieldName === 'gender'
+                ? (value === 'male' ? 'Masculino' : value === 'female' ? 'Femenino' : value === 'other' ? 'Otro' : formatData(value))
+                : fieldName === 'status'
+                  ? (
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${value === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        {value === 'active' ? 'Activo' : value === 'inactive' ? 'Inactivo' : formatData(value)}
+                      </div>
+                    )
+                  : formatData(value)
+          }
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -653,43 +1346,28 @@ const GuestHistory = () => {
                       <CardTitle className="text-lg">Datos Personales</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Nombre Completo</Label>
-                        <p className="font-medium">
-                          {guestProfile.firstName} {guestProfile.paternalLastName} {guestProfile.maternalLastName}
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">RUT/Pasaporte</Label>
-                        <p className="font-mono">{formatData(guestProfile.identificationNumber)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Email</Label>
-                        <p>{formatData(guestProfile.email)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Teléfono</Label>
-                        <p>{formatData(guestProfile.phone)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Género</Label>
-                        <p>{formatData(guestProfile.gender === 'male' ? 'Masculino' : guestProfile.gender === 'female' ? 'Femenino' : guestProfile.gender === 'other' ? 'Otro' : guestProfile.gender)}</p>
-                      </div>
-                      {guestProfile.birthDate && (
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Edad</Label>
+                      {renderEditableField('firstName', 'Nombre', guestProfile.firstName)}
+                      {renderEditableField('paternalLastName', 'Apellido Paterno', guestProfile.paternalLastName)}
+                      {renderEditableField('maternalLastName', 'Apellido Materno', guestProfile.maternalLastName)}
+                      {renderEditableField('identificationNumber', 'RUT/Pasaporte', guestProfile.identificationNumber)}
+                      {renderEditableField('email', 'Email', guestProfile.email, 'email')}
+                      {renderEditableField('phoneNumber', 'Teléfono', guestProfile.phone, 'tel')}
+                      {renderEditableField('gender', 'Género', guestProfile.gender, 'select', [
+                        { value: 'masculino', label: 'Masculino' },
+                        { value: 'femenino', label: 'Femenino' },
+                        { value: 'no_binario', label: 'No binario' },
+                        { value: 'prefiero_no_decir', label: 'Prefiero no decir' }
+                      ])}
+                      {renderEditableField('birthDate', 'Fecha de Nacimiento', guestProfile.birthDate, 'date')}
+                      {guestProfile.birthDate && !editingStates.birthDate && (
+                        <div className="mt-2">
+                          <Label className="text-xs text-muted-foreground">Edad Calculada</Label>
                           <p className="font-medium">
                             {calculateAge(guestProfile.birthDate)}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            Nacido el {formatDate(guestProfile.birthDate)}
-                          </p>
                         </div>
                       )}
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Fecha de registro</Label>
-                        <p>{formatData(guestProfile.registrationDate ? formatDate(guestProfile.registrationDate) : null)}</p>
-                      </div>
+                      {renderEditableField('registrationDate', 'Fecha de Registro', guestProfile.registrationDate, 'date', null, true)}
                     </CardContent>
                   </Card>
 
@@ -699,28 +1377,14 @@ const GuestHistory = () => {
                       <CardTitle className="text-lg">Ubicación y Preferencias</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">País</Label>
-                        <p>{formatData(guestProfile.nationality)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Región</Label>
-                        <p>{formatData(guestProfile.region)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Ciudad</Label>
-                        <p>{formatData(guestProfile.city)}</p>
-                      </div>
+                      {renderEditableField('country', 'País', guestProfile.nationality, 'countrySelect')}
+                      {renderEditableField('region', 'Región', guestProfile.region, 'stateSelect')}
+                      {renderEditableField('city', 'Ciudad', guestProfile.city, 'citySelect')}
                       <Separator />
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Viaja con niños</Label>
-                        <p>{guestProfile.travelsWithChildren ? 'Sí' : 'No'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Solicitudes especiales</Label>
-                        <p className="text-sm">{formatData(guestProfile.specialRequests)}</p>
-                      </div>
-                      {/* Observaciones editables */}
+                      {renderEditableField('travelsWithChildren', 'Viaja con niños', guestProfile.travelsWithChildren, 'travelsWithChildren')}
+                      {renderEditableField('specialRequests', 'Solicitudes especiales', guestProfile.specialRequests, 'textarea')}
+                      
+                      {/* Observaciones editables - mantener implementación existente */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <Label className="text-xs text-muted-foreground">Observaciones</Label>
@@ -872,6 +1536,19 @@ const GuestHistory = () => {
                         )}
                       </>
                     )}
+                  </CardContent>
+                </Card>
+
+                {/* Estado del Sistema */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Estado del Sistema</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {renderEditableField('status', 'Estado del Huésped', guestProfile.status, 'select', [
+                      { value: 'active', label: 'Activo' },
+                      { value: 'inactive', label: 'Inactivo' }
+                    ])}
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -10,6 +10,7 @@ const {
   getGuestReservations,
   searchAllGuests,
   updateGuestObservations,
+  updateGuestProfile,
 } = require("./guests.controller");
 
 // Define rate limiter for guest update route
@@ -50,6 +51,9 @@ router.post("/", authenticate, guestCreateLimiter, createGuest);
 
 // Actualizar huésped
 router.put("/:id", authenticate, guestUpdateLimiter, updateGuest);
+
+// Actualizar perfil completo de huésped
+router.put("/:id/profile", authenticate, guestUpdateLimiter, updateGuestProfile);
 
 // Actualizar observaciones de huésped
 router.put("/:id/observations", authenticate, guestUpdateLimiter, updateGuestObservations);
