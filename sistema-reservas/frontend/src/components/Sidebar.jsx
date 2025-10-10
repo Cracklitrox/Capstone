@@ -11,6 +11,7 @@ import {
   ViewColumnsIcon,
   ClockIcon,
   BellAlertIcon,
+  BellIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { PlusCircle } from "lucide-react";
@@ -35,6 +36,12 @@ const navLinks = [
     icon: BellAlertIcon,
     roles: ["administrator", "receptionist"],
     showBadge: true, // Indicador para mostrar badge
+  },
+  {
+    href: "/notifications",
+    label: "Notificaciones",
+    icon: BellIcon,
+    roles: ["administrator", "receptionist"],
   },
   {
     label: "Gestionar Habitaciones",

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const notificationsController = require("./notifications.controller");
+const realtimeController = require("./notifications.realtime.controller");
 const { authenticate, authorize } = require("../../middleware/auth.middleware");
 const rateLimit = require("express-rate-limit");
 
@@ -11,6 +12,101 @@ const notificationsLimiter = rateLimit({
   standardHeaders: true, // Send rate limit info in the RateLimit-* headers
   legacyHeaders: false, // Disable the X-RateLimit-* headers
 });
+
+// ==================== RUTAS DE NOTIFICACIONES EN TIEMPO REAL ====================
+
+/**
+ * @route POST /api/v1/notifications
+ * @desc Crea una nueva notificación y la envía en tiempo real
+ * @access Administrador y Recepcionista
+ */
+router.post(
+  "/",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.createNotification
+);
+
+/**
+ * @route GET /api/v1/notifications
+ * @desc Obtiene todas las notificaciones del usuario autenticado
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  "/",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.getUserNotifications
+);
+
+/**
+ * @route GET /api/v1/notifications/unread-count
+ * @desc Obtiene el conteo de notificaciones no leídas
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  "/unread-count",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.getUnreadCount
+);
+
+/**
+ * @route PUT /api/v1/notifications/mark-all-read
+ * @desc Marca todas las notificaciones como leídas
+ * @access Administrador y Recepcionista
+ */
+router.put(
+  "/mark-all-read",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.markAllAsRead
+);
+
+/**
+ * @route PUT /api/v1/notifications/:id/read
+ * @desc Marca una notificación como leída
+ * @access Administrador y Recepcionista
+ */
+router.put(
+  "/:id/read",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.markAsRead
+);
+
+/**
+ * @route PUT /api/v1/notifications/:id/archive
+ * @desc Marca una notificación como archivada
+ * @access Administrador y Recepcionista
+ */
+router.put(
+  "/:id/archive",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.markAsArchived
+);
+
+/**
+ * @route PUT /api/v1/notifications/:id/unarchive
+ * @desc Desmarca una notificación archivada
+ * @access Administrador y Recepcionista
+ */
+router.put(
+  "/:id/unarchive",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.unarchiveNotification
+);
+
+// ==================== RUTAS DE ALERTAS DE CHECK-OUT ====================
 
 /**
  * @route GET /api/v1/notifications/checkout-alerts
