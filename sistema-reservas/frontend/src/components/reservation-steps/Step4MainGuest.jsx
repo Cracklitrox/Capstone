@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Country, State, City } from "country-state-city";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -20,14 +20,13 @@ import {
   CheckCircle2,
   Plus,
   Minus,
-} from "lucide-react"; // CORREGIDO
+} from "lucide-react";
 import { toast } from "sonner";
 import { guestsService } from "@/services/guests";
 import {
   validateRutFormat,
   validateRutDv,
   formatRutInput,
-  validatePassport,
   cleanRut,
 } from "@/lib/rutValidator";
 
@@ -40,6 +39,27 @@ const MAX_LENGTHS = {
   identificationNumber: 15,
   specialRequests: 200,
   observations: 250,
+};
+
+// ✅ Helper para normalizar valores null a string vacío
+const normalizeGuestData = (guestData = {}) => {
+  return {
+    identificationNumber: guestData.identificationNumber || "",
+    firstName: guestData.firstName || "",
+    paternalLastName: guestData.paternalLastName || "",
+    maternalLastName: guestData.maternalLastName || "",
+    email: guestData.email || "",
+    phoneNumber: guestData.phoneNumber || "",
+    birthDate: guestData.birthDate || "",
+    gender: guestData.gender || "",
+    country: guestData.country || "",
+    region: guestData.region || "",
+    city: guestData.city || "",
+    travelsWithChildren: guestData.travelsWithChildren || false,
+    childrenUnderFour: guestData.childrenUnderFour || 0,
+    specialRequests: guestData.specialRequests || "",
+    observations: guestData.observations || "",
+  };
 };
 
 const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
@@ -72,31 +92,15 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
     observations: "",
   });
 
-  // Pre-llenar formulario si ya existe mainGuest
+  // ✅ Pre-llenar formulario si ya existe mainGuest
   useEffect(() => {
     if (data.mainGuest) {
-      const guest = data.mainGuest;
-      setFormData({
-        identificationNumber: guest.identificationNumber || "",
-        firstName: guest.firstName || "",
-        paternalLastName: guest.paternalLastName || "",
-        maternalLastName: guest.maternalLastName || "",
-        email: guest.email || "",
-        phoneNumber: guest.phoneNumber || "",
-        birthDate: guest.birthDate || "",
-        gender: guest.gender || "",
-        country: guest.country || "",
-        region: guest.region || "",
-        city: guest.city || "",
-        travelsWithChildren: guest.travelsWithChildren || false,
-        childrenUnderFour: guest.childrenUnderFour || 0,
-        specialRequests: guest.specialRequests || "",
-        observations: guest.observations || "",
-      });
+      setFormData(normalizeGuestData(data.mainGuest));
       setSearchMode(false);
     }
   }, [data.mainGuest]);
 
+  // ✅ Memoizar opciones de países/estados/ciudades
   const countries = useMemo(
     () =>
       Country.getAllCountries().map((c) => ({
@@ -128,86 +132,92 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
     [formData.country, formData.region]
   );
 
+  // ✅ Validación con debounce de 300ms
   useEffect(() => {
-    const errors = {};
+    const timeoutId = setTimeout(() => {
+      const errors = {};
 
-    if (touched.identificationNumber && formData.identificationNumber) {
-      if (nationality === "chileno") {
-        const cleaned = cleanRut(formData.identificationNumber);
-        const rutPart = cleaned.slice(0, -1);
-        const dvPart = cleaned.slice(-1);
+      if (touched.identificationNumber && formData.identificationNumber) {
+        if (nationality === "chileno") {
+          const cleaned = cleanRut(formData.identificationNumber);
+          const rutPart = cleaned.slice(0, -1);
+          const dvPart = cleaned.slice(-1);
 
-        if (!validateRutFormat(rutPart)) {
-          errors.identificationNumber = "RUT ingresado erróneo";
-        } else if (!validateRutDv(rutPart, dvPart)) {
-          errors.identificationNumber = "RUT ingresado erróneo";
-        }
-      } else {
-        if (!/^[A-Z0-9]{8,15}$/i.test(formData.identificationNumber)) {
-          errors.identificationNumber =
-            "Pasaporte debe tener 8-15 caracteres alfanuméricos";
-        }
-      }
-    }
-
-    if (touched.firstName && !formData.firstName) {
-      errors.firstName = "Nombre es obligatorio";
-    }
-
-    if (touched.paternalLastName && !formData.paternalLastName) {
-      errors.paternalLastName = "Apellido paterno es obligatorio";
-    }
-
-    if (touched.email) {
-      if (!formData.email) {
-        errors.email = "Email es obligatorio";
-      } else {
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(formData.email)) {
-          errors.email = "Email inválido";
+          if (!validateRutFormat(rutPart)) {
+            errors.identificationNumber = "RUT ingresado erróneo";
+          } else if (!validateRutDv(rutPart, dvPart)) {
+            errors.identificationNumber = "RUT ingresado erróneo";
+          }
+        } else {
+          if (!/^[A-Z0-9]{8,15}$/i.test(formData.identificationNumber)) {
+            errors.identificationNumber =
+              "Pasaporte debe tener 8-15 caracteres alfanuméricos";
+          }
         }
       }
-    }
 
-    if (touched.birthDate && formData.birthDate) {
-      const birthDate = new Date(formData.birthDate);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-
-      if (age < 18) {
-        errors.birthDate = "El huésped principal debe ser mayor de edad (18+)";
+      if (touched.firstName && !formData.firstName) {
+        errors.firstName = "Nombre es obligatorio";
       }
-    }
 
-    if (touched.maternalLastName && !formData.maternalLastName) {
-      errors.maternalLastName = "Apellido materno es obligatorio";
-    }
+      if (touched.paternalLastName && !formData.paternalLastName) {
+        errors.paternalLastName = "Apellido paterno es obligatorio";
+      }
 
-    if (touched.phoneNumber && !formData.phoneNumber) {
-      errors.phoneNumber = "Teléfono es obligatorio";
-    }
+      if (touched.email) {
+        if (!formData.email) {
+          errors.email = "Email es obligatorio";
+        } else {
+          const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailPattern.test(formData.email)) {
+            errors.email = "Email inválido";
+          }
+        }
+      }
 
-    if (touched.birthDate && !formData.birthDate) {
-      errors.birthDate = "Fecha de nacimiento es obligatoria";
-    }
+      if (touched.birthDate && formData.birthDate) {
+        const birthDate = new Date(formData.birthDate);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
 
-    if (touched.gender && !formData.gender) {
-      errors.gender = "Género es obligatorio";
-    }
+        if (age < 18) {
+          errors.birthDate =
+            "El huésped principal debe ser mayor de edad (18+)";
+        }
+      }
 
-    if (touched.country && !formData.country) {
-      errors.country = "País es obligatorio";
-    }
+      if (touched.maternalLastName && !formData.maternalLastName) {
+        errors.maternalLastName = "Apellido materno es obligatorio";
+      }
 
-    if (touched.region && !formData.region) {
-      errors.region = "Región es obligatoria";
-    }
+      if (touched.phoneNumber && !formData.phoneNumber) {
+        errors.phoneNumber = "Teléfono es obligatorio";
+      }
 
-    if (touched.city && !formData.city) {
-      errors.city = "Ciudad es obligatoria";
-    }
+      if (touched.birthDate && !formData.birthDate) {
+        errors.birthDate = "Fecha de nacimiento es obligatoria";
+      }
 
-    setValidationErrors(errors);
+      if (touched.gender && !formData.gender) {
+        errors.gender = "Género es obligatorio";
+      }
+
+      if (touched.country && !formData.country) {
+        errors.country = "País es obligatorio";
+      }
+
+      if (touched.region && !formData.region) {
+        errors.region = "Región es obligatoria";
+      }
+
+      if (touched.city && !formData.city) {
+        errors.city = "Ciudad es obligatoria";
+      }
+
+      setValidationErrors(errors);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [formData, touched, nationality]);
 
   const handleSearchGuest = async () => {
@@ -232,7 +242,6 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
         return;
       }
     } else {
-      // CORREGIDO: Validar pasaporte
       if (!/^[A-Z0-9]{8,15}$/i.test(cleaned)) {
         toast.error("Pasaporte debe tener 8-15 caracteres alfanuméricos");
         return;
@@ -253,11 +262,14 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
             )
           : null;
 
-        setGuestFound({
-          ...result.guest,
-          country: countryData?.isoCode || "",
-          region: stateData?.isoCode || "",
-        });
+        // ✅ Normalizar datos encontrados
+        setGuestFound(
+          normalizeGuestData({
+            ...result.guest,
+            country: countryData?.isoCode || "",
+            region: stateData?.isoCode || "",
+          })
+        );
         toast.success("Huésped encontrado");
       } else {
         setGuestFound(null);
@@ -265,10 +277,12 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
           "Huésped no encontrado. Complete el formulario para registrarlo."
         );
         setSearchMode(false);
-        setFormData((prev) => ({
-          ...prev,
-          identificationNumber: cleaned,
-        }));
+        // ✅ Normalizar al crear nuevo
+        setFormData(
+          normalizeGuestData({
+            identificationNumber: cleaned,
+          })
+        );
       }
     } catch (error) {
       console.error("Error al buscar huésped:", error);
@@ -280,20 +294,21 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
 
   const handleUseFoundGuest = () => {
     const missingFields = [];
-    if (!guestFound.email) missingFields.push('Email');
-    if (!guestFound.birthDate) missingFields.push('Fecha de nacimiento');
-    if (!guestFound.gender) missingFields.push('Género');
-    
+    if (!guestFound.email) missingFields.push("Email");
+    if (!guestFound.birthDate) missingFields.push("Fecha de nacimiento");
+    if (!guestFound.gender) missingFields.push("Género");
+
     if (missingFields.length > 0) {
       setSearchMode(false);
       setIsEditingExisting(true);
-      setFormData({
-        ...guestFound,
-      });
-      toast.warning(`Complete los campos faltantes: ${missingFields.join(', ')}`);
+      // ✅ Normalizar datos antes de setear
+      setFormData(normalizeGuestData(guestFound));
+      toast.warning(
+        `Complete los campos faltantes: ${missingFields.join(", ")}`
+      );
       return;
     }
-    
+
     onUpdate({ mainGuest: guestFound });
     onNext();
   };
@@ -326,7 +341,9 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
       !formData.region ||
       !formData.city
     ) {
-      toast.error("Complete todos los campos obligatorios del huésped principal");
+      toast.error(
+        "Complete todos los campos obligatorios del huésped principal"
+      );
       return;
     }
 
@@ -338,83 +355,100 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
     setCreating(true);
 
     try {
-      const countryName = countries.find((c) => c.value === formData.country)?.label || "";
-      const stateName = states.find((s) => s.value === formData.region)?.label || "";
+      const countryName =
+        countries.find((c) => c.value === formData.country)?.label || "";
+      const stateName =
+        states.find((s) => s.value === formData.region)?.label || "";
 
-      const guestData = {
+      const guestDataBase = {
         ...formData,
         country: countryName,
         region: stateName,
         isMainGuest: true,
       };
 
+      let finalGuestData;
+
       if (isEditingExisting && guestFound?.id) {
-        await guestsService.updateGuest(guestFound.id, guestData);
+        const result = await guestsService.updateGuest(guestFound.id, guestDataBase);
+        finalGuestData = { ...result, id: guestFound.id };
         toast.success("Datos del huésped actualizados correctamente");
-        
-        guestData.id = guestFound.id;
       } else {
+        finalGuestData = guestDataBase;
         toast.success("Datos del huésped principal guardados");
       }
 
-      onUpdate({ mainGuest: guestData });
+      onUpdate({ mainGuest: finalGuestData });
       onNext();
     } catch (error) {
       console.error("Error al guardar huésped:", error);
-      toast.error(error.response?.data?.message || "Error al guardar huésped");
+      toast.error(
+        error.response?.data?.message || "Error al guardar huésped"
+      );
     } finally {
       setCreating(false);
     }
   };
 
-  const updateFormField = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  const updateFormField = useCallback((field, value) => {
+    setFormData((prev) => {
+      if (prev[field] === value) return prev;
+      return { ...prev, [field]: value };
+    });
+  }, []);
 
-  const handleFieldBlur = (field) => {
+  const handleFieldBlur = useCallback((field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
-  };
+  }, []);
 
-  const handleIdentificationChange = (e) => {
-    const value = e.target.value;
+  const handleIdentificationChange = useCallback(
+    (e) => {
+      const value = e.target.value;
 
-    if (nationality === "chileno") {
-      const formatted = formatRutInput(value);
-      setIdentificationSearch(formatted);
-    } else {
-      // CORREGIDO: Solo alfanuméricos uppercase
-      setIdentificationSearch(value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
-    }
-  };
+      if (nationality === "chileno") {
+        const formatted = formatRutInput(value);
+        setIdentificationSearch(formatted);
+      } else {
+        setIdentificationSearch(value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+      }
+    },
+    [nationality]
+  );
 
-  const handleFormIdentificationChange = (e) => {
-    const value = e.target.value;
+  const handleFormIdentificationChange = useCallback(
+    (e) => {
+      const value = e.target.value;
 
-    if (nationality === "chileno") {
-      const formatted = formatRutInput(value);
-      updateFormField("identificationNumber", formatted);
-    } else {
-      // CORREGIDO: Solo alfanuméricos uppercase
-      updateFormField(
-        "identificationNumber",
-        value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+      if (nationality === "chileno") {
+        const formatted = formatRutInput(value);
+        updateFormField("identificationNumber", formatted);
+      } else {
+        updateFormField(
+          "identificationNumber",
+          value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+        );
+      }
+    },
+    [nationality, updateFormField]
+  );
+
+  // ✅ Memoizar getCharacterCount
+  const getCharacterCount = useCallback(
+    (field, maxLength) => {
+      const current = formData[field]?.length || 0;
+      const percentage = (current / maxLength) * 100;
+      const isWarning = percentage >= 75;
+
+      return (
+        <span
+          className={`text-xs ${isWarning ? "text-orange-500" : "text-muted-foreground"}`}
+        >
+          {current}/{maxLength}
+        </span>
       );
-    }
-  };
-
-  const getCharacterCount = (field, maxLength) => {
-    const current = formData[field]?.length || 0;
-    const percentage = (current / maxLength) * 100;
-    const isWarning = percentage >= 75;
-
-    return (
-      <span
-        className={`text-xs ${isWarning ? "text-orange-500" : "text-muted-foreground"}`}
-      >
-        {current}/{maxLength}
-      </span>
-    );
-  };
+    },
+    [formData]
+  );
 
   return (
     <div className="space-y-6">
@@ -490,7 +524,7 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
                         </p>
                         <p>
                           <span className="font-medium">Email:</span>{" "}
-                          {guestFound.email}
+                          {guestFound.email || "N/A"}
                         </p>
                         <p>
                           <span className="font-medium">Teléfono:</span>{" "}
@@ -933,7 +967,7 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Notas/Alertas del Huésped</Label> {/* RENOMBRADO */}
+                <Label>Notas/Alertas del Huésped</Label>
                 {getCharacterCount("observations", MAX_LENGTHS.observations)}
               </div>
               <Input

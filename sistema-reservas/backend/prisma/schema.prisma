@@ -507,6 +507,7 @@ enum payment_status_enum {
 enum reservation_channel_enum {
   chatbot
   reception
+  in_person
   walk_in
   web
 }

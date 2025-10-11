@@ -26,6 +26,99 @@ const parseRut = (rutString) => {
 };
 
 /**
+ * ✅ HELPER: Convertir strings vacíos a NULL
+ * Mantiene la integridad de datos en la BD
+ */
+const sanitizeGuestData = (data) => {
+  const sanitized = {};
+
+  // Campos requeridos (nunca null)
+  sanitized.identificationNumber = data.identificationNumber;
+  sanitized.firstName = data.firstName;
+  sanitized.paternalLastName = data.paternalLastName;
+
+  // Campos opcionales (pueden ser null)
+  sanitized.maternalLastName =
+    data.maternalLastName && data.maternalLastName.trim() !== ""
+      ? data.maternalLastName
+      : null;
+
+  sanitized.email = data.email && data.email.trim() !== "" ? data.email : null;
+
+  sanitized.phoneNumber =
+    data.phoneNumber && data.phoneNumber.trim() !== ""
+      ? data.phoneNumber
+      : null;
+
+  sanitized.birthDate =
+    data.birthDate && data.birthDate.trim() !== "" ? data.birthDate : null;
+
+  sanitized.gender =
+    data.gender && data.gender.trim() !== "" ? data.gender : null;
+
+  sanitized.country =
+    data.country && data.country.trim() !== "" ? data.country : "Chile";
+
+  sanitized.region =
+    data.region && data.region.trim() !== "" ? data.region : null;
+
+  sanitized.city = data.city && data.city.trim() !== "" ? data.city : null;
+
+  // Campos booleanos/numéricos
+  sanitized.travelsWithChildren = data.travelsWithChildren || false;
+  sanitized.childrenUnderFour = data.childrenUnderFour || 0;
+
+  sanitized.specialRequests =
+    data.specialRequests && data.specialRequests.trim() !== ""
+      ? data.specialRequests
+      : null;
+
+  sanitized.observations =
+    data.observations && data.observations.trim() !== ""
+      ? data.observations
+      : null;
+
+  return sanitized;
+};
+
+/**
+ * ✅ HELPER: Calcular si el huésped está completamente registrado
+ */
+const calculateIsFullyRegistered = (cleanData, isMainGuest) => {
+  if (isMainGuest) {
+    // Huésped principal: TODOS los campos obligatorios
+    const requiredFields = [
+      "identificationNumber",
+      "firstName",
+      "paternalLastName",
+      "maternalLastName",
+      "email",
+      "phoneNumber",
+      "birthDate",
+      "gender",
+      "country",
+      "region",
+      "city",
+    ];
+
+    return requiredFields.every(
+      (field) => cleanData[field] && String(cleanData[field]).trim() !== ""
+    );
+  } else {
+    // Huésped adicional: SOLO 3 campos mínimos
+    const requiredFields = [
+      "identificationNumber",
+      "firstName",
+      "paternalLastName",
+    ];
+
+    return requiredFields.every(
+      (field) => cleanData[field] && String(cleanData[field]).trim() !== ""
+    );
+  }
+};
+
+/**
  * Buscar huésped por número de identificación
  */
 async function searchGuestByIdentification(identificationNumber) {
@@ -82,134 +175,57 @@ async function searchGuestByIdentification(identificationNumber) {
 }
 
 /**
- * Crear o actualizar huésped
+ * ✅ CREAR huésped nuevo
  */
-async function createOrUpdateGuest(
-  guestData,
-  isMainGuest = true,
-  isUpdate = false,
-  guestId = null
-) {
-  const {
-    identificationNumber,
-    firstName,
-    paternalLastName,
-    maternalLastName,
-    email,
-    phoneNumber,
-    birthDate,
-    gender,
-    country,
-    region,
-    city,
-    travelsWithChildren,
-    childrenUnderFour,
-    specialRequests,
-    observations,
-  } = guestData;
-
-  const { rut: rutBase, dv } = parseRut(identificationNumber);
+async function createGuest(guestData, isMainGuest = true) {
+  // Limpiar y formatear datos
+  const cleanData = sanitizeGuestData(guestData);
+  const { rut: rutBase, dv } = parseRut(cleanData.identificationNumber);
   const formattedIdNumber = `${rutBase}-${dv}`;
 
-  // ✅ CONVERTIR STRINGS VACÍOS A NULL
-  const cleanData = {
-    identificationNumber: formattedIdNumber,
-    firstName,
-    paternalLastName,
-    maternalLastName:
-      maternalLastName && maternalLastName.trim() !== ""
-        ? maternalLastName
-        : null,
-    email: email && email.trim() !== "" ? email : null,
-    phoneNumber: phoneNumber && phoneNumber.trim() !== "" ? phoneNumber : null,
-    birthDate: birthDate && birthDate.trim() !== "" ? birthDate : null,
-    gender: gender && gender.trim() !== "" ? gender : null,
-    country: country && country.trim() !== "" ? country : "Chile", // Default a Chile
-    region: region && region.trim() !== "" ? region : null,
-    city: city && city.trim() !== "" ? city : null,
-    travelsWithChildren,
-    childrenUnderFour,
-    specialRequests:
-      specialRequests && specialRequests.trim() !== "" ? specialRequests : null,
-    observations:
-      observations && observations.trim() !== "" ? observations : null,
-  };
+  // ✅ Verificar si ya existe
+  const existingGuest = await prisma.users.findFirst({
+    where: {
+      identification_number: formattedIdNumber,
+      deleted_at: null,
+    },
+    include: {
+      guest_details: true,
+    },
+  });
 
-  // ✅ CALCULAR is_fully_registered DINÁMICAMENTE
-  let isFullyRegistered;
-
-  if (isMainGuest) {
-    // Huésped principal: TODOS los campos obligatorios
-    const allRequiredFields = [
-      "identificationNumber",
-      "firstName",
-      "paternalLastName",
-      "maternalLastName",
-      "email",
-      "phoneNumber",
-      "birthDate",
-      "gender",
-      "country",
-      "region",
-      "city",
-    ];
-    isFullyRegistered = allRequiredFields.every(
-      (field) => cleanData[field] && cleanData[field].trim() !== ""
-    );
-  } else {
-    // Huésped adicional: SOLO 3 campos obligatorios
-    const minRequiredFields = [
-      "identificationNumber",
-      "firstName",
-      "paternalLastName",
-    ];
-    isFullyRegistered = minRequiredFields.every(
-      (field) => cleanData[field] && cleanData[field].trim() !== ""
-    );
+  if (existingGuest) {
+    // ✅ IMPORTANTE: Devolver 409 con los datos del huésped existente
+    const error = new Error("Ya existe un huésped con esta identificación");
+    error.statusCode = 409;
+    error.existingGuest = {
+      id: existingGuest.id,
+      identificationNumber: existingGuest.identification_number,
+      firstName: existingGuest.first_name,
+      paternalLastName: existingGuest.paternal_last_name,
+      maternalLastName: existingGuest.maternal_last_name,
+      email: existingGuest.email,
+      phoneNumber: existingGuest.phone_number,
+      birthDate: existingGuest.birth_date,
+      gender: existingGuest.gender,
+      country: existingGuest.country,
+      region: existingGuest.region,
+      city: existingGuest.city,
+      travelsWithChildren: existingGuest.guest_details?.travels_with_children,
+      childrenUnderFour: existingGuest.guest_details?.children_under_four || 0,
+      specialRequests: existingGuest.guest_details?.special_requests,
+      observations: existingGuest.guest_details?.observations,
+    };
+    throw error;
   }
 
-  if (isUpdate && guestId) {
-    // Actualizar huésped existente
-    const updatedGuest = await prisma.users.update({
-      where: { id: guestId },
-      data: {
-        first_name: cleanData.firstName,
-        paternal_last_name: cleanData.paternalLastName,
-        maternal_last_name: cleanData.maternalLastName,
-        email: cleanData.email,
-        phone_number: cleanData.phoneNumber,
-        birth_date: cleanData.birthDate ? new Date(cleanData.birthDate) : null,
-        gender: cleanData.gender,
-        country: cleanData.country,
-        region: cleanData.region,
-        city: cleanData.city,
-        is_fully_registered: isFullyRegistered,
-        guest_details: {
-          upsert: {
-            create: {
-              travels_with_children: cleanData.travelsWithChildren || false,
-              children_under_four: cleanData.childrenUnderFour || 0,
-              special_requests: cleanData.specialRequests,
-              observations: cleanData.observations,
-            },
-            update: {
-              travels_with_children: cleanData.travelsWithChildren || false,
-              children_under_four: cleanData.childrenUnderFour || 0,
-              special_requests: cleanData.specialRequests,
-              observations: cleanData.observations,
-            },
-          },
-        },
-      },
-    });
-
-    return updatedGuest;
-  }
+  // Calcular si está completamente registrado
+  const isFullyRegistered = calculateIsFullyRegistered(cleanData, isMainGuest);
 
   // Crear nuevo huésped
   const newGuest = await prisma.users.create({
     data: {
-      identification_number: cleanData.identificationNumber,
+      identification_number: formattedIdNumber,
       first_name: cleanData.firstName,
       paternal_last_name: cleanData.paternalLastName,
       maternal_last_name: cleanData.maternalLastName,
@@ -232,19 +248,109 @@ async function createOrUpdateGuest(
       },
       guest_details: {
         create: {
-          travels_with_children: cleanData.travelsWithChildren || false,
-          children_under_four: cleanData.childrenUnderFour || 0,
+          travels_with_children: cleanData.travelsWithChildren,
+          children_under_four: cleanData.childrenUnderFour,
           special_requests: cleanData.specialRequests,
           observations: cleanData.observations,
         },
       },
     },
+    include: {
+      guest_details: true,
+    },
   });
 
-  return newGuest;
+  return {
+    id: newGuest.id,
+    identificationNumber: newGuest.identification_number,
+    firstName: newGuest.first_name,
+    paternalLastName: newGuest.paternal_last_name,
+    maternalLastName: newGuest.maternal_last_name,
+    email: newGuest.email,
+    phoneNumber: newGuest.phone_number,
+    birthDate: newGuest.birth_date,
+    gender: newGuest.gender,
+    country: newGuest.country,
+    region: newGuest.region,
+    city: newGuest.city,
+    isFullyRegistered: newGuest.is_fully_registered,
+    travelsWithChildren: newGuest.guest_details?.travels_with_children,
+    childrenUnderFour: newGuest.guest_details?.children_under_four || 0,
+    specialRequests: newGuest.guest_details?.special_requests,
+    observations: newGuest.guest_details?.observations,
+  };
+}
+
+/**
+ * ✅ ACTUALIZAR huésped existente
+ */
+async function updateGuest(guestId, guestData, isMainGuest = true) {
+  // Limpiar datos
+  const cleanData = sanitizeGuestData(guestData);
+
+  // Calcular si está completamente registrado
+  const isFullyRegistered = calculateIsFullyRegistered(cleanData, isMainGuest);
+
+  // Actualizar huésped
+  const updatedGuest = await prisma.users.update({
+    where: { id: guestId },
+    data: {
+      first_name: cleanData.firstName,
+      paternal_last_name: cleanData.paternalLastName,
+      maternal_last_name: cleanData.maternalLastName,
+      email: cleanData.email,
+      phone_number: cleanData.phoneNumber,
+      birth_date: cleanData.birthDate ? new Date(cleanData.birthDate) : null,
+      gender: cleanData.gender,
+      country: cleanData.country,
+      region: cleanData.region,
+      city: cleanData.city,
+      is_fully_registered: isFullyRegistered,
+      guest_details: {
+        upsert: {
+          create: {
+            travels_with_children: cleanData.travelsWithChildren,
+            children_under_four: cleanData.childrenUnderFour,
+            special_requests: cleanData.specialRequests,
+            observations: cleanData.observations,
+          },
+          update: {
+            travels_with_children: cleanData.travelsWithChildren,
+            children_under_four: cleanData.childrenUnderFour,
+            special_requests: cleanData.specialRequests,
+            observations: cleanData.observations,
+          },
+        },
+      },
+    },
+    include: {
+      guest_details: true,
+    },
+  });
+
+  return {
+    id: updatedGuest.id,
+    identificationNumber: updatedGuest.identification_number,
+    firstName: updatedGuest.first_name,
+    paternalLastName: updatedGuest.paternal_last_name,
+    maternalLastName: updatedGuest.maternal_last_name,
+    email: updatedGuest.email,
+    phoneNumber: updatedGuest.phone_number,
+    birthDate: updatedGuest.birth_date,
+    gender: updatedGuest.gender,
+    country: updatedGuest.country,
+    region: updatedGuest.region,
+    city: updatedGuest.city,
+    isFullyRegistered: updatedGuest.is_fully_registered,
+    travelsWithChildren: updatedGuest.guest_details?.travels_with_children,
+    childrenUnderFour: updatedGuest.guest_details?.children_under_four || 0,
+    specialRequests: updatedGuest.guest_details?.special_requests,
+    observations: updatedGuest.guest_details?.observations,
+  };
 }
 
 module.exports = {
   searchGuestByIdentification,
-  createOrUpdateGuest,
+  createGuest,
+  updateGuest,
 };

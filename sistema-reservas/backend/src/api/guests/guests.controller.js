@@ -1,6 +1,7 @@
 const {
   searchGuestByIdentification,
-  createOrUpdateGuest,
+  createGuest: createGuestService,
+  updateGuest: updateGuestService,
 } = require("./guests.service");
 const { logError } = require("../../utils/errorLogger");
 
@@ -42,7 +43,7 @@ async function searchGuest(req, res) {
 }
 
 /**
- * Crear nuevo huésped
+ * ✅ Crear nuevo huésped
  */
 async function createGuest(req, res) {
   try {
@@ -87,34 +88,24 @@ async function createGuest(req, res) {
       }
     }
 
-    // Verificar si ya existe
-    const existing = await searchGuestByIdentification(
-      guestData.identificationNumber
-    );
-    if (existing.found) {
-      return res.status(409).json({
-        message: "Ya existe un huésped con esta identificación",
-        guest: existing.guest,
-      });
-    }
-
-    const newGuest = await createOrUpdateGuest(guestData, isMainGuest, false);
+    // ✅ Intentar crear el huésped
+    // El service ya maneja la verificación de duplicados y lanza error 409
+    const newGuest = await createGuestService(guestData, isMainGuest);
 
     return res.status(201).json({
       message: "Huésped creado exitosamente",
-      guest: {
-        id: newGuest.id,
-        identificationNumber: newGuest.identification_number,
-        firstName: newGuest.first_name,
-        paternalLastName: newGuest.paternal_last_name,
-        maternalLastName: newGuest.maternal_last_name,
-        email: newGuest.email,
-        phoneNumber: newGuest.phone_number,
-        isFullyRegistered: newGuest.is_fully_registered,
-      },
+      guest: newGuest,
     });
   } catch (error) {
     console.error("Error al crear huésped:", error);
+
+    // ✅ Si es error 409 (duplicado), devolver con los datos del existente
+    if (error.statusCode === 409) {
+      return res.status(409).json({
+        message: error.message,
+        guest: error.existingGuest,
+      });
+    }
 
     await logError({
       userId: req.user?.id,
@@ -133,7 +124,7 @@ async function createGuest(req, res) {
 }
 
 /**
- * Actualizar huésped existente
+ * ✅ Actualizar huésped existente
  */
 async function updateGuest(req, res) {
   try {
@@ -142,23 +133,16 @@ async function updateGuest(req, res) {
     const isMainGuest =
       req.body.isMainGuest !== undefined ? req.body.isMainGuest : true;
 
-    // CORREGIDO: Pasar todos los parámetros correctamente
-    const updatedGuest = await createOrUpdateGuest(
+    // ✅ Usar la nueva función updateGuest del service
+    const updatedGuest = await updateGuestService(
+      parseInt(id),
       guestData,
-      isMainGuest,
-      true,
-      parseInt(id)
+      isMainGuest
     );
 
     return res.status(200).json({
       message: "Huésped actualizado exitosamente",
-      guest: {
-        id: updatedGuest.id,
-        identificationNumber: updatedGuest.identification_number,
-        firstName: updatedGuest.first_name,
-        paternalLastName: updatedGuest.paternal_last_name,
-        isFullyRegistered: updatedGuest.is_fully_registered,
-      },
+      guest: updatedGuest,
     });
   } catch (error) {
     console.error("Error al actualizar huésped:", error);

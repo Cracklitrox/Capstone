@@ -32,7 +32,7 @@ CREATE TYPE "public"."payment_method_enum" AS ENUM ('bank_transfer', 'cash', 'cr
 CREATE TYPE "public"."payment_status_enum" AS ENUM ('pending', 'confirmed', 'rejected', 'refunded');
 
 -- CreateEnum
-CREATE TYPE "public"."reservation_channel_enum" AS ENUM ('chatbot', 'reception', 'walk_in', 'web');
+CREATE TYPE "public"."reservation_channel_enum" AS ENUM ('chatbot', 'reception', 'in_person', 'walk_in', 'web');
 
 -- CreateEnum
 CREATE TYPE "public"."reservation_status_enum" AS ENUM ('pending', 'confirmed', 'in_progress', 'canceled', 'completed', 'no_show');
