@@ -50,7 +50,7 @@ async function createGuest(req, res) {
     const isMainGuest =
       req.body.isMainGuest !== undefined ? req.body.isMainGuest : true;
 
-    // Validaciones básicas
+    // Validaciones mínimas (siempre obligatorias)
     if (
       !guestData.identificationNumber ||
       !guestData.firstName ||
@@ -62,7 +62,7 @@ async function createGuest(req, res) {
       });
     }
 
-    // Validar email solo si es huésped principal
+    // Validar email SOLO si es huésped principal Y si tiene email
     if (isMainGuest) {
       if (!guestData.email) {
         return res.status(400).json({
@@ -74,6 +74,16 @@ async function createGuest(req, res) {
         return res.status(400).json({
           message: "Email inválido",
         });
+      }
+    } else {
+      // Huésped adicional: validar email SOLO si lo proporcionó
+      if (guestData.email && guestData.email.trim() !== "") {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(guestData.email)) {
+          return res.status(400).json({
+            message: "Email inválido",
+          });
+        }
       }
     }
 
@@ -88,7 +98,6 @@ async function createGuest(req, res) {
       });
     }
 
-    // CORREGIDO: Pasar isMainGuest correctamente
     const newGuest = await createOrUpdateGuest(guestData, isMainGuest, false);
 
     return res.status(201).json({

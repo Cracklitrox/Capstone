@@ -1,7 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-
 /**
  * Limpiar RUT (eliminar puntos, espacios y guiones)
  */
@@ -16,10 +15,7 @@ const cleanRut = (rutString) => {
 const parseRut = (rutString) => {
   if (!rutString) return { rut: "", dv: "" };
 
-  // Usa cleanRut (local) para eliminar todos los caracteres de formato
   const cleanedAll = cleanRut(rutString);
-  
-  // Separa el número base del DV
   const rutBase = cleanedAll.slice(0, -1);
   const dv = cleanedAll.slice(-1);
 
@@ -29,18 +25,15 @@ const parseRut = (rutString) => {
   };
 };
 
-
 /**
  * Buscar huésped por número de identificación
  */
 async function searchGuestByIdentification(identificationNumber) {
-  // 2. Limpiar el RUT de puntos y obtener el formato limpio XXXXXXXX-X
   const { rut: rutBase, dv } = parseRut(identificationNumber);
   const cleanIdNumber = `${rutBase}-${dv}`;
 
   const guest = await prisma.users.findFirst({
     where: {
-      // Usar el valor limpio
       identification_number: cleanIdNumber,
       deleted_at: null,
       user_roles: {
@@ -115,23 +108,25 @@ async function createOrUpdateGuest(
     observations,
   } = guestData;
 
-  // 3. Limpiar y formatear el RUT para el almacenamiento en la BD (XXXXXXXX-X)
   const { rut: rutBase, dv } = parseRut(identificationNumber);
   const formattedIdNumber = `${rutBase}-${dv}`;
 
+  // ✅ CONVERTIR STRINGS VACÍOS A NULL
   const cleanData = {
-    // Usar el RUT limpio y formateado
     identificationNumber: formattedIdNumber,
     firstName,
     paternalLastName,
-    maternalLastName,
+    maternalLastName:
+      maternalLastName && maternalLastName.trim() !== ""
+        ? maternalLastName
+        : null,
     email: email && email.trim() !== "" ? email : null,
-    phoneNumber,
+    phoneNumber: phoneNumber && phoneNumber.trim() !== "" ? phoneNumber : null,
     birthDate: birthDate && birthDate.trim() !== "" ? birthDate : null,
     gender: gender && gender.trim() !== "" ? gender : null,
-    country,
-    region,
-    city,
+    country: country && country.trim() !== "" ? country : "Chile", // Default a Chile
+    region: region && region.trim() !== "" ? region : null,
+    city: city && city.trim() !== "" ? city : null,
     travelsWithChildren,
     childrenUnderFour,
     specialRequests:
@@ -140,29 +135,44 @@ async function createOrUpdateGuest(
       observations && observations.trim() !== "" ? observations : null,
   };
 
-  // Calcular is_fully_registered dinámicamente
-  const allRequiredFields = [
-    "identificationNumber",
-    "firstName",
-    "paternalLastName",
-    "maternalLastName",
-    "phoneNumber",
-    "birthDate",
-    "gender",
-    "country",
-    "region",
-    "city",
-  ];
-  const isFullyRegistered = allRequiredFields.every(
-    (field) => cleanData[field] && cleanData[field].trim() !== ""
-  );
+  // ✅ CALCULAR is_fully_registered DINÁMICAMENTE
+  let isFullyRegistered;
+
+  if (isMainGuest) {
+    // Huésped principal: TODOS los campos obligatorios
+    const allRequiredFields = [
+      "identificationNumber",
+      "firstName",
+      "paternalLastName",
+      "maternalLastName",
+      "email",
+      "phoneNumber",
+      "birthDate",
+      "gender",
+      "country",
+      "region",
+      "city",
+    ];
+    isFullyRegistered = allRequiredFields.every(
+      (field) => cleanData[field] && cleanData[field].trim() !== ""
+    );
+  } else {
+    // Huésped adicional: SOLO 3 campos obligatorios
+    const minRequiredFields = [
+      "identificationNumber",
+      "firstName",
+      "paternalLastName",
+    ];
+    isFullyRegistered = minRequiredFields.every(
+      (field) => cleanData[field] && cleanData[field].trim() !== ""
+    );
+  }
 
   if (isUpdate && guestId) {
     // Actualizar huésped existente
     const updatedGuest = await prisma.users.update({
       where: { id: guestId },
       data: {
-        // ... (el identification_number no se actualiza aquí)
         first_name: cleanData.firstName,
         paternal_last_name: cleanData.paternalLastName,
         maternal_last_name: cleanData.maternalLastName,
@@ -199,7 +209,6 @@ async function createOrUpdateGuest(
   // Crear nuevo huésped
   const newGuest = await prisma.users.create({
     data: {
-      // Usar el RUT limpio y formateado
       identification_number: cleanData.identificationNumber,
       first_name: cleanData.firstName,
       paternal_last_name: cleanData.paternalLastName,
@@ -208,7 +217,7 @@ async function createOrUpdateGuest(
       phone_number: cleanData.phoneNumber,
       birth_date: cleanData.birthDate ? new Date(cleanData.birthDate) : null,
       gender: cleanData.gender,
-      country: cleanData.country || "Chile",
+      country: cleanData.country,
       region: cleanData.region,
       city: cleanData.city,
       password_hash: "GUEST_NO_PASSWORD",

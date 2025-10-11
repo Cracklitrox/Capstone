@@ -2,6 +2,7 @@ const prisma = require("../../db/prisma.client");
 
 /**
  * Obtiene un historial paginado y filtrado de reservas completadas.
+ * MEJORADO: Ahora incluye más información para mostrar en cards modernas
  */
 const getHistory = async (filters, pagination) => {
   const {
@@ -20,7 +21,7 @@ const getHistory = async (filters, pagination) => {
     AND: [],
   };
 
-  // ✅ Filtro por RUT/Pasaporte
+  // Filtro por RUT/Pasaporte
   if (identification_number) {
     where.AND.push({
       users_reservations_main_guest_idTousers: {
@@ -32,20 +33,14 @@ const getHistory = async (filters, pagination) => {
     });
   }
 
-  // ✅ FIX: Manejar filtros de habitaciones de forma optimizada
-  // Combinar roomId y floor en un solo objeto cuando ambos están presentes
+  // Filtros de habitaciones
   const roomFilters = {};
-
   if (roomId) {
-    // ✅ FIX: room_number es STRING, no usar parseInt
     roomFilters.room_number = String(roomId);
   }
-
   if (floor) {
     roomFilters.floor = parseInt(floor, 10);
   }
-
-  // Si hay filtros de habitación, agregarlos como un solo "some"
   if (Object.keys(roomFilters).length > 0) {
     where.AND.push({
       reservation_rooms: {
@@ -56,24 +51,24 @@ const getHistory = async (filters, pagination) => {
     });
   }
 
-  // ✅ Filtro por fecha de Check-in
+  // Filtro por fecha de Check-in
   if (startDate) {
     where.AND.push({ check_in_date: { gte: new Date(startDate) } });
   }
 
-  // ✅ Filtro por fecha de Check-out
+  // Filtro por fecha de Check-out
   if (endDate) {
     const nextDay = new Date(endDate);
     nextDay.setDate(nextDay.getDate() + 1);
     where.AND.push({ check_out_date: { lte: nextDay } });
   }
 
-  // ✅ Filtro por precio mínimo
+  // Filtro por precio mínimo
   if (minPrice) {
     where.AND.push({ total_amount: { gte: parseInt(minPrice, 10) } });
   }
 
-  // ✅ Filtro por precio máximo
+  // Filtro por precio máximo
   if (maxPrice) {
     where.AND.push({ total_amount: { lte: parseInt(maxPrice, 10) } });
   }
@@ -95,7 +90,11 @@ const getHistory = async (filters, pagination) => {
       },
       select: {
         id: true,
+        code: true,
+        channel: true,
+        status: true,
         guest_count: true,
+        total_amount: true,
         check_in_date: true,
         check_out_date: true,
         users_reservations_main_guest_idTousers: {
@@ -107,8 +106,32 @@ const getHistory = async (filters, pagination) => {
           },
         },
         reservation_rooms: {
-          select: { rooms: { select: { room_number: true } } },
-          take: 1,
+          select: {
+            rooms: {
+              select: {
+                room_number: true,
+                room_types: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
+        },
+        reservation_services: {
+          select: {
+            quantity: true,
+            services: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        payments: {
+          select: {
+            amount: true,
+            status: true,
+          },
         },
       },
     }),
@@ -116,19 +139,48 @@ const getHistory = async (filters, pagination) => {
   ]);
 
   return {
-    data: reservations.map((r) => ({
-      reservation_id: r.id,
-      identification_number:
-        r.users_reservations_main_guest_idTousers.identification_number,
-      nombre_cliente: `${r.users_reservations_main_guest_idTousers.first_name} ${r.users_reservations_main_guest_idTousers.paternal_last_name}`,
-      grupo_asignado: r.guest_count,
-      habitacion_reservada: r.reservation_rooms[0]?.rooms?.room_number || "N/A",
-      observacion:
-        r.users_reservations_main_guest_idTousers.guest_details?.observations ||
-        "Sin observaciones",
-      check_in_date: r.check_in_date,
-      check_out_date: r.check_out_date,
-    })),
+    data: reservations.map((r) => {
+      // Calcular monto pagado (solo pagos confirmados)
+      const paid_amount = r.payments
+        .filter((p) => p.status === "confirmed")
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      // Calcular duración en noches
+      const checkIn = new Date(r.check_in_date);
+      const checkOut = new Date(r.check_out_date);
+      const diffTime = Math.abs(checkOut - checkIn);
+      const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Servicios simplificados (máximo 3 para mostrar)
+      const services = r.reservation_services.slice(0, 3).map((rs) => ({
+        name: rs.services.name,
+        quantity: rs.quantity,
+      }));
+
+      return {
+        reservation_id: r.id,
+        code: r.code,
+        channel: r.channel,
+        status: r.status,
+        identification_number:
+          r.users_reservations_main_guest_idTousers.identification_number,
+        nombre_cliente: `${r.users_reservations_main_guest_idTousers.first_name} ${r.users_reservations_main_guest_idTousers.paternal_last_name}`,
+        guest_count: r.guest_count,
+        habitacion_reservada:
+          r.reservation_rooms[0]?.rooms?.room_number || "N/A",
+        room_type: r.reservation_rooms[0]?.rooms?.room_types?.name || "N/A",
+        observacion:
+          r.users_reservations_main_guest_idTousers.guest_details
+            ?.observations || "Sin observaciones",
+        check_in_date: r.check_in_date,
+        check_out_date: r.check_out_date,
+        total_amount: r.total_amount,
+        paid_amount,
+        nights,
+        services,
+        total_services: r.reservation_services.length,
+      };
+    }),
     meta: {
       total,
       page,
@@ -154,6 +206,7 @@ const getHistoryDetailById = async (id) => {
           paternal_last_name: true,
           email: true,
           phone_number: true,
+          identification_number: true,
           guest_details: true,
         },
       },
@@ -194,10 +247,10 @@ const getHistoryDetailById = async (id) => {
   const diffTime = Math.abs(checkOut - checkIn);
   const days_stayed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  const paid_amount = reservation.payments.reduce(
-    (sum, p) => sum + (p.amount || 0),
-    0
-  );
+  const paid_amount = reservation.payments
+    .filter((p) => p.status === "confirmed")
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+
   const price_per_night =
     reservation.total_amount && days_stayed > 0
       ? reservation.total_amount / days_stayed

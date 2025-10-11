@@ -28,12 +28,13 @@ import {
 import { Input } from "@/components/ui/Input.jsx";
 import { Label } from "@/components/ui/Label.jsx";
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import RoomHistory from "./RoomHistory.jsx";
+import RoomDetailsTabsModal from "./RoomDetailsTabsModal.jsx";
 import {
   MaintenanceDetailView,
   CleaningDetailView,
   ReservationDetailView,
 } from "./HistoryDetailViews.jsx";
+import { cn } from "@/lib/utils";
 
 const StatusSummary = ({ rooms }) => {
   const statusCounts = useMemo(
@@ -330,7 +331,7 @@ function RoomBoard() {
       );
     if (roomDetails) {
       return (
-        <RoomHistory
+        <RoomDetailsTabsModal
           roomDetails={roomDetails}
           onShowDetail={handleShowHistoryDetail}
         />
@@ -453,7 +454,6 @@ function RoomBoard() {
               key={room.id}
               room={room}
               onDetails={openDetails}
-              onStatusChange={handleStatusChange}
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
             />
@@ -496,7 +496,16 @@ function RoomBoard() {
         open={!!selectedRoom}
         onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent 
+          className={cn(
+            "sm:max-w-lg",
+            selectedRoom?.status === "available" && "border-l-4 border-l-green-500",
+            selectedRoom?.status === "occupied" && "border-l-4 border-l-red-500",
+            selectedRoom?.status === "cleaning" && "border-l-4 border-l-blue-500",
+            selectedRoom?.status === "maintenance" && "border-l-4 border-l-slate-500",
+            selectedRoom?.status === "pending" && "border-l-4 border-l-orange-500"
+          )}
+        >
           <DialogHeader>
             <DialogTitle>
               {historyDetail

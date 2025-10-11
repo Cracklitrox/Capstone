@@ -1,119 +1,231 @@
 import React, { useState } from "react";
 import { useAuth } from "@/services/authContext.jsx";
 import { createAdminRoomType } from "@/services/adminRooms";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/Dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/Dialog";
+import { PlusIcon } from "@heroicons/react/24/outline";
 
+const initialState = {
+  name: "",
+  base_capacity: "",
+  description: "",
+};
 
 const CreateRoomType = ({ onCreated, roomTypes = [] }) => {
+  const { token } = useAuth();
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [baseCapacity, setBaseCapacity] = useState("");
-  const [description, setDescription] = useState("");
+  const [form, setForm] = useState(initialState);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const { token } = useAuth();
-  const handleCreate = async () => {
-    if (!name.trim()) {
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    let val = value;
+
+    // Validaciones en tiempo real
+    if (name === "name") {
+      if (val.length > 30) return;
+    }
+    if (name === "base_capacity") {
+      val = val.replace(/\D/g, "");
+      if (val !== "" && (Number(val) < 0 || Number(val) > 10)) return;
+    }
+    if (name === "description") {
+      if (val.length > 150) return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: val,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    // Validaciones finales
+    if (!form.name.trim()) {
       setError("El nombre es obligatorio.");
+      setLoading(false);
       return;
     }
-    if (!baseCapacity || isNaN(baseCapacity) || Number(baseCapacity) < 1 || Number(baseCapacity) > 10) {
-      setError("La capacidad base debe ser mayor a 1 y menor que 10.");
+
+    if (
+      form.base_capacity === "" ||
+      isNaN(form.base_capacity) ||
+      Number(form.base_capacity) < 1 ||
+      Number(form.base_capacity) > 10
+    ) {
+      setError("La capacidad base debe ser entre 1 y 10.");
+      setLoading(false);
       return;
     }
+
     // Validación de nombre duplicado (case-insensitive)
-    // Mejor validación: elimina tildes y caracteres especiales
-    const normalizeName = str => str.trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, '_');
-    if (roomTypes.some(rt => normalizeName(rt.name) === normalizeName(name))) {
+    const normalizeName = (str) =>
+      str
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .replace(/\s+/g, "_");
+
+    if (
+      roomTypes.some(
+        (rt) => normalizeName(rt.name) === normalizeName(form.name)
+      )
+    ) {
       setError("Ya existe un tipo de habitación con ese nombre.");
+      setLoading(false);
       return;
     }
+
+    if (form.description.length > 150) {
+      setError("La descripción no puede superar los 150 caracteres.");
+      setLoading(false);
+      return;
+    }
+
     try {
-  await createAdminRoomType({ name, base_capacity: Number(baseCapacity), description }, token);
+      await createAdminRoomType(
+        {
+          name: form.name,
+          base_capacity: Number(form.base_capacity),
+          description: form.description,
+        },
+        token
+      );
+      setForm(initialState);
       setOpen(false);
-  setName("");
-  setBaseCapacity("");
-  setDescription("");
-      setError(null);
       if (onCreated) onCreated();
     } catch (err) {
-      // Mostrar el mensaje exacto del backend y loguear la respuesta
       if (err?.response) {
         console.error("Backend error:", err.response);
-        setError(err.response.data?.message || JSON.stringify(err.response.data) || err.message);
+        setError(
+          err.response.data?.message ||
+            JSON.stringify(err.response.data) ||
+            err.message
+        );
       } else {
         setError(err.message || "Error al crear tipo de habitación");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg shadow-md hover:bg-primary/80 transition">Crear tipo</Button>
+      <Button onClick={() => setOpen(true)} className="gap-2">
+        <PlusIcon className="h-5 w-5" />
+        Crear Tipo
+      </Button>
+
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-gradient-to-br from-card via-card/80 to-card/60 text-card-foreground border border-input rounded-3xl shadow-2xl p-4 md:p-8 max-w-lg w-full">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle className="text-center text-2xl md:text-3xl font-extrabold mb-2 text-[var(--primary)]">Crear tipo de habitación</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">
+              Crear Tipo de Habitación
+            </DialogTitle>
+            <DialogDescription>
+              Define las características base de un nuevo tipo de habitación.
+            </DialogDescription>
           </DialogHeader>
-          <form className="grid gap-6 mt-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="nombre" className="font-semibold text-[var(--secondary)]">Nombre del tipo</label>
-                <input
-                  id="nombre"
+
+          <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+            {/* Primera fila: Nombre y Capacidad */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre del Tipo *</Label>
+                <Input
+                  id="name"
+                  name="name"
                   type="text"
-                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                   placeholder="Ej: Suite, Doble, Familiar..."
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  maxLength={30}
-                  autoComplete="off"
+                  value={form.name}
+                  onChange={handleChange}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  Máximo 30 caracteres
+                </p>
               </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="capacidad" className="font-semibold text-[var(--secondary)]">Capacidad base</label>
-                <input
-                  id="capacidad"
-                  type="number"
-                  min={2}
-                  max={9}
-                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
+
+              <div className="space-y-2">
+                <Label htmlFor="base_capacity">Capacidad Base *</Label>
+                <Input
+                  id="base_capacity"
+                  name="base_capacity"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="Ej: 2"
-                  value={baseCapacity}
-                  onChange={e => {
-                    const val = e.target.value.replace(/\D/g, "");
-                    if (val === "") {
-                      setBaseCapacity("");
-                      return;
-                    }
-                    const num = Number(val);
-                    if (num > 0 && num < 11) {
-                      setBaseCapacity(val);
-                    }
-                  }}
+                  value={form.base_capacity}
+                  onChange={handleChange}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  Entre 1 y 10 personas
+                </p>
               </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="descripcion" className="font-semibold text-[var(--secondary)]">Descripción (opcional)</label>
+
+            {/* Descripción */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción (Opcional)</Label>
               <textarea
-                id="descripcion"
-                className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition resize-none"
-                placeholder="Máximo 150 caracteres"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
+                id="description"
+                name="description"
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                placeholder="Describe las características de este tipo de habitación..."
+                value={form.description}
+                onChange={handleChange}
                 maxLength={150}
                 rows={3}
               />
-              <span className="text-xs text-muted-foreground self-end">{description.length}/150</span>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">
+                  Máximo 150 caracteres
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {form.description.length}/150
+                </p>
+              </div>
             </div>
-            {error && <p className="text-destructive text-sm text-center mt-2">{error}</p>}
-            <DialogFooter className="flex flex-row gap-2 justify-center mt-4">
-              <Button type="button" onClick={handleCreate} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg shadow hover:bg-primary/80 transition">Crear</Button>
-              <Button type="button" onClick={() => setOpen(false)} variant="secondary" className="bg-secondary text-primary font-semibold px-4 py-2 rounded-lg shadow">Cancelar</Button>
+
+            {/* Mensaje de error */}
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive text-center">{error}</p>
+              </div>
+            )}
+
+            {/* Footer con botones */}
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setForm(initialState);
+                  setOpen(false);
+                }}
+                disabled={loading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Creando..." : "Crear Tipo"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
