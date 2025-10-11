@@ -6,6 +6,7 @@ import {
   markNotificationAsRead,
   markNotificationAsArchived,
   unarchiveNotification,
+  deleteNotification,
   getUnreadCount,
   markAllAsRead,
   createNotification,
@@ -68,17 +69,48 @@ export function NotificationsProvider({ children, token }) {
     if (!socketService.isConnected()) {
       socketService.connect(token);
     }
-    setConnected(socketService.isConnected());
+    
+    // Actualizar estado de conexión cada vez que cambie
+    const updateConnectionStatus = () => {
+      const isConnected = socketService.isConnected();
+      console.log('🔌 Estado de conexión actualizado:', isConnected);
+      setConnected(isConnected);
+    };
 
-    // Cargar datos iniciales
-    loadNotifications({ archived: false });
+    // Escuchar eventos de conexión/desconexión
+    socketService.onConnect(() => {
+      console.log('✅ Socket conectado');
+      updateConnectionStatus();
+    });
+
+    socketService.onDisconnect((reason) => {
+      console.log('❌ Socket desconectado:', reason);
+      updateConnectionStatus();
+    });
+
+    // Establecer estado inicial
+    updateConnectionStatus();
+
+    // Cargar TODAS las notificaciones (archivadas y no archivadas)
+    // El filtrado se hará en el componente NotificationPanel
+    loadNotifications(); // Sin filtros para obtener todas
     loadUnreadCount();
 
     // Listener para nuevas notificaciones
     const handleNewNotification = (notification) => {
       console.log('📩 Nueva notificación recibida:', notification);
       
-      setNotifications((prev) => [notification, ...prev]);
+      // Verificar si la notificación ya existe para evitar duplicados
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n.id === notification.id);
+        if (exists) {
+          console.log('⚠️ Notificación duplicada detectada, ignorando...');
+          return prev;
+        }
+        // Agregar isArchived por defecto si no viene en la notificación
+        return [{ ...notification, isArchived: notification.isArchived || false }, ...prev];
+      });
+      
       setUnreadCount((prev) => prev + 1);
       
       // Mostrar notificación del navegador si está permitido
@@ -155,7 +187,21 @@ export function NotificationsProvider({ children, token }) {
       try {
         await markNotificationAsArchived(token, notificationId);
         
-        setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+        // Actualizar la notificación con isArchived: true en lugar de eliminarla
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notificationId
+              ? { 
+                  ...n, 
+                  isArchived: true,
+                  read_status: { 
+                    ...n.read_status, 
+                    archived_at: new Date().toISOString() 
+                  }
+                }
+              : n
+          )
+        );
         
         // Si no estaba leída, decrementar el contador
         const notification = notifications.find((n) => n.id === notificationId);
@@ -181,15 +227,54 @@ export function NotificationsProvider({ children, token }) {
       try {
         await unarchiveNotification(token, notificationId);
         
-        // Recargar notificaciones
-        await loadNotifications({ archived: false });
+        // Actualizar la notificación con isArchived: false
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notificationId
+              ? { 
+                  ...n, 
+                  isArchived: false,
+                  read_status: { 
+                    ...n.read_status, 
+                    archived_at: null 
+                  }
+                }
+              : n
+          )
+        );
+        
+        // Actualizar conteo de no leídas
         await loadUnreadCount();
       } catch (err) {
         console.error('Error al desarchivar:', err);
         throw err;
       }
     },
-    [token, loadNotifications, loadUnreadCount]
+    [token, loadUnreadCount]
+  );
+
+  // Eliminar notificación
+  const deleteNotif = useCallback(
+    async (notificationId) => {
+      if (!token) return;
+
+      try {
+        await deleteNotification(token, notificationId);
+        
+        // Eliminar la notificación del estado local
+        setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+        
+        // Si no estaba leída, decrementar el contador
+        const notification = notifications.find((n) => n.id === notificationId);
+        if (notification && !notification.read_status?.read_at) {
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        }
+      } catch (err) {
+        console.error('Error al eliminar notificación:', err);
+        throw err;
+      }
+    },
+    [token, notifications]
   );
 
   // Marcar todas como leídas
@@ -262,6 +347,7 @@ export function NotificationsProvider({ children, token }) {
     markAsRead,
     markAsArchived,
     unarchive,
+    deleteNotification: deleteNotif,
     markAllRead: handleMarkAllRead,
     refreshNotifications,
   };

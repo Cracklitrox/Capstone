@@ -68,6 +68,19 @@ router.put(
 );
 
 /**
+ * @route GET /api/v1/notifications/users-by-role/:roleId
+ * @desc Obtiene usuarios activos por rol (excluyendo al usuario actual)
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  "/users-by-role/:roleId",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.getUsersByRole
+);
+
+/**
  * @route PUT /api/v1/notifications/:id/read
  * @desc Marca una notificación como leída
  * @access Administrador y Recepcionista
@@ -104,6 +117,19 @@ router.put(
   authenticate,
   authorize(["administrator", "receptionist"]),
   realtimeController.unarchiveNotification
+);
+
+/**
+ * @route DELETE /api/v1/notifications/:id
+ * @desc Elimina una notificación
+ * @access Administrador y Recepcionista
+ */
+router.delete(
+  "/:id",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.deleteNotification
 );
 
 // ==================== RUTAS DE ALERTAS DE CHECK-OUT ====================

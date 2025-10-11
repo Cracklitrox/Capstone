@@ -7,12 +7,13 @@ const prisma = new PrismaClient();
  * Crea una notificación y la envía en tiempo real
  */
 async function createNotification(data) {
-  const { senderId, targetRoleId, targetUserId, title, message, notificationType } = data;
+  const { senderId, targetRoleId, targetUserId, title, message, notificationType, category } = data;
 
   // Preparar los datos de la notificación
   const notificationData = {
     title,
     message: message || null,
+    category: category || 'general', // Categoría por defecto
     users: {
       connect: { id: senderId }
     },
@@ -60,6 +61,7 @@ async function createNotification(data) {
       id: notification.id,
       title: notification.title,
       message: notification.message,
+      category: notification.category || 'general',
       sender: {
         id: notification.users.id,
         name: `${notification.users.first_name} ${notification.users.paternal_last_name}`,
@@ -79,6 +81,10 @@ async function createNotification(data) {
           some: {
             role_id: targetRoleId,
           },
+        },
+        // Excluir al remitente para que no se envíe notificación a sí mismo
+        NOT: {
+          id: senderId,
         },
       },
       select: {
@@ -105,6 +111,7 @@ async function createNotification(data) {
       id: notification.id,
       title: notification.title,
       message: notification.message,
+      category: notification.category || 'general',
       sender: {
         id: notification.users.id,
         name: `${notification.users.first_name} ${notification.users.paternal_last_name}`,
@@ -177,6 +184,7 @@ async function getUserNotifications(userId, filters = {}) {
     id: readStatus.notifications.id,
     title: readStatus.notifications.title,
     message: readStatus.notifications.message,
+    category: readStatus.notifications.category || 'general',
     sender: {
       id: readStatus.notifications.users.id,
       name: `${readStatus.notifications.users.first_name} ${readStatus.notifications.users.paternal_last_name}${
@@ -259,6 +267,24 @@ async function unarchiveNotification(notificationId, userId) {
 }
 
 /**
+ * Elimina una notificación para un usuario específico
+ */
+async function deleteNotification(notificationId, userId) {
+  const readStatus = await prisma.notification_read_status.deleteMany({
+    where: {
+      notification_id: notificationId,
+      user_id: userId,
+    },
+  });
+
+  if (readStatus.count === 0) {
+    throw new Error('Notificación no encontrada para este usuario');
+  }
+
+  return { success: true, message: 'Notificación eliminada' };
+}
+
+/**
  * Obtiene el conteo de notificaciones no leídas de un usuario
  */
 async function getUnreadCount(userId) {
@@ -296,6 +322,42 @@ async function markAllAsRead(userId) {
 }
 
 /**
+ * Obtiene usuarios por rol (excluyendo al usuario actual)
+ */
+async function getUsersByRole(roleId, currentUserId) {
+  const users = await prisma.users.findMany({
+    where: {
+      status: 'active',
+      user_roles: {
+        some: {
+          role_id: roleId,
+        },
+      },
+      NOT: {
+        id: currentUserId,
+      },
+    },
+    select: {
+      id: true,
+      first_name: true,
+      paternal_last_name: true,
+      maternal_last_name: true,
+      email: true,
+    },
+    orderBy: {
+      first_name: 'asc',
+    },
+  });
+
+  return users.map(user => ({
+    id: user.id,
+    name: `${user.first_name} ${user.paternal_last_name}`,
+    fullName: `${user.first_name} ${user.paternal_last_name} ${user.maternal_last_name}`,
+    email: user.email,
+  }));
+}
+
+/**
  * Elimina (archiva permanentemente) notificaciones antiguas
  */
 async function deleteOldNotifications(daysOld = 90) {
@@ -322,7 +384,9 @@ module.exports = {
   markAsRead,
   markAsArchived,
   unarchiveNotification,
+  deleteNotification,
   getUnreadCount,
   markAllAsRead,
+  getUsersByRole,
   deleteOldNotifications,
 };

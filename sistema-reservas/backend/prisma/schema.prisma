@@ -97,15 +97,16 @@ model notification_read_status {
 }
 
 model notifications {
-  id                       Int                        @id @default(autoincrement())
+  id                       Int                          @id @default(autoincrement())
   sender_id                Int
   target_role_id           Int?
-  title                    String                     @db.VarChar(120)
+  title                    String                       @db.VarChar(120)
   message                  String?
-  sent_at                  DateTime?                  @default(now()) @db.Timestamp(6)
+  category                 notification_category_enum?  @default(general)
+  sent_at                  DateTime?                    @default(now()) @db.Timestamp(6)
   notification_read_status notification_read_status[]
-  users                    users                      @relation(fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  roles                    roles?                     @relation(fields: [target_role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                    users                        @relation(fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles                    roles?                       @relation(fields: [target_role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model payments {
@@ -488,6 +489,16 @@ enum notification_status_enum {
   read
   unread
   archived
+}
+
+enum notification_category_enum {
+  general
+  operational
+  administrative
+  alert
+  maintenance
+  reservation
+  payment
 }
 
 enum payment_method_enum {

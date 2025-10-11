@@ -133,6 +133,29 @@ export async function unarchiveNotification(token, notificationId) {
 }
 
 /**
+ * Elimina una notificación
+ * @param {string} token - JWT token de autenticación
+ * @param {number} notificationId - ID de la notificación
+ * @returns {Promise<Object>} Resultado de la operación
+ */
+export async function deleteNotification(token, notificationId) {
+  const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al eliminar la notificación');
+  }
+
+  return response.json();
+}
+
+/**
  * Obtiene el conteo de notificaciones no leídas
  * @param {string} token - JWT token de autenticación
  * @returns {Promise<Object>} Conteo de notificaciones no leídas
@@ -171,6 +194,29 @@ export async function markAllAsRead(token) {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || 'Error al marcar todas como leídas');
+  }
+
+  return response.json();
+}
+
+/**
+ * Obtiene usuarios activos por rol (excluyendo al usuario actual)
+ * @param {string} token - JWT token de autenticación
+ * @param {number} roleId - ID del rol
+ * @returns {Promise<Object>} Lista de usuarios
+ */
+export async function getUsersByRole(token, roleId) {
+  const response = await fetch(`${API_BASE_URL}/notifications/users-by-role/${roleId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al obtener usuarios');
   }
 
   return response.json();

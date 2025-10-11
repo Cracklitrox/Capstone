@@ -137,6 +137,27 @@ async function unarchiveNotification(req, res, next) {
 }
 
 /**
+ * Controlador para eliminar una notificación
+ * @route DELETE /api/v1/notifications/:id
+ */
+async function deleteNotification(req, res, next) {
+  try {
+    const notificationId = parseInt(req.params.id);
+    const userId = req.user.id;
+
+    const result = await notificationService.deleteNotification(notificationId, userId);
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error('Error al eliminar notificación:', error);
+    next(error);
+  }
+}
+
+/**
  * Controlador para obtener el conteo de notificaciones no leídas
  * @route GET /api/v1/notifications/unread-count
  */
@@ -174,12 +195,36 @@ async function markAllAsRead(req, res, next) {
   }
 }
 
+/**
+ * Controlador para obtener usuarios por rol
+ * @route GET /api/v1/notifications/users-by-role/:roleId
+ */
+async function getUsersByRole(req, res, next) {
+  try {
+    const roleId = parseInt(req.params.roleId);
+    const currentUserId = req.user.id;
+
+    const users = await notificationService.getUsersByRole(roleId, currentUserId);
+
+    res.json({
+      success: true,
+      count: users.length,
+      data: users,
+    });
+  } catch (error) {
+    console.error('Error al obtener usuarios por rol:', error);
+    next(error);
+  }
+}
+
 module.exports = {
   createNotification,
   getUserNotifications,
   markAsRead,
   markAsArchived,
   unarchiveNotification,
+  deleteNotification,
   getUnreadCount,
   markAllAsRead,
+  getUsersByRole,
 };

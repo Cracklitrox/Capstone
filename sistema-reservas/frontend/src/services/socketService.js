@@ -75,6 +75,21 @@ class SocketService {
     this.listeners.set('user:status', callback);
   }
 
+  // Escuchar cambios en el estado de conexión
+  onConnect(callback) {
+    if (!this.socket) return;
+    
+    this.socket.on('connect', callback);
+    this.listeners.set('socket:connect', callback);
+  }
+
+  onDisconnect(callback) {
+    if (!this.socket) return;
+    
+    this.socket.on('disconnect', callback);
+    this.listeners.set('socket:disconnect', callback);
+  }
+
   // Emitir eventos
   sendNotification(data) {
     if (!this.socket) {

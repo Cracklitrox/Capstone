@@ -22,7 +22,8 @@ const initializeSocket = (server) => {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = decoded.userId;
+      // El token usa 'id' no 'userId'
+      socket.userId = decoded.id;
       socket.userRole = decoded.role;
       next();
     } catch (error) {
