@@ -81,7 +81,7 @@ const navLinks = [
   },
   {
     href: "/guest-history",
-    label: "Historial de Huéspedes",
+    label: "Huéspedes",
     icon: UserGroupIcon,
     roles: ["administrator", "receptionist"],
   },

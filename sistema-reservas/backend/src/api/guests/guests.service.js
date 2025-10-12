@@ -80,8 +80,6 @@ async function searchGuestByIdentification(identificationNumber) {
       country: guest.country,
       region: guest.region,
       city: guest.city,
-      travelsWithChildren: guest.guest_details?.travels_with_children,
-      childrenUnderFour: guest.guest_details?.children_under_four || 0,
       specialRequests: guest.guest_details?.special_requests,
       observations: guest.guest_details?.observations,
     },
@@ -109,8 +107,6 @@ async function createOrUpdateGuest(
     country,
     region,
     city,
-    travelsWithChildren,
-    childrenUnderFour,
     specialRequests,
     observations,
   } = guestData;
@@ -132,8 +128,6 @@ async function createOrUpdateGuest(
     country,
     region,
     city,
-    travelsWithChildren,
-    childrenUnderFour,
     specialRequests:
       specialRequests && specialRequests.trim() !== "" ? specialRequests : null,
     observations:
@@ -177,14 +171,10 @@ async function createOrUpdateGuest(
         guest_details: {
           upsert: {
             create: {
-              travels_with_children: cleanData.travelsWithChildren || false,
-              children_under_four: cleanData.childrenUnderFour || 0,
               special_requests: cleanData.specialRequests,
               observations: cleanData.observations,
             },
             update: {
-              travels_with_children: cleanData.travelsWithChildren || false,
-              children_under_four: cleanData.childrenUnderFour || 0,
               special_requests: cleanData.specialRequests,
               observations: cleanData.observations,
             },
@@ -223,8 +213,6 @@ async function createOrUpdateGuest(
       },
       guest_details: {
         create: {
-          travels_with_children: cleanData.travelsWithChildren || false,
-          children_under_four: cleanData.childrenUnderFour || 0,
           special_requests: cleanData.specialRequests,
           observations: cleanData.observations,
         },
@@ -406,11 +394,6 @@ async function getGuestProfileById(guestId) {
       totalPaidAmount: completedStats.totalPaidAmount + activeStats.totalPaidAmount,
       totalPendingAmount: activeStats.totalPendingAmount
     };
-    
-    // Verificar si viaja con niños basado en reservas históricas
-    const travelsWithChildren = allReservations.some(reservation => {
-      return reservation.reservation_rooms.some(room => room.children_count > 0);
-    });
 
     const profile = {
       id: guest.id,
@@ -428,7 +411,6 @@ async function getGuestProfileById(guestId) {
       gender: guest.gender || 'Sin datos',
       birthDate: guest.birth_date,
       registrationDate: guest.created_at,
-      travelsWithChildren: travelsWithChildren,
       specialRequests: guest.guest_details?.special_requests || 'Sin datos',
       observations: guest.guest_details?.observations || 'Sin datos',
       status: guest.deleted_at ? 'inactive' : 'active',
@@ -876,8 +858,6 @@ async function updateGuestObservationsService(guestId, observations) {
       data: {
         user_id: guestId,
         observations: observations || null,
-        travels_with_children: false,
-        children_under_four: 0,
       },
     });
   }
@@ -980,9 +960,6 @@ async function updateGuestProfileService(guestId, updateData) {
     if (updateData.observations !== undefined) {
       guestDetailsUpdateData.observations = updateData.observations?.trim() || null;
     }
-    if (updateData.travelsWithChildren !== undefined) {
-      guestDetailsUpdateData.travels_with_children = updateData.travelsWithChildren;
-    }
 
     // Iniciar transacción para actualizar ambas tablas
     const result = await prisma.$transaction(async (prisma) => {
@@ -1045,8 +1022,7 @@ async function updateGuestProfileService(guestId, updateData) {
       registrationDate: result.created_at,
       status: result.status,
       specialRequests: result.guest_details?.special_requests,
-      observations: result.guest_details?.observations,
-      travelsWithChildren: result.guest_details?.travels_with_children || false
+      observations: result.guest_details?.observations
     };
 
     return {

@@ -66,8 +66,6 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
     country: "",
     region: "",
     city: "",
-    travelsWithChildren: false,
-    childrenUnderFour: 0,
     specialRequests: "",
     observations: "",
   });
@@ -88,8 +86,6 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
         country: guest.country || "",
         region: guest.region || "",
         city: guest.city || "",
-        travelsWithChildren: guest.travelsWithChildren || false,
-        childrenUnderFour: guest.childrenUnderFour || 0,
         specialRequests: guest.specialRequests || "",
         observations: guest.observations || "",
       });
@@ -835,82 +831,6 @@ const Step4MainGuest = ({ data, onUpdate, onNext, onBack }) => {
                 )}
               </div>
             )}
-
-            {/* Gestión de Niños */}
-            <Separator />
-            <h4 className="font-medium text-foreground">
-              Información sobre Niños
-            </h4>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="travelsWithChildren"
-                  checked={formData.travelsWithChildren}
-                  onChange={(e) => {
-                    const isChecked = e.target.checked;
-                    updateFormField("travelsWithChildren", isChecked);
-                    updateFormField("childrenUnderFour", isChecked ? 1 : 0);
-                  }}
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="travelsWithChildren" className="cursor-pointer">
-                  Viaja con niños
-                </Label>
-              </div>
-
-              {formData.travelsWithChildren && (
-                <div className="space-y-2 animate-fade-in pl-7">
-                  <Label>Número de niños menores de 4 años</Label>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        updateFormField(
-                          "childrenUnderFour",
-                          Math.max(0, (formData.childrenUnderFour || 0) - 1)
-                        )
-                      }
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <Input
-                      type="number"
-                      value={formData.childrenUnderFour || 0}
-                      onChange={(e) =>
-                        updateFormField(
-                          "childrenUnderFour",
-                          parseInt(e.target.value) || 0
-                        )
-                      }
-                      className="w-20 text-center"
-                      min="0"
-                      max="5"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        updateFormField(
-                          "childrenUnderFour",
-                          Math.min(5, (formData.childrenUnderFour || 0) + 1)
-                        )
-                      }
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Los niños menores de 4 años no ocupan cama ni se cuentan en
-                    la capacidad de la habitación
-                  </p>
-                </div>
-              )}
-            </div>
 
             {/* Información adicional */}
             <div className="space-y-2">

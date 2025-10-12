@@ -119,23 +119,9 @@ export const GuestDetailsModal = ({ guest, open, onOpenChange }) => {
           )}
 
           {/* Información Adicional */}
-          {(guest.travelsWithChildren || guest.childrenUnderFour > 0 || guest.specialRequests || guest.observations) && (
+          {(guest.specialRequests || guest.observations) && (
             <div className="space-y-3">
               <h4 className="font-semibold text-sm text-muted-foreground">INFORMACIÓN ADICIONAL</h4>
-              
-              {guest.travelsWithChildren && (
-                <div className="flex items-center gap-2">
-                  <Baby className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Viaja con niños</span>
-                    {guest.childrenUnderFour > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {guest.childrenUnderFour} menor(es) de 4 años
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {guest.specialRequests && (
                 <div className="flex items-start gap-3">

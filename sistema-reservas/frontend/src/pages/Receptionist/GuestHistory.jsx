@@ -51,10 +51,9 @@ const GuestHistory = () => {
       const editableFields = [
         'email',              // ✅ Email
         'phoneNumber',        // ✅ Teléfono
-        'country',            // ✅ País
+        'nationality',        // ✅ País
         'region',             // ✅ Región
         'city',               // ✅ Ciudad
-        'travelsWithChildren', // ✅ Viaja con niños
         'specialRequests',    // ✅ Solicitudes especiales
         'observations'        // ✅ Observaciones
       ];
@@ -143,7 +142,6 @@ const GuestHistory = () => {
     country: false,
     region: false,
     city: false,
-    travelsWithChildren: false,
     specialRequests: false,
     status: false,
     registrationDate: false
@@ -161,8 +159,6 @@ const GuestHistory = () => {
     country: '',
     region: '',
     city: '',
-    travelsWithChildren: false,
-    childrenUnderFour: 0,
     specialRequests: '',
     status: '',
     registrationDate: ''
@@ -185,7 +181,6 @@ const GuestHistory = () => {
     country: false,
     region: false,
     city: false,
-    travelsWithChildren: false,
     specialRequests: false,
     status: false,
     registrationDate: false
@@ -343,26 +338,15 @@ const GuestHistory = () => {
           currentValue = '';
         }
         break;
+      case 'nationality':
+        currentValue = guestProfile.nationality || '';
+        break;
       case 'region':
-        // Buscar el código ISO de la región basado en el nombre
-        if (guestProfile.region && guestProfile.nationality) {
-          const countryItem = countries.find(c => c.label === guestProfile.nationality);
-          if (countryItem) {
-            const stateList = State.getStatesOfCountry(countryItem.value);
-            const stateItem = stateList.find(s => s.name === guestProfile.region);
-            currentValue = stateItem ? stateItem.isoCode : '';
-          } else {
-            currentValue = '';
-          }
-        } else {
-          currentValue = '';
-        }
+        // Usar el nombre de la región directamente
+        currentValue = guestProfile.region || '';
         break;
       case 'city':
         currentValue = guestProfile.city || '';
-        break;
-      case 'travelsWithChildren':
-        currentValue = guestProfile.travelsWithChildren || false;
         break;
       case 'specialRequests':
         currentValue = guestProfile.specialRequests || '';
@@ -381,7 +365,7 @@ const GuestHistory = () => {
     }));
 
     // Cargar datos dependientes para campos geográficos
-    if (fieldName === 'country' && guestProfile.nationality) {
+    if ((fieldName === 'nationality' || fieldName === 'country') && guestProfile.nationality) {
       const countryItem = countries.find(c => c.label === guestProfile.nationality);
       if (countryItem) {
         const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
@@ -392,24 +376,56 @@ const GuestHistory = () => {
       }
     }
 
-    if (fieldName === 'region' && guestProfile.region && guestProfile.nationality) {
-      const countryItem = countries.find(c => c.label === guestProfile.nationality);
+    if (fieldName === 'region' && (editedValues.nationality || guestProfile.nationality)) {
+      const currentNationality = editedValues.nationality || guestProfile.nationality;
+      const countryItem = countries.find(c => c.label === currentNationality);
       if (countryItem) {
-        // Cargar estados
+        // Cargar estados del país actual
         const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
           value: state.isoCode,
           label: state.name
         }));
         setStates(stateList);
 
-        // Cargar ciudades si hay región
-        const stateItem = stateList.find(s => s.label === guestProfile.region);
-        if (stateItem) {
-          const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
-            value: city.name,
-            label: city.name
+        // Si hay una región seleccionada actualmente, cargar sus ciudades
+        const currentRegion = editedValues.region || guestProfile.region;
+        if (currentRegion) {
+          const stateItem = stateList.find(s => s.label === currentRegion);
+          if (stateItem) {
+            const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+              value: city.name,
+              label: city.name
+            }));
+            setCities(cityList);
+          }
+        }
+      }
+    }
+
+    if (fieldName === 'city' && guestProfile.nationality) {
+      // Usar la región actual (editada o del perfil)
+      const currentRegion = editedValues.region || guestProfile.region;
+      const currentNationality = editedValues.nationality || guestProfile.nationality;
+      
+      if (currentRegion && currentNationality) {
+        const countryItem = countries.find(c => c.label === currentNationality);
+        if (countryItem) {
+          // Cargar estados si no están cargados
+          const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
+            value: state.isoCode,
+            label: state.name
           }));
-          setCities(cityList);
+          setStates(stateList);
+
+          // Cargar ciudades de la región actual
+          const stateItem = stateList.find(s => s.label === currentRegion);
+          if (stateItem) {
+            const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+              value: city.name,
+              label: city.name
+            }));
+            setCities(cityList);
+          }
         }
       }
     }
@@ -446,8 +462,33 @@ const GuestHistory = () => {
   const handleSaveField = async (fieldName) => {
     if (!selectedGuest) return;
     
+    // Prevenir múltiples peticiones simultáneas
+    if (savingStates[fieldName]) {
+      console.log('Ya se está guardando este campo, ignorando petición');
+      return;
+    }
+    
     const value = editedValues[fieldName];
-    const error = validateField(fieldName, value);
+    
+    // Si el valor editado es undefined, obtener el valor actual del campo
+    let actualValue = value;
+    if (actualValue === undefined) {
+      switch (fieldName) {
+        case 'nationality':
+          actualValue = guestProfile.nationality;
+          break;
+        case 'region':
+          actualValue = guestProfile.region;
+          break;
+        case 'city':
+          actualValue = guestProfile.city;
+          break;
+        default:
+          actualValue = guestProfile[fieldName];
+      }
+    }
+    
+    const error = validateField(fieldName, actualValue);
     
     if (error) {
       setFieldErrors(prev => ({
@@ -457,20 +498,36 @@ const GuestHistory = () => {
       return;
     }
 
+    // Validación especial para campos geográficos
+    if (['nationality', 'region', 'city'].includes(fieldName)) {
+      const currentNationality = fieldName === 'nationality' ? actualValue : editedValues.nationality || guestProfile.nationality;
+      const currentRegion = fieldName === 'region' ? actualValue : editedValues.region || guestProfile.region;
+      const currentCity = fieldName === 'city' ? actualValue : editedValues.city || guestProfile.city;
+      
+      const geoError = validateGeographicCoherence(currentNationality, currentRegion, currentCity);
+      if (geoError) {
+        setFieldErrors(prev => ({ ...prev, [fieldName]: geoError }));
+        return;
+      }
+    }
+
     setSavingStates(prev => ({
       ...prev,
       [fieldName]: true
     }));
 
     try {
+      // Pequeño delay para evitar rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Convertir códigos ISO a nombres para enviar al backend
-      let valueToSend = value;
+      let valueToSend = actualValue;
       if (fieldName === 'country') {
-        const countryItem = countries.find(c => c.value === value);
-        valueToSend = countryItem ? countryItem.label : value;
+        const countryItem = countries.find(c => c.value === actualValue);
+        valueToSend = countryItem ? countryItem.label : actualValue;
       } else if (fieldName === 'region') {
-        const stateItem = states.find(s => s.value === value);
-        valueToSend = stateItem ? stateItem.label : value;
+        const stateItem = states.find(s => s.value === actualValue);
+        valueToSend = stateItem ? stateItem.label : actualValue;
       }
 
       const updateData = { [fieldName]: valueToSend };
@@ -497,6 +554,9 @@ const GuestHistory = () => {
           case 'phoneNumber':
             updated.phone = valueToSend;
             break;
+          case 'nationality':
+            updated.nationality = valueToSend;
+            break;
           case 'country':
             updated.nationality = valueToSend;
             break;
@@ -512,10 +572,84 @@ const GuestHistory = () => {
         [fieldName]: false
       }));
       
-      setEditedValues(prev => ({
-        ...prev,
-        [fieldName]: undefined
-      }));
+      // No limpiar editedValues, solo cambiar el estado de edición
+      // Los valores editados se mantienen para preservar cambios no guardados en otros campos
+      
+      // Para campos geográficos, asegurar que las opciones dependientes estén cargadas
+      if (fieldName === 'nationality') {
+        const nationality = valueToSend;
+        const countryItem = countries.find(c => c.label === nationality);
+        if (countryItem) {
+          const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
+            value: state.isoCode,
+            label: state.name
+          }));
+          setStates(stateList);
+          
+          // Si hay región editada, cargar sus ciudades
+          const currentRegion = editedValues.region;
+          if (currentRegion) {
+            const stateItem = stateList.find(s => s.label === currentRegion);
+            if (stateItem) {
+              const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+                value: city.name,
+                label: city.name
+              }));
+              setCities(cityList);
+            }
+          }
+        }
+      }
+      
+      // Si se guarda una región, recargar ciudades para esa región
+      if (fieldName === 'region') {
+        const nationality = editedValues.nationality || guestProfile.nationality;
+        const countryItem = countries.find(c => c.label === nationality);
+        if (countryItem) {
+          const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
+            value: state.isoCode,
+            label: state.name
+          }));
+          setStates(stateList);
+          
+          const stateItem = stateList.find(s => s.label === valueToSend);
+          if (stateItem) {
+            const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+              value: city.name,
+              label: city.name
+            }));
+            setCities(cityList);
+          }
+        }
+      }
+      
+      // Si se guarda una ciudad, asegurar que regiones y ciudades estén cargadas
+      if (fieldName === 'city') {
+        const nationality = editedValues.nationality || guestProfile.nationality;
+        const region = editedValues.region || guestProfile.region;
+        
+        if (nationality && region) {
+          const countryItem = countries.find(c => c.label === nationality);
+          if (countryItem) {
+            // Recargar estados
+            const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
+              value: state.isoCode,
+              label: state.name
+            }));
+            setStates(stateList);
+            
+            // Recargar ciudades
+            const stateItem = stateList.find(s => s.label === region);
+            if (stateItem) {
+              const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+                value: city.name,
+                label: city.name
+              }));
+              setCities(cityList);
+            }
+          }
+        }
+      }
       
       setFieldErrors(prev => ({
         ...prev,
@@ -524,9 +658,21 @@ const GuestHistory = () => {
       
       setError(null);
     } catch (err) {
+      console.error('Error al guardar campo:', err);
+      let errorMessage = err.message;
+      
+      // Manejo especial para error 429 (Too Many Requests)
+      if (err.response?.status === 429) {
+        errorMessage = "Demasiadas peticiones. Por favor espera unos segundos antes de intentar nuevamente.";
+      } else if (err.response?.status >= 500) {
+        errorMessage = "Error del servidor. Inténtalo nuevamente.";
+      } else if (!err.response) {
+        errorMessage = "Error de conexión. Verifica tu conexión a internet.";
+      }
+      
       setFieldErrors(prev => ({
         ...prev,
-        [fieldName]: err.message
+        [fieldName]: errorMessage
       }));
     } finally {
       setSavingStates(prev => ({
@@ -582,7 +728,7 @@ const GuestHistory = () => {
         if (!value) return "Género es obligatorio";
         break;
       
-      case 'country':
+      case 'nationality':
         if (!value) return "País es obligatorio";
         break;
       
@@ -601,6 +747,108 @@ const GuestHistory = () => {
   const handleRutChange = (value) => {
     const formatted = formatRutInput(value);
     setEditedValues(prev => ({ ...prev, identificationNumber: formatted }));
+  };
+
+  // Función para manejar cambio en el país
+  const handleCountryChange = (value) => {
+    setEditedValues(prev => ({ ...prev, nationality: value }));
+    
+    // Actualizar estados disponibles
+    if (value) {
+      const countryItem = countries.find(c => c.label === value);
+      if (countryItem) {
+        const stateList = State.getStatesOfCountry(countryItem.value).map((state) => ({
+          value: state.isoCode,
+          label: state.name
+        }));
+        setStates(stateList);
+        
+        // Si ya hay una región seleccionada, actualizar ciudades
+        const currentRegion = editedValues.region || guestProfile?.region;
+        if (currentRegion) {
+          const stateItem = stateList.find(s => s.label === currentRegion);
+          if (stateItem) {
+            const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+              value: city.name,
+              label: city.name
+            }));
+            setCities(cityList);
+          } else {
+            // La región actual no existe en el nuevo país, limpiar
+            setEditedValues(prev => ({ ...prev, region: '', city: '' }));
+            setCities([]);
+          }
+        }
+      }
+    } else {
+      setStates([]);
+      setCities([]);
+    }
+  };
+
+  // Función para manejar cambio en la región
+  const handleRegionChange = (value) => {
+    setEditedValues(prev => ({ ...prev, region: value }));
+    
+    // Actualizar ciudades disponibles
+    if (value && (editedValues.nationality || guestProfile.nationality)) {
+      const nationality = editedValues.nationality || guestProfile.nationality;
+      const countryItem = countries.find(c => c.label === nationality);
+      if (countryItem) {
+        // Buscar el estado por su código ISO (value contiene el isoCode)
+        const stateItem = states.find(s => s.value === value);
+        if (stateItem) {
+          const cityList = City.getCitiesOfState(countryItem.value, stateItem.value).map((city) => ({
+            value: city.name,
+            label: city.name
+          }));
+          setCities(cityList);
+        }
+      }
+    }
+  };
+
+  // Función para manejar cambio en la ciudad
+  const handleCityChange = (value) => {
+    setEditedValues(prev => ({ ...prev, city: value }));
+  };
+
+  // Función para validar coherencia geográfica
+  const validateGeographicCoherence = (nationality, region, city) => {
+    if (!nationality || !region || !city) return null;
+    
+    try {
+      // Buscar el país
+      const countryItem = countries.find(c => c.label === nationality);
+      if (!countryItem) {
+        return `El país "${nationality}" no es válido`;
+      }
+
+      // Verificar que la región pertenezca al país
+      const validStates = State.getStatesOfCountry(countryItem.value);
+      
+      // La región puede venir como código ISO o como nombre, verificar ambos
+      const stateItem = validStates.find(state => 
+        state.isoCode === region || state.name === region
+      );
+      
+      if (!stateItem) {
+        const regionNames = validStates.map(s => s.name).join(', ');
+        return `La región "${region}" no pertenece a ${nationality}. Regiones válidas: ${regionNames}`;
+      }
+
+      // Verificar que la ciudad pertenezca al país y región
+      const validCities = City.getCitiesOfState(countryItem.value, stateItem.isoCode);
+      const cityExists = validCities.some(validCity => validCity.name === city);
+      if (!cityExists) {
+        return `La ciudad "${city}" no pertenece a la región ${stateItem.name}, ${nationality}. Debe seleccionar una ciudad válida para esta región.`;
+      }
+
+      return null; // Todo es válido
+    } catch (error) {
+      console.error('Error validating geographic coherence:', error);
+      return "Error al validar ubicación geográfica. Verifique que los datos sean correctos.";
+    }
   };
 
   // Función para ver historial completo (con filtro por RUT/pasaporte)
@@ -822,10 +1070,15 @@ const GuestHistory = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleSaveField(fieldName)}
-                disabled={isSaving}
-                className="h-6 w-6 p-0 text-green-600"
+                disabled={isSaving || savingStates[fieldName]}
+                className="h-6 w-6 p-0 text-green-600 disabled:opacity-50"
+                title={isSaving || savingStates[fieldName] ? "Guardando..." : "Guardar cambios"}
               >
-                {isSaving ? '...' : <CheckIcon className="h-3 w-3" />}
+                {isSaving || savingStates[fieldName] ? (
+                  <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full"></div>
+                ) : (
+                  <CheckIcon className="h-3 w-3" />
+                )}
               </Button>
               <Button
                 variant="ghost"
@@ -864,27 +1117,98 @@ const GuestHistory = () => {
             </select>
           ) : type === 'countrySelect' ? (
             <select
-              value={editedValue}
-              onChange={(e) => {
-                setEditedValues(prev => ({ ...prev, country: e.target.value, region: '', city: '' }));
-              }}
+              value={editedValues.nationality || ''}
+              onChange={(e) => handleCountryChange(e.target.value)}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="">Seleccionar país...</option>
               {countries.map(country => (
-                <option key={country.value} value={country.value}>
+                <option key={country.value} value={country.label}>
                   {country.label}
                 </option>
               ))}
             </select>
           ) : type === 'stateSelect' ? (
             <select
-              value={editedValue}
+              value={(() => {
+                // Si está en modo edición, usar editedValues.region
+                if (isEditing && editedValues.region !== undefined) {
+                  const stateItem = states.find(s => s.label === editedValues.region);
+                  return stateItem ? stateItem.value : '';
+                }
+                // Si no está editando, usar el valor del perfil
+                if (guestProfile?.region) {
+                  const stateItem = states.find(s => s.label === guestProfile.region);
+                  return stateItem ? stateItem.value : '';
+                }
+                return '';
+              })()}
               onChange={(e) => {
-                setEditedValues(prev => ({ ...prev, region: e.target.value, city: '' }));
+                // Convertir el código ISO de vuelta al nombre para almacenar
+                const selectedState = states.find(s => s.value === e.target.value);
+                const regionName = selectedState ? selectedState.label : e.target.value;
+                setEditedValues(prev => ({ ...prev, region: regionName, city: '' })); // Limpiar ciudad
+                
+                // Actualizar ciudades inmediatamente
+                if (selectedState) {
+                  const nationality = editedValues.nationality || guestProfile?.nationality;
+                  const countryItem = countries.find(c => c.label === nationality);
+                  if (countryItem) {
+                    console.log('Cargando ciudades para:', {
+                      country: countryItem.label,
+                      countryCode: countryItem.value,
+                      region: selectedState.label,
+                      regionCode: selectedState.value
+                    });
+                    
+                    let cityList = City.getCitiesOfState(countryItem.value, selectedState.value);
+                    
+                    // Manejo especial para regiones chilenas que pueden tener problemas
+                    if (cityList.length === 0 && countryItem.value === 'CL') {
+                      console.log('No se encontraron ciudades, intentando códigos alternativos...');
+                      
+                      // Mapeo especial para regiones chilenas problemáticas
+                      const regionMappings = {
+                        'Región Metropolitana de Santiago': ['RM', 'ME'], // Posibles códigos
+                        'Los Lagos': ['LL', 'LR'],
+                        'Valparaíso': ['VS', 'VA']
+                      };
+                      
+                      const possibleCodes = regionMappings[selectedState.label] || [selectedState.value];
+                      
+                      for (const code of possibleCodes) {
+                        cityList = City.getCitiesOfState(countryItem.value, code);
+                        if (cityList.length > 0) {
+                          console.log(`Ciudades encontradas con código ${code}:`, cityList);
+                          break;
+                        }
+                      }
+                    }
+                    
+                    const formattedCities = cityList.map((city) => ({
+                      value: city.name,
+                      label: city.name
+                    }));
+                    
+                    console.log('Ciudades finales:', formattedCities);
+                    console.log('Total de ciudades:', formattedCities.length);
+                    
+                    // Forzar actualización del estado
+                    setCities([]);
+                    setTimeout(() => {
+                      setCities(formattedCities);
+                    }, 50);
+                    
+                    if (formattedCities.length === 0) {
+                      console.warn('No se encontraron ciudades para esta región. Esto puede ser un problema con la librería country-state-city.');
+                    }
+                  }
+                } else {
+                  setCities([]);
+                }
               }}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              disabled={!editedValues.country}
+              disabled={!(editedValues.nationality || guestProfile?.nationality)}
             >
               <option value="">Seleccionar región...</option>
               {states.map(state => (
@@ -895,10 +1219,17 @@ const GuestHistory = () => {
             </select>
           ) : type === 'citySelect' ? (
             <select
-              value={editedValue}
-              onChange={(e) => setEditedValues(prev => ({ ...prev, city: e.target.value }))}
+              value={(() => {
+                // Si está en modo edición, usar editedValues.city
+                if (isEditing && editedValues.city !== undefined) {
+                  return editedValues.city;
+                }
+                // Si no está editando, usar el valor del perfil
+                return guestProfile?.city || '';
+              })()}
+              onChange={(e) => handleCityChange(e.target.value)}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              disabled={!editedValues.country || !editedValues.region}
+              disabled={!(editedValues.nationality || guestProfile?.nationality) || !(editedValues.region || guestProfile?.region)}
             >
               <option value="">Seleccionar ciudad...</option>
               {cities.map(city => (
@@ -907,66 +1238,6 @@ const GuestHistory = () => {
                 </option>
               ))}
             </select>
-          ) : type === 'travelsWithChildren' ? (
-            <div className="space-y-3">
-              <select
-                value={editedValue ? 'true' : 'false'}
-                onChange={(e) => {
-                  const travels = e.target.value === 'true';
-                  setEditedValues(prev => ({ 
-                    ...prev, 
-                    travelsWithChildren: travels,
-                    childrenUnderFour: travels ? (prev.childrenUnderFour || 1) : 0
-                  }));
-                }}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="false">No</option>
-                <option value="true">Sí</option>
-              </select>
-              {editedValues.travelsWithChildren && (
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-2 block">Número de niños menores de 4 años</Label>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditedValues(prev => ({ 
-                        ...prev, 
-                        childrenUnderFour: Math.max(0, (prev.childrenUnderFour || 0) - 1)
-                      }))}
-                      className="h-8 w-8 p-0"
-                    >
-                      -
-                    </Button>
-                    <Input
-                      type="number"
-                      value={editedValues.childrenUnderFour || 0}
-                      onChange={(e) => setEditedValues(prev => ({ 
-                        ...prev, 
-                        childrenUnderFour: Math.max(0, parseInt(e.target.value) || 0)
-                      }))}
-                      className="w-16 text-center"
-                      min="0"
-                      max="10"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditedValues(prev => ({ 
-                        ...prev, 
-                        childrenUnderFour: Math.min(10, (prev.childrenUnderFour || 0) + 1)
-                      }))}
-                      className="h-8 w-8 p-0"
-                    >
-                      +
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
           ) : type === 'textarea' ? (
             <textarea
               value={editedValue}
@@ -1043,7 +1314,7 @@ const GuestHistory = () => {
   return (
     <div className="container mx-auto p-4 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Historial de Huéspedes</h1>
+        <h1 className="text-3xl font-bold text-foreground">Huéspedes</h1>
       </div>
 
       {/* Panel de búsqueda */}
@@ -1435,11 +1706,10 @@ const GuestHistory = () => {
                       <CardTitle className="text-lg">Ubicación y Preferencias</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      {renderEditableField('country', 'País', guestProfile.nationality, 'countrySelect')}
+                      {renderEditableField('nationality', 'País', guestProfile.nationality, 'countrySelect')}
                       {renderEditableField('region', 'Región', guestProfile.region, 'stateSelect')}
                       {renderEditableField('city', 'Ciudad', guestProfile.city, 'citySelect')}
                       <Separator />
-                      {renderEditableField('travelsWithChildren', 'Viaja con niños', guestProfile.travelsWithChildren, 'travelsWithChildren')}
                       {renderEditableField('specialRequests', 'Solicitudes especiales', guestProfile.specialRequests, 'textarea')}
                       
                       {/* Observaciones editables - mantener implementación existente */}
