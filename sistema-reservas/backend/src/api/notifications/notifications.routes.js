@@ -5,12 +5,13 @@ const realtimeController = require("./notifications.realtime.controller");
 const { authenticate, authorize } = require("../../middleware/auth.middleware");
 const rateLimit = require("express-rate-limit");
 
-// Configure a rate limiter: 100 requests per 15 minutes (per IP)
+// Configure a rate limiter: 2000 requests per 15 minutes (per IP) - Aumentado significativamente para desarrollo
 const notificationsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 2000, // Limit each IP to 2000 requests per windowMs (aumentado para desarrollo con React Strict Mode)
   standardHeaders: true, // Send rate limit info in the RateLimit-* headers
   legacyHeaders: false, // Disable the X-RateLimit-* headers
+  message: 'Demasiadas solicitudes desde esta IP, por favor intenta nuevamente en 15 minutos.'
 });
 
 // ==================== RUTAS DE NOTIFICACIONES EN TIEMPO REAL ====================

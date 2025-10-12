@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '@/services/authContext.jsx';
+import { useAuth } from '@/hooks/useAuth';
 import { getReservationHistory, getReservationDetailsById } from '@/services/reservation_history.js';
 import { fetchRooms } from '@/services/rooms.js';
 import { format, parseISO } from "date-fns";

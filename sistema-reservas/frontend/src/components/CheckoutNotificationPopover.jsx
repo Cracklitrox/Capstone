@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../services/authContext';
+import { useAuth } from '../hooks/useAuth';
 import { fetchCheckoutAlerts } from '../services/notifications';
 import { Button } from '@/components/ui/Button';
 import { ClockIcon, HomeIcon } from '@heroicons/react/24/outline';

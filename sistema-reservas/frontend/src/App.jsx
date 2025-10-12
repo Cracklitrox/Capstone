@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { useAuth } from "./services/authContext.jsx";
+import { useAuth } from "./hooks/useAuth";
 import { NotificationsProvider } from "./contexts/NotificationsContext.jsx";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";

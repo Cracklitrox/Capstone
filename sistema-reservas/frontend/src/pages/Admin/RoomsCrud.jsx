@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { fetchAdminRooms, fetchAdminRoomTypes } from "../../services/adminRooms";
-import { useAuth } from "../../services/authContext.jsx";
+import { useAuth } from "../../hooks/useAuth";
 import CreateRoom from "../../components/AdminRooms/CreateRoom";
 import EditRoom from "../../components/AdminRooms/EditRoom";
 import DeleteRoom from "../../components/AdminRooms/DeleteRoom";

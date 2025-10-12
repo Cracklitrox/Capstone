@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NotificationsContext } from './NotificationsContextDefinition';
 import socketService from '../services/socketService';
+import { useApiCache } from '../hooks/useApiCache';
 import {
   getUserNotifications,
   markNotificationAsRead,
@@ -22,8 +23,11 @@ export function NotificationsProvider({ children, token }) {
   const [error, setError] = useState(null);
   const [connected, setConnected] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  
+  // Hook de caché con TTL de 3 segundos
+  const { cachedFetch, invalidate } = useApiCache(3000);
 
-  // Cargar notificaciones iniciales
+  // Cargar notificaciones iniciales CON CACHÉ
   const loadNotifications = useCallback(
     async (filters = {}) => {
       if (!token) return;
@@ -31,7 +35,13 @@ export function NotificationsProvider({ children, token }) {
       try {
         setLoading(true);
         setError(null);
-        const response = await getUserNotifications(token, filters);
+        
+        // Usar caché para evitar peticiones duplicadas
+        const response = await cachedFetch(
+          `notifications-${JSON.stringify(filters)}`,
+          () => getUserNotifications(token, filters)
+        );
+        
         setNotifications(response.data || []);
       } catch (err) {
         console.error('Error al cargar notificaciones:', err);
@@ -40,20 +50,23 @@ export function NotificationsProvider({ children, token }) {
         setLoading(false);
       }
     },
-    [token]
+    [token, cachedFetch]
   );
 
-  // Cargar conteo de no leídas
+  // Cargar conteo de no leídas CON CACHÉ
   const loadUnreadCount = useCallback(async () => {
     if (!token) return;
 
     try {
-      const response = await getUnreadCount(token);
+      const response = await cachedFetch(
+        'notifications-unread-count',
+        () => getUnreadCount(token)
+      );
       setUnreadCount(response.count || 0);
     } catch (err) {
       console.error('Error al cargar conteo:', err);
     }
-  }, [token]);
+  }, [token, cachedFetch]);
 
   // Conectar Socket.io y cargar datos iniciales (solo una vez)
   useEffect(() => {
@@ -169,6 +182,9 @@ export function NotificationsProvider({ children, token }) {
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
 
+        // Invalidar caché para forzar recarga en próxima petición
+        invalidate('notifications-unread-count');
+
         // Emitir evento de actualización por socket
         socketService.markAsRead(notificationId);
       } catch (err) {
@@ -176,7 +192,7 @@ export function NotificationsProvider({ children, token }) {
         throw err;
       }
     },
-    [token]
+    [token, invalidate]
   );
 
   // Marcar como archivada
@@ -209,6 +225,9 @@ export function NotificationsProvider({ children, token }) {
           setUnreadCount((prev) => Math.max(0, prev - 1));
         }
 
+        // Invalidar caché
+        invalidate('notifications-unread-count');
+
         // Emitir evento de actualización por socket
         socketService.markAsArchived(notificationId);
       } catch (err) {
@@ -216,7 +235,7 @@ export function NotificationsProvider({ children, token }) {
         throw err;
       }
     },
-    [token, notifications]
+    [token, notifications, invalidate]
   );
 
   // Desarchivar notificación

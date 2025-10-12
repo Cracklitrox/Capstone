@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../services/authContext.jsx'; // Importamos nuestro hook
+import { useAuth } from '../hooks/useAuth'; // Importamos nuestro hook
 
 /**
  * Este componente es el guardián de nuestras rutas. Ahora utiliza el contexto de autenticación.

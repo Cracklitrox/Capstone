@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Check, Archive } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -24,6 +25,7 @@ export function NotificationBell({
   onNotificationClick,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleNotificationClick = (notification) => {
     if (notification.status === 'unread') {
@@ -32,6 +34,12 @@ export function NotificationBell({
     if (onNotificationClick) {
       onNotificationClick(notification);
     }
+    
+    // Cerrar el dropdown
+    setIsOpen(false);
+    
+    // Redirigir a la página de notificaciones con el ID de la notificación
+    navigate(`/notifications?highlight=${notification.id}`);
   };
 
   const handleMarkAllRead = () => {

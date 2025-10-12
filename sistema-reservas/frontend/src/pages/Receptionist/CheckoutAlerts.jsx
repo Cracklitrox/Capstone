@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../services/authContext';
+import { useAuth } from '../../hooks/useAuth';
 import { fetchCheckoutAlerts, fetchPastCheckouts, fetchFutureCheckouts } from '../../services/notifications';
 import CheckoutAlertCardImproved from '../../components/CheckoutAlertCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { useAuth } from '../services/authContext.jsx';
+import { useAuth } from '../hooks/useAuth';
 import { useCheckoutCount } from '../hooks/useCheckoutCount';
 import { useNotificationsContext } from '../hooks/useNotificationsContext';
 import CheckoutNotificationPopover from './CheckoutNotificationPopover';
 import { NotificationBell } from './NotificationBell';
-import { Button } from "@/components/ui/Button.jsx";
+import { Button } from '@/components/ui/Button';
 import { Switch } from "@/components/ui/Switch.jsx";
 import { Label } from "@/components/ui/Label.jsx";
 import { ArrowLeftOnRectangleIcon, Bars3Icon, SunIcon, MoonIcon, BellAlertIcon } from '@heroicons/react/24/outline';

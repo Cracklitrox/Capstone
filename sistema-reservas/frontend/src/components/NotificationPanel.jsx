@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Bell, Check, Archive, Trash2, RefreshCw, Send, Users, User } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
@@ -30,6 +31,7 @@ import { es } from 'date-fns/locale';
 import { getUsersByRole } from '../services/notifications';
 import { getCategoryConfig, getCategoryOptions } from '../config/notificationCategories';
 import NotificationReadStats from './NotificationReadStats';
+import { useApiCache } from '../hooks/useApiCache';
 
 /**
  * Panel completo de gestión de notificaciones
@@ -45,16 +47,21 @@ export function NotificationPanel({
   onSendNotification,
   onRefresh,
 }) {
+  const { cachedFetch } = useApiCache(5000);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState(null); // ID del usuario actual
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [highlightedNotificationId, setHighlightedNotificationId] = useState(null);
+  const notificationRefs = useRef({});
+  const [markingAsRead, setMarkingAsRead] = useState(new Set()); // Track notifications being marked as read
   const [newNotification, setNewNotification] = useState({
     title: '',
     message: '',
     targetRole: '',
     category: 'general',
     sendToAll: true,
-    targetUserIds: [], // Cambio: array de IDs en lugar de un solo ID
+    targetUserIds: [],
   });
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -63,6 +70,41 @@ export function NotificationPanel({
     { value: 'administrator', label: 'Administradores' },
     { value: 'receptionist', label: 'Recepcionistas' },
   ]);
+
+  // Manejar el parámetro highlight de la URL
+  useEffect(() => {
+    const highlightId = searchParams.get('highlight');
+    if (highlightId) {
+      const notificationId = parseInt(highlightId);
+      setHighlightedNotificationId(notificationId);
+      
+      // Buscar la notificación para determinar en qué pestaña está
+      const notification = notifications.find(n => n.id === notificationId);
+      if (notification) {
+        if (notification.isArchived) {
+          setActiveTab('archived');
+        } else if (notification.status === 'unread') {
+          setActiveTab('unread');
+        } else {
+          setActiveTab('all');
+        }
+      }
+      
+      // Hacer scroll a la notificación después de un pequeño delay
+      setTimeout(() => {
+        const element = notificationRefs.current[notificationId];
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+      
+      // Remover el highlight después de 3 segundos
+      setTimeout(() => {
+        setHighlightedNotificationId(null);
+        setSearchParams({});
+      }, 3000);
+    }
+  }, [searchParams, notifications, setSearchParams]);
 
   // Obtener el rol y el ID del usuario actual desde el token
   useEffect(() => {
@@ -93,8 +135,8 @@ export function NotificationPanel({
       ]) {
         try {
           const roleId = roleMap[roleKey];
-          const response = await getUsersByRole(token, roleId);
-          const users = response.data || [];
+          const data = await cachedFetch(`users-by-role-${roleId}`, () => getUsersByRole(token, roleId));
+          const users = data.data || [];
 
           // Solo agregar el rol si hay otros usuarios además del actual
           // O si el usuario actual NO es de ese rol
@@ -110,7 +152,7 @@ export function NotificationPanel({
     };
 
     checkAvailableRoles();
-  }, [currentUserRole]);
+  }, [currentUserRole, cachedFetch]);
 
   // Cargar usuarios cuando cambia el rol objetivo
   useEffect(() => {
@@ -126,8 +168,18 @@ export function NotificationPanel({
         const roleMap = { administrator: 1, receptionist: 2 };
         const roleId = roleMap[newNotification.targetRole];
         
-        const response = await getUsersByRole(token, roleId);
-        setAvailableUsers(response.data || []);
+        const data = await cachedFetch(`users-by-role-${roleId}`, () => getUsersByRole(token, roleId));
+        const users = data.data || [];
+        setAvailableUsers(users);
+        
+        // Si solo hay 1 usuario, seleccionarlo automáticamente
+        if (users.length === 1) {
+          setNewNotification(prev => ({
+            ...prev,
+            sendToAll: false,
+            targetUserIds: [users[0].id.toString()],
+          }));
+        }
       } catch (error) {
         console.error('Error al cargar usuarios:', error);
         setAvailableUsers([]);
@@ -137,14 +189,34 @@ export function NotificationPanel({
     };
 
     loadUsers();
-  }, [newNotification.targetRole]);
+  }, [newNotification.targetRole, cachedFetch]);
 
   const filteredNotifications = notifications.filter((notif) => {
     if (activeTab === 'all') return !notif.isArchived;
     if (activeTab === 'unread') return notif.status === 'unread' && !notif.isArchived;
+    if (activeTab === 'sent') return notif.sender?.id === currentUserId && !notif.isArchived;
     if (activeTab === 'archived') return notif.isArchived;
     return true;
   });
+
+  const handleMarkAsRead = async (notificationId) => {
+    // Add to the set of notifications being marked as read
+    setMarkingAsRead((prev) => new Set(prev).add(notificationId));
+    
+    try {
+      await onMarkAsRead(notificationId);
+    } catch (error) {
+      console.error('Error al marcar como leída:', error);
+      // Remove from set if there's an error
+      setMarkingAsRead((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(notificationId);
+        return newSet;
+      });
+    }
+    // Note: We don't remove from the set on success because the notification
+    // will be updated and the button will disappear anyway
+  };
 
   const handleSendNotification = async () => {
     if (!newNotification.title || !newNotification.targetRole) {
@@ -200,6 +272,14 @@ export function NotificationPanel({
         targetUserIds: [],
       });
       setIsDialogOpen(false);
+      
+      // Refrescar automáticamente para mostrar el mensaje enviado
+      if (onRefresh) {
+        await onRefresh();
+      }
+      
+      // Cambiar automáticamente a la pestaña "Enviados"
+      setActiveTab('sent');
     } catch (error) {
       console.error('Error al enviar notificación:', error);
       alert('Error al enviar la notificación');
@@ -322,35 +402,49 @@ export function NotificationPanel({
                   {/* Opciones de envío: Todos o Usuario Específico */}
                   {newNotification.targetRole && availableUsers.length > 0 && (
                     <div className="space-y-3">
-                      <Label>Tipo de Envío</Label>
-                      <RadioGroup
-                        value={newNotification.sendToAll ? 'all' : 'specific'}
-                        onValueChange={(value) => {
-                          setNewNotification({
-                            ...newNotification,
-                            sendToAll: value === 'all',
-                            targetUserIds: value === 'all' ? [] : newNotification.targetUserIds,
-                          });
-                        }}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="all" id="sendToAll" />
-                          <Label htmlFor="sendToAll" className="cursor-pointer flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            Enviar a todos los {newNotification.targetRole === 'administrator' ? 'administradores' : 'recepcionistas'}
-                          </Label>
+                      {/* Si solo hay 1 usuario, mostrar mensaje informativo */}
+                      {availableUsers.length === 1 ? (
+                        <div className="bg-muted p-3 rounded-lg border border-border">
+                          <Label className="text-sm font-medium">Destinatario</Label>
+                          <div className="flex items-center gap-2 mt-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">{availableUsers[0].name}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Único {newNotification.targetRole === 'administrator' ? 'administrador' : 'recepcionista'} disponible
+                          </p>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="specific" id="sendToSpecific" />
-                          <Label htmlFor="sendToSpecific" className="cursor-pointer flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            Enviar a usuarios seleccionados
-                          </Label>
-                        </div>
-                      </RadioGroup>
+                      ) : (
+                        <>
+                          <Label>Tipo de Envío</Label>
+                          <RadioGroup
+                            value={newNotification.sendToAll ? 'all' : 'specific'}
+                            onValueChange={(value) => {
+                              setNewNotification({
+                                ...newNotification,
+                                sendToAll: value === 'all',
+                                targetUserIds: value === 'all' ? [] : newNotification.targetUserIds,
+                              });
+                            }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="all" id="sendToAll" />
+                              <Label htmlFor="sendToAll" className="cursor-pointer flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                Enviar a todos los {newNotification.targetRole === 'administrator' ? 'administradores' : 'recepcionistas'}
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="specific" id="sendToSpecific" />
+                              <Label htmlFor="sendToSpecific" className="cursor-pointer flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Enviar a usuarios seleccionados
+                              </Label>
+                            </div>
+                          </RadioGroup>
 
-                      {/* Selector de Usuarios Específicos con Checkboxes */}
-                      {!newNotification.sendToAll && (
+                          {/* Selector de Usuarios Específicos con Checkboxes */}
+                          {!newNotification.sendToAll && (
                         <div className="mt-3 space-y-3">
                           <div className="flex items-center justify-between">
                             <Label>
@@ -427,6 +521,8 @@ export function NotificationPanel({
                           </div>
                         </div>
                       )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -466,6 +562,14 @@ export function NotificationPanel({
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="sent">
+                Enviados
+                {notifications.filter((n) => n.sender?.id === currentUserId && !n.isArchived).length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {notifications.filter((n) => n.sender?.id === currentUserId && !n.isArchived).length}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="archived">Archivadas</TabsTrigger>
             </TabsList>
             
@@ -488,6 +592,8 @@ export function NotificationPanel({
                       ? 'No tienes notificaciones sin leer'
                       : activeTab === 'archived'
                       ? 'No has archivado ninguna notificación'
+                      : activeTab === 'sent'
+                      ? 'No has enviado ninguna notificación'
                       : 'Aún no tienes notificaciones'}
                   </p>
                 </div>
@@ -495,13 +601,16 @@ export function NotificationPanel({
                 <div className="space-y-3">
                   {filteredNotifications.map((notification) => {
                     const categoryConfig = getCategoryConfig(notification.category || 'general');
+                    const isHighlighted = notification.id === highlightedNotificationId;
                     
                     return (
                       <Card
                         key={notification.id}
+                        ref={(el) => (notificationRefs.current[notification.id] = el)}
                         className={`
                           transition-all border-l-4
                           ${notification.status === 'unread' ? 'border-primary' : categoryConfig.borderColor}
+                          ${isHighlighted ? 'ring-4 ring-primary/50 ring-offset-2 shadow-xl animate-pulse' : ''}
                         `}
                       >
                         <CardContent className="p-4">
@@ -555,39 +664,45 @@ export function NotificationPanel({
                             <Separator className="my-3" />
                             
                             <div className="flex gap-2 flex-wrap">
-                              {notification.status === 'unread' && !notification.isArchived && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onMarkAsRead(notification.id)}
-                                >
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Marcar como leída
-                                </Button>
+                              {/* Botones para mensajes recibidos - Solo si NO es el emisor */}
+                              {notification.sender?.id !== currentUserId && (
+                                <>
+                                  {notification.status === 'unread' && !notification.isArchived && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleMarkAsRead(notification.id)}
+                                      disabled={markingAsRead.has(notification.id)}
+                                    >
+                                      <Check className="h-3 w-3 mr-1" />
+                                      {markingAsRead.has(notification.id) ? 'Marcando...' : 'Marcar como leída'}
+                                    </Button>
+                                  )}
+                                  
+                                  {!notification.isArchived ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => onMarkAsArchived(notification.id)}
+                                    >
+                                      <Archive className="h-3 w-3 mr-1" />
+                                      Archivar
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => onUnarchive(notification.id)}
+                                    >
+                                      <RefreshCw className="h-3 w-3 mr-1" />
+                                      Restaurar
+                                    </Button>
+                                  )}
+                                </>
                               )}
                               
-                              {!notification.isArchived ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onMarkAsArchived(notification.id)}
-                                >
-                                  <Archive className="h-3 w-3 mr-1" />
-                                  Archivar
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onUnarchive(notification.id)}
-                                >
-                                  <RefreshCw className="h-3 w-3 mr-1" />
-                                  Restaurar
-                                </Button>
-                              )}
-                              
-                              {/* Botón "Ver quién leyó" solo para mensajes enviados por el usuario */}
-                              {notification.sender?.id === currentUserId && (
+                              {/* Botón "Ver quién leyó" SOLO en la pestaña "Enviados" */}
+                              {activeTab === 'sent' && (
                                 <NotificationReadStats 
                                   notificationId={notification.id}
                                   notificationTitle={notification.title}

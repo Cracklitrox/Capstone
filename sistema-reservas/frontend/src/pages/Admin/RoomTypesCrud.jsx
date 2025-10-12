@@ -1,7 +1,9 @@
 // Página principal para la administración de tipos de habitación
 // Incluye CRUD completo, diseño moderno y responsivo, y validaciones
 import React, { useState, useEffect } from "react";
-import { useAuth } from "@/services/authContext.jsx";
+import { Plus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { fetchAdminRoomTypes } from "@/services/adminRooms";
 import CreateRoomType from "../../components/AdminRoomTypes/CreateRoomType";
 import EditRoomType from "../../components/AdminRoomTypes/EditRoomType";
