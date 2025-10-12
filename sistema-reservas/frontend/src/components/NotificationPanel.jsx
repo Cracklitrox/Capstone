@@ -263,6 +263,8 @@ export function NotificationPanel({
         await Promise.all(promises);
       }
 
+      console.log('📤 Notificación enviada, limpiando formulario...');
+      
       setNewNotification({ 
         title: '', 
         message: '', 
@@ -273,13 +275,17 @@ export function NotificationPanel({
       });
       setIsDialogOpen(false);
       
+      console.log('🔄 Refrescando notificaciones...');
+      
       // Refrescar automáticamente para mostrar el mensaje enviado
       if (onRefresh) {
         await onRefresh();
+        console.log('✅ Notificaciones refrescadas');
       }
       
       // Cambiar automáticamente a la pestaña "Enviados"
       setActiveTab('sent');
+      console.log('📂 Cambiado a pestaña Enviados');
     } catch (error) {
       console.error('Error al enviar notificación:', error);
       alert('Error al enviar la notificación');

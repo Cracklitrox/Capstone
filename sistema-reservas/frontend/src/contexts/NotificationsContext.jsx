@@ -68,6 +68,32 @@ export function NotificationsProvider({ children, token }) {
     }
   }, [token, cachedFetch]);
 
+  // Recargar notificaciones SIN CACHÉ (para actualizaciones en tiempo real)
+  const reloadNotifications = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      // Llamada directa sin caché
+      const response = await getUserNotifications(token, {});
+      setNotifications(response.data || []);
+      console.log('🔄 Notificaciones recargadas sin caché');
+    } catch (err) {
+      console.error('Error al recargar notificaciones:', err);
+    }
+  }, [token]);
+
+  // Calcular automáticamente el contador de no leídas desde las notificaciones
+  useEffect(() => {
+    // Contar solo las notificaciones RECIBIDAS (no enviadas) que no han sido leídas
+    const count = notifications.filter(
+      (n) => 
+        n.status !== 'sent' && // No contar las enviadas
+        !n.read_status?.read_at && // No leída
+        !n.isArchived // No archivada
+    ).length;
+    setUnreadCount(count);
+  }, [notifications]);
+
   // Conectar Socket.io y cargar datos iniciales (solo una vez)
   useEffect(() => {
     if (!token) return;
@@ -110,21 +136,14 @@ export function NotificationsProvider({ children, token }) {
     loadUnreadCount();
 
     // Listener para nuevas notificaciones
-    const handleNewNotification = (notification) => {
+    const handleNewNotification = async (notification) => {
       console.log('📩 Nueva notificación recibida:', notification);
       
-      // Verificar si la notificación ya existe para evitar duplicados
-      setNotifications((prev) => {
-        const exists = prev.some((n) => n.id === notification.id);
-        if (exists) {
-          console.log('⚠️ Notificación duplicada detectada, ignorando...');
-          return prev;
-        }
-        // Agregar isArchived por defecto si no viene en la notificación
-        return [{ ...notification, isArchived: notification.isArchived || false }, ...prev];
-      });
+      // Invalidar caché y recargar todas las notificaciones para obtener la estructura completa
+      invalidate();
       
-      setUnreadCount((prev) => prev + 1);
+      // Usar la función de recarga sin caché
+      await reloadNotifications();
       
       // Mostrar notificación del navegador si está permitido
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -143,7 +162,8 @@ export function NotificationsProvider({ children, token }) {
         prev.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
       );
 
-      // Actualizar conteo de no leídas
+      // Invalidar caché del contador y recargarlo
+      invalidate('notifications-unread-count');
       loadUnreadCount();
     };
 
@@ -163,7 +183,7 @@ export function NotificationsProvider({ children, token }) {
       console.log('🧹 Limpiando listeners de NotificationsProvider');
       // No desconectamos el socket aquí para mantener la conexión activa
     };
-  }, [token, initialized, loadNotifications, loadUnreadCount]);
+  }, [token, initialized, loadNotifications, loadUnreadCount, invalidate, reloadNotifications]);
 
   // Marcar como leída
   const markAsRead = useCallback(
@@ -288,12 +308,15 @@ export function NotificationsProvider({ children, token }) {
         if (notification && !notification.read_status?.read_at) {
           setUnreadCount((prev) => Math.max(0, prev - 1));
         }
+
+        // Invalidar caché del contador
+        invalidate('notifications-unread-count');
       } catch (err) {
         console.error('Error al eliminar notificación:', err);
         throw err;
       }
     },
-    [token, notifications]
+    [token, notifications, invalidate]
   );
 
   // Marcar todas como leídas
@@ -310,11 +333,14 @@ export function NotificationsProvider({ children, token }) {
         }))
       );
       setUnreadCount(0);
+
+      // Invalidar caché del contador
+      invalidate('notifications-unread-count');
     } catch (err) {
       console.error('Error al marcar todas como leídas:', err);
       throw err;
     }
-  }, [token]);
+  }, [token, invalidate]);
 
   // Enviar notificación
   const sendNotification = useCallback(
@@ -327,16 +353,30 @@ export function NotificationsProvider({ children, token }) {
         // Emitir por socket (el backend se encarga de broadcast)
         socketService.sendNotification(data);
         
+        // Invalidar TODO el caché de notificaciones Y contadores
+        invalidate(); // Sin parámetros invalida TODO el caché
+        
+        // Pequeño delay para asegurar que el backend procesó todo
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Cargar todas las notificaciones de nuevo (sin caché)
+        const notificationsResponse = await getUserNotifications(token, {});
+        setNotifications(notificationsResponse.data || []);
+        
+        // Recargar el contador de no leídas (sin caché)
+        const unreadResponse = await getUnreadCount(token);
+        setUnreadCount(unreadResponse.count || 0);
+        
+        console.log('✅ Notificación enviada, lista y contadores actualizados');
+
         return response.data;
       } catch (err) {
         console.error('Error al enviar notificación:', err);
         throw err;
       }
     },
-    [token]
-  );
-
-  // Recargar notificaciones (útil para refrescar manualmente)
+    [token, invalidate]
+  );  // Recargar notificaciones (útil para refrescar manualmente)
   const refreshNotifications = useCallback(
     async (filters = { archived: false }) => {
       if (!token) return;

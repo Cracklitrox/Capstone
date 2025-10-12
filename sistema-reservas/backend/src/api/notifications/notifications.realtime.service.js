@@ -126,31 +126,32 @@ async function createNotification(data) {
 }
 
 /**
- * Obtiene todas las notificaciones de un usuario con su estado de lectura
+ * Obtiene todas las notificaciones del usuario (recibidas Y enviadas)
  */
 async function getUserNotifications(userId, filters = {}) {
   const { status, archived, limit = 50, offset = 0 } = filters;
 
-  const where = {
+  // 1. Obtener notificaciones RECIBIDAS
+  const whereReceived = {
     user_id: userId,
   };
 
   // Filtrar por estado (read/unread)
   if (status) {
-    where.status = status;
+    whereReceived.status = status;
   }
 
   // Filtrar por archivado
   if (archived !== undefined) {
     if (archived === true) {
-      where.archived_at = { not: null };
+      whereReceived.archived_at = { not: null };
     } else {
-      where.archived_at = null;
+      whereReceived.archived_at = null;
     }
   }
 
-  const notifications = await prisma.notification_read_status.findMany({
-    where,
+  const receivedNotifications = await prisma.notification_read_status.findMany({
+    where: whereReceived,
     include: {
       notifications: {
         include: {
@@ -171,16 +172,33 @@ async function getUserNotifications(userId, filters = {}) {
         },
       },
     },
-    orderBy: {
-      notifications: {
-        sent_at: 'desc',
-      },
-    },
-    take: limit,
-    skip: offset,
   });
 
-  return notifications.map((readStatus) => ({
+  // 2. Obtener notificaciones ENVIADAS
+  const sentNotifications = await prisma.notifications.findMany({
+    where: {
+      sender_id: userId,
+    },
+    include: {
+      users: {
+        select: {
+          id: true,
+          first_name: true,
+          paternal_last_name: true,
+          maternal_last_name: true,
+        },
+      },
+      roles: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  // Formatear notificaciones recibidas
+  const formattedReceived = receivedNotifications.map((readStatus) => ({
     id: readStatus.notifications.id,
     title: readStatus.notifications.title,
     message: readStatus.notifications.message,
@@ -200,6 +218,35 @@ async function getUserNotifications(userId, filters = {}) {
     archivedAt: readStatus.archived_at,
     isArchived: !!readStatus.archived_at,
   }));
+
+  // Formatear notificaciones enviadas
+  const formattedSent = sentNotifications.map((notification) => ({
+    id: notification.id,
+    title: notification.title,
+    message: notification.message,
+    category: notification.category || 'general',
+    sender: {
+      id: notification.users.id,
+      name: `${notification.users.first_name} ${notification.users.paternal_last_name}${
+        notification.users.maternal_last_name
+          ? ' ' + notification.users.maternal_last_name
+          : ''
+      }`,
+    },
+    targetRole: notification.roles?.name || null,
+    sentAt: notification.sent_at,
+    status: 'sent', // Estado especial para notificaciones enviadas
+    readAt: null,
+    archivedAt: null,
+    isArchived: false,
+  }));
+
+  // Combinar ambas listas y ordenar por fecha
+  const allNotifications = [...formattedReceived, ...formattedSent]
+    .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt))
+    .slice(offset, offset + limit);
+
+  return allNotifications;
 }
 
 /**
@@ -270,6 +317,25 @@ async function unarchiveNotification(notificationId, userId) {
  * Elimina una notificación para un usuario específico
  */
 async function deleteNotification(notificationId, userId) {
+  // Primero verificar si la notificación fue enviada por este usuario
+  const sentNotification = await prisma.notifications.findFirst({
+    where: {
+      id: notificationId,
+      sender_id: userId,
+    },
+  });
+
+  // Si el usuario es el emisor, eliminar la notificación completa
+  if (sentNotification) {
+    await prisma.notifications.delete({
+      where: {
+        id: notificationId,
+      },
+    });
+    return { success: true, message: 'Notificación eliminada' };
+  }
+
+  // Si no es el emisor, eliminar solo el registro de lectura (receptor)
   const readStatus = await prisma.notification_read_status.deleteMany({
     where: {
       notification_id: notificationId,
