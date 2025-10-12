@@ -217,6 +217,33 @@ async function getUsersByRole(req, res, next) {
   }
 }
 
+/**
+ * Controlador para obtener estadísticas de lectura de una notificación
+ * @route GET /api/v1/notifications/:id/read-stats
+ */
+async function getNotificationReadStats(req, res, next) {
+  try {
+    const notificationId = parseInt(req.params.id);
+    const userId = req.user.id;
+
+    const stats = await notificationService.getNotificationReadStats(notificationId, userId);
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    console.error('Error al obtener estadísticas de lectura:', error);
+    if (error.message.includes('no encontrada') || error.message.includes('no tienes permiso')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    next(error);
+  }
+}
+
 module.exports = {
   createNotification,
   getUserNotifications,
@@ -227,4 +254,5 @@ module.exports = {
   getUnreadCount,
   markAllAsRead,
   getUsersByRole,
+  getNotificationReadStats,
 };

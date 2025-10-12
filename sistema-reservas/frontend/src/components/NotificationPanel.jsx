@@ -29,6 +29,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getUsersByRole } from '../services/notifications';
 import { getCategoryConfig, getCategoryOptions } from '../config/notificationCategories';
+import NotificationReadStats from './NotificationReadStats';
 
 /**
  * Panel completo de gestión de notificaciones
@@ -46,6 +47,7 @@ export function NotificationPanel({
 }) {
   const [activeTab, setActiveTab] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null); // ID del usuario actual
   const [newNotification, setNewNotification] = useState({
     title: '',
     message: '',
@@ -62,13 +64,14 @@ export function NotificationPanel({
     { value: 'receptionist', label: 'Recepcionistas' },
   ]);
 
-  // Obtener el rol del usuario actual desde el token
+  // Obtener el rol y el ID del usuario actual desde el token
   useEffect(() => {
     try {
       const token = localStorage.getItem('token');
       if (token) {
         const payload = JSON.parse(atob(token.split('.')[1]));
         setCurrentUserRole(payload.role);
+        setCurrentUserId(payload.id); // Guardar el ID del usuario
       }
     } catch (error) {
       console.error('Error al decodificar token:', error);
@@ -551,7 +554,7 @@ export function NotificationPanel({
                             
                             <Separator className="my-3" />
                             
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                               {notification.status === 'unread' && !notification.isArchived && (
                                 <Button
                                   variant="outline"
@@ -581,6 +584,14 @@ export function NotificationPanel({
                                   <RefreshCw className="h-3 w-3 mr-1" />
                                   Restaurar
                                 </Button>
+                              )}
+                              
+                              {/* Botón "Ver quién leyó" solo para mensajes enviados por el usuario */}
+                              {notification.sender?.id === currentUserId && (
+                                <NotificationReadStats 
+                                  notificationId={notification.id}
+                                  notificationTitle={notification.title}
+                                />
                               )}
                               
                               <Button

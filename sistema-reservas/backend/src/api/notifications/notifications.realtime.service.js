@@ -378,6 +378,84 @@ async function deleteOldNotifications(daysOld = 90) {
   };
 }
 
+/**
+ * Obtiene estadísticas de lectura de una notificación
+ * Devuelve quién ha leído y quién no ha leído el mensaje
+ */
+async function getNotificationReadStats(notificationId, userId) {
+  // Verificar que la notificación existe y fue enviada por el usuario
+  const notification = await prisma.notifications.findFirst({
+    where: {
+      id: notificationId,
+      sender_id: userId,
+    },
+    include: {
+      roles: true,
+    },
+  });
+
+  if (!notification) {
+    throw new Error('Notificación no encontrada o no tienes permiso para ver sus estadísticas');
+  }
+
+  // Obtener todos los estados de lectura de esta notificación
+  const readStatuses = await prisma.notification_read_status.findMany({
+    where: {
+      notification_id: notificationId,
+    },
+    include: {
+      users: {
+        select: {
+          id: true,
+          first_name: true,
+          paternal_last_name: true,
+          maternal_last_name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: [
+      {
+        status: 'asc', // 'read' primero, luego 'unread'
+      },
+      {
+        updated_at: 'desc',
+      },
+    ],
+  });
+
+  // Separar en leídos y no leídos
+  const readBy = [];
+  const unreadBy = [];
+
+  readStatuses.forEach((status) => {
+    const userData = {
+      id: status.users.id,
+      name: `${status.users.first_name} ${status.users.paternal_last_name}`,
+      fullName: `${status.users.first_name} ${status.users.paternal_last_name} ${status.users.maternal_last_name || ''}`.trim(),
+      email: status.users.email,
+      readAt: status.status === 'read' ? status.updated_at : null,
+    };
+
+    if (status.status === 'read') {
+      readBy.push(userData);
+    } else {
+      unreadBy.push(userData);
+    }
+  });
+
+  return {
+    notificationId: notification.id,
+    title: notification.title,
+    targetRole: notification.roles?.name || null,
+    totalRecipients: readStatuses.length,
+    readCount: readBy.length,
+    unreadCount: unreadBy.length,
+    readBy,
+    unreadBy,
+  };
+}
+
 module.exports = {
   createNotification,
   getUserNotifications,
@@ -389,4 +467,5 @@ module.exports = {
   markAllAsRead,
   getUsersByRole,
   deleteOldNotifications,
+  getNotificationReadStats,
 };

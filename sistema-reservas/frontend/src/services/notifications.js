@@ -222,6 +222,29 @@ export async function getUsersByRole(token, roleId) {
   return response.json();
 }
 
+/**
+ * Obtiene estadísticas de lectura de una notificación
+ * @param {string} token - JWT token de autenticación
+ * @param {number} notificationId - ID de la notificación
+ * @returns {Promise<Object>} Estadísticas de lectura (quién leyó y quién no)
+ */
+export async function getNotificationReadStats(token, notificationId) {
+  const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read-stats`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al obtener estadísticas de lectura');
+  }
+
+  return response.json();
+}
+
 // ==================== ALERTAS DE CHECK-OUT ====================
 
 /**

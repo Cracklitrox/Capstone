@@ -81,6 +81,19 @@ router.get(
 );
 
 /**
+ * @route GET /api/v1/notifications/:id/read-stats
+ * @desc Obtiene estadísticas de lectura de una notificación
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  "/:id/read-stats",
+  notificationsLimiter,
+  authenticate,
+  authorize(["administrator", "receptionist"]),
+  realtimeController.getNotificationReadStats
+);
+
+/**
  * @route PUT /api/v1/notifications/:id/read
  * @desc Marca una notificación como leída
  * @access Administrador y Recepcionista
