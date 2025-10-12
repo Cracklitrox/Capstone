@@ -33,8 +33,45 @@ import {
 } from '@heroicons/react/24/outline';
 
 const GuestHistory = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
+  
+  // Función para verificar si el usuario puede editar un campo específico
+  const canEditField = (fieldName) => {
+    // Si no hay usuario, no puede editar (por seguridad)
+    if (!user || !user.role) return false;
+    
+    // ADMINISTRADOR: Puede editar todo excepto fecha de registro
+    if (user.role === 'administrator') {
+      return fieldName !== 'registrationDate';
+    }
+    
+    // RECEPCIONISTA: solo puede editar campos secundarios
+    if (user.role === 'receptionist') {
+      const editableFields = [
+        'email',              // ✅ Email
+        'phoneNumber',        // ✅ Teléfono
+        'country',            // ✅ País
+        'region',             // ✅ Región
+        'city',               // ✅ Ciudad
+        'travelsWithChildren', // ✅ Viaja con niños
+        'specialRequests',    // ✅ Solicitudes especiales
+        'observations'        // ✅ Observaciones
+      ];
+      // Campos NO editables para recepcionista:
+      // ❌ firstName, paternalLastName, maternalLastName (Nombres)
+      // ❌ identificationNumber (RUT/Pasaporte)
+      // ❌ gender (Género)
+      // ❌ birthDate (Fecha de nacimiento)
+      // ❌ status (Estado del huésped)
+      // ❌ registrationDate (Fecha de registro)
+      
+      return editableFields.includes(fieldName);
+    }
+    
+    // Por defecto, no puede editar
+    return false;
+  };
   
   // Estados principales
   const [guests, setGuests] = useState([]);
@@ -754,14 +791,23 @@ const GuestHistory = () => {
     const error = fieldErrors[fieldName];
     const editedValue = editedValues[fieldName];
 
-    // Campos que no se pueden editar
-    if (readonly || fieldName === 'registrationDate') {
+    // Verificar permisos de edición
+    const hasEditPermission = canEditField(fieldName);
+
+    // Campos que no se pueden editar (readonly o sin permisos)
+    if (readonly || fieldName === 'registrationDate' || !hasEditPermission) {
       return (
         <div>
           <Label className="text-xs text-muted-foreground">{label}</Label>
-          <p className="font-medium">
+          <div className="font-medium">
             {type === 'date' && value ? new Date(value).toLocaleDateString('es-CL') : value || 'No especificado'}
-          </p>
+            {!hasEditPermission && (
+              <span className="text-xs text-muted-foreground ml-2">
+                {/* Comentado: Mostrar razón de restricción */}
+                {/* (Solo {user?.role === 'administrator' ? 'administradores' : 'lectura'}) */}
+              </span>
+            )}
+          </div>
         </div>
       );
     }
@@ -1156,6 +1202,16 @@ const GuestHistory = () => {
                 <TabsTrigger value="profile">Datos del Huésped</TabsTrigger>
                 <TabsTrigger value="reservations">Historial de Reservas</TabsTrigger>
               </TabsList>
+
+              {/* Indicador de rol actual (comentado para futura implementación) */}
+              {/* 
+              <div className="mb-4 p-2 bg-muted/30 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  Conectado como: <Badge variant="outline">{user?.role === 'administrator' ? 'Administrador' : 'Recepcionista'}</Badge>
+                  {user?.role === 'receptionist' && ' - Edición limitada a campos de contacto y preferencias'}
+                </p>
+              </div>
+              */}
 
               {/* Tab 1: Reserva Activa */}
               <TabsContent value="active-reservation" className="space-y-4">
