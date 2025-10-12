@@ -565,6 +565,21 @@ const GuestHistory = () => {
     const formatted = formatRutInput(value);
     setEditedValues(prev => ({ ...prev, identificationNumber: formatted }));
   };
+
+  // Función para ver historial completo (con filtro por RUT/pasaporte)
+  const handleViewFullHistory = (identificationNumber, reservationCode = null) => {
+    if (reservationCode) {
+      // Ver detalles de una reserva específica
+      console.log('Redirigiendo a Ver Detalles con código de reserva:', reservationCode);
+      // Navegar a /history con parámetro de reserva específica
+      navigate(`/history?reservation=${reservationCode}`);
+    } else {
+      // Ver historial completo filtrado por RUT/pasaporte
+      console.log('Redirigiendo a Ver Historial Completo con RUT/pasaporte:', identificationNumber);
+      // Navegar a /history con filtro de identificación
+      navigate(`/history?guest=${encodeURIComponent(identificationNumber)}`);
+    }
+  };
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
@@ -632,19 +647,6 @@ const GuestHistory = () => {
     'pending': 'Pendiente',
     'canceled': 'Cancelada',
     'no_show': 'No se Presentó',
-  };
-
-  // Función para redirigir al historial de reservas
-  const handleViewFullHistory = (guestIdentification, reservationId = null) => {
-    const params = new URLSearchParams({
-      guestRut: guestIdentification
-    });
-    
-    if (reservationId) {
-      params.append('reservationId', reservationId);
-    }
-    
-    navigate(`/history?${params.toString()}`);
   };
 
   // Efecto para búsqueda automática
@@ -971,7 +973,7 @@ const GuestHistory = () => {
             <PencilIcon className="h-3 w-3" />
           </Button>
         </div>
-        <p className="font-medium">
+        <div className="font-medium">
           {type === 'checkbox' 
             ? (value ? 'Sí' : 'No')
             : type === 'date' && value
@@ -987,7 +989,7 @@ const GuestHistory = () => {
                     )
                   : formatData(value)
           }
-        </p>
+        </div>
       </div>
     );
   };
@@ -1595,7 +1597,7 @@ const GuestHistory = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleViewFullHistory(selectedGuest?.identificationNumber, reservation.id)}
+                                  onClick={() => handleViewFullHistory(selectedGuest?.identificationNumber, reservation.code)}
                                 >
                                   Ver Detalles
                                 </Button>
