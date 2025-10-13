@@ -14,9 +14,7 @@ const Navbar = ({ toggleSidebar, markAsRead }) => {
     const [showPopover, setShowPopover] = useState(false);
 
     const navLinks = [
-        { href: "/", label: "Inicio", roles: ["administrator", "receptionist"] },
-        { href: "/reservations", label: "Reservas", roles: ["administrator", "receptionist"] },
-        { href: "/users", label: "Usuarios", roles: ["administrator"] }
+        { href: "/", label: "Inicio", roles: ["administrator", "receptionist"] }
     ];
 
     return (

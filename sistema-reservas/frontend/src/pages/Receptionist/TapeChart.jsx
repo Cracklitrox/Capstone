@@ -72,10 +72,11 @@ const statusStyles = {
 
 // 🏷️ CANALES
 const channelLabels = {
-  chatbot: "ChatBot",
-  phone_call: "Llamada",
-  walk_in: "Walk-in",
+  chatbot: "ChatBot/WhatsApp",
+  reception: "Llamada",
   in_person: "Presencial",
+  walk_in: "Walk-in",
+  web: "Web",
 };
 
 // 🎯 EMOJIS DE SERVICIOS

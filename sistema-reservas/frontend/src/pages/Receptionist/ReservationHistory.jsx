@@ -175,16 +175,18 @@ const ReservationHistory = () => {
 
   // Mapeo de canales
   const channelLabels = {
-    chatbot: "ChatBot",
-    reception: "Recepción",
+    chatbot: "ChatBot/WhatsApp",
+    reception: "Llamada Telefónica",
+    in_person: "Presencial con Cita",
     walk_in: "Walk-in",
     web: "Web",
   };
 
   const channelVariants = {
     chatbot: "info",
-    reception: "default",
-    walk_in: "secondary",
+    reception: "secondary",
+    in_person: "default",
+    walk_in: "warning",
     web: "success",
   };
 

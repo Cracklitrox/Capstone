@@ -254,8 +254,8 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
             </Button>
             
             <Button
-              variant={channel === 'phone_call' ? 'default' : 'outline'}
-              onClick={() => setChannel('phone_call')}
+              variant={channel === 'reception' ? 'default' : 'outline'}
+              onClick={() => setChannel('reception')}
               className="h-auto py-4"
             >
               <div className="flex flex-col items-center gap-2">

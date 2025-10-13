@@ -15,9 +15,10 @@ const statusLabels = {
 
 const channelLabels = {
   chatbot: "ChatBot/WhatsApp",
-  phone_call: "Llamada Telefónica",
+  reception: "Llamada Telefónica",
+  in_person: "Presencial con Cita",
   walk_in: "Walk-in (sin cita)",
-  in_person: "Presencial con cita",
+  web: "Web",
 };
 
 function ReservationDetailsModal({ reservation }) {
