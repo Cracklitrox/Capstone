@@ -17,7 +17,6 @@ export default function NotificationsPage() {
     markAsArchived,
     unarchive,
     deleteNotification,
-    markAllRead,
     refreshNotifications,
   } = useNotificationsContext();
 
@@ -67,7 +66,6 @@ export default function NotificationsPage() {
         onMarkAsArchived={markAsArchived}
         onUnarchive={unarchive}
         onDelete={deleteNotification}
-        onMarkAllRead={markAllRead}
         onSendNotification={sendNotification}
         onRefresh={() => refreshNotifications()}
       />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bell, Check, Archive, Trash2, RefreshCw, Send, Users, User } from 'lucide-react';
+import { Bell, Check, Archive, Trash2, Send, Users, User } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
@@ -43,9 +43,7 @@ export function NotificationPanel({
   onMarkAsArchived,
   onUnarchive,
   onDelete,
-  onMarkAllRead,
   onSendNotification,
-  onRefresh,
 }) {
   const { cachedFetch } = useApiCache(5000);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -198,6 +196,15 @@ export function NotificationPanel({
     if (activeTab === 'archived') return notif.isArchived;
     return true;
   });
+  
+  // Eliminar duplicados basándose en el ID de la notificación
+  const uniqueNotifications = filteredNotifications.reduce((acc, current) => {
+    const exists = acc.find(item => item.id === current.id);
+    if (!exists) {
+      return [...acc, current];
+    }
+    return acc;
+  }, []);
 
   const handleMarkAsRead = async (notificationId) => {
     // Add to the set of notifications being marked as read
@@ -275,14 +282,6 @@ export function NotificationPanel({
       });
       setIsDialogOpen(false);
       
-      console.log('🔄 Refrescando notificaciones...');
-      
-      // Refrescar automáticamente para mostrar el mensaje enviado
-      if (onRefresh) {
-        await onRefresh();
-        console.log('✅ Notificaciones refrescadas');
-      }
-      
       // Cambiar automáticamente a la pestaña "Enviados"
       setActiveTab('sent');
       console.log('📂 Cambiado a pestaña Enviados');
@@ -309,19 +308,14 @@ export function NotificationPanel({
             </CardDescription>
           </div>
           
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onRefresh}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Send className="h-4 w-4 mr-2" />
-                  Enviar Notificación
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Send className="h-4 w-4 mr-2" />
+                Enviar Notificación
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Enviar Nueva Notificación</DialogTitle>
                   <DialogDescription>
@@ -351,7 +345,7 @@ export function NotificationPanel({
                       onChange={(e) =>
                         setNewNotification({ ...newNotification, message: e.target.value })
                       }
-                      placeholder="Mensaje detallado (opcional)"
+                      placeholder="Mensaje detallado"
                     />
                   </div>
 
@@ -417,7 +411,7 @@ export function NotificationPanel({
                             <span className="text-sm font-medium">{availableUsers[0].name}</span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Único {newNotification.targetRole === 'administrator' ? 'administrador' : 'recepcionista'} disponible
+                            {newNotification.targetRole === 'administrator' ? 'Administrador' : 'Recepcionista'}
                           </p>
                         </div>
                       ) : (
@@ -544,7 +538,6 @@ export function NotificationPanel({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
         </div>
       </CardHeader>
       
@@ -578,18 +571,11 @@ export function NotificationPanel({
               </TabsTrigger>
               <TabsTrigger value="archived">Archivadas</TabsTrigger>
             </TabsList>
-            
-            {activeTab === 'all' && unreadCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={onMarkAllRead}>
-                <Check className="h-4 w-4 mr-2" />
-                Marcar todas como leídas
-              </Button>
-            )}
           </div>
           
           <TabsContent value={activeTab} className="mt-0">
             <div className="max-h-[600px] overflow-y-auto pr-4">
-              {filteredNotifications.length === 0 ? (
+              {uniqueNotifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Bell className="h-16 w-16 mb-4 opacity-50" />
                   <p className="text-lg font-medium">No hay notificaciones</p>
@@ -605,7 +591,7 @@ export function NotificationPanel({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredNotifications.map((notification) => {
+                  {uniqueNotifications.map((notification) => {
                     const categoryConfig = getCategoryConfig(notification.category || 'general');
                     const isHighlighted = notification.id === highlightedNotificationId;
                     

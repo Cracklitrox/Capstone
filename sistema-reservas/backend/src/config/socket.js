@@ -37,6 +37,11 @@ const initializeSocket = (server) => {
     // Unir al usuario a su sala personal y sala de rol
     socket.join(`user:${socket.userId}`);
     socket.join(`role:${socket.userRole}`);
+    
+    console.log(`👤 Usuario ${socket.userId} unido a salas:`, [
+      `user:${socket.userId}`,
+      `role:${socket.userRole}`
+    ]);
 
     // Evento: Usuario se conecta
     socket.on('user:connected', () => {
@@ -113,10 +118,19 @@ const getIO = () => {
 const emitNotification = (targetUserId, targetRole, notification) => {
   const socketIO = getIO();
   
+  console.log('📤 Emitiendo notificación:', {
+    targetUserId,
+    targetRole,
+    notificationId: notification.id,
+    roomName: targetUserId ? `user:${targetUserId}` : `role:${targetRole}`
+  });
+  
   if (targetUserId) {
     socketIO.to(`user:${targetUserId}`).emit('notification:new', notification);
+    console.log(`✅ Notificación emitida a user:${targetUserId}`);
   } else if (targetRole) {
     socketIO.to(`role:${targetRole}`).emit('notification:new', notification);
+    console.log(`✅ Notificación emitida a role:${targetRole}`);
   }
 };
 

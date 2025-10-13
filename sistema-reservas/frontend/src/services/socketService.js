@@ -57,7 +57,13 @@ class SocketService {
   onNewNotification(callback) {
     if (!this.socket) return;
     
-    this.socket.on('notification:new', callback);
+    // Agregar log para verificar que el evento se está registrando
+    console.log('🔔 Registrando listener para notification:new');
+    
+    this.socket.on('notification:new', (data) => {
+      console.log('📨 Evento notification:new recibido en socketService:', data);
+      callback(data);
+    });
     this.listeners.set('notification:new', callback);
   }
 

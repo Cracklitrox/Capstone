@@ -217,6 +217,12 @@ async function getUserNotifications(userId, filters = {}) {
     readAt: readStatus.status === 'read' ? readStatus.updated_at : null,
     archivedAt: readStatus.archived_at,
     isArchived: !!readStatus.archived_at,
+    // Incluir objeto read_status para compatibilidad con el frontend
+    read_status: {
+      status: readStatus.status,
+      read_at: readStatus.status === 'read' ? readStatus.updated_at : null,
+      updated_at: readStatus.updated_at,
+    },
   }));
 
   // Formatear notificaciones enviadas
@@ -239,6 +245,8 @@ async function getUserNotifications(userId, filters = {}) {
     readAt: null,
     archivedAt: null,
     isArchived: false,
+    // No incluir read_status para notificaciones enviadas
+    read_status: null,
   }));
 
   // Combinar ambas listas y ordenar por fecha

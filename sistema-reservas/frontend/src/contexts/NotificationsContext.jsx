@@ -73,10 +73,14 @@ export function NotificationsProvider({ children, token }) {
     if (!token) return;
 
     try {
+      console.log('🔄 Recargando notificaciones sin caché...');
       // Llamada directa sin caché
       const response = await getUserNotifications(token, {});
+      console.log('✅ Notificaciones recargadas:', {
+        count: response.data?.length,
+        first: response.data?.[0]
+      });
       setNotifications(response.data || []);
-      console.log('🔄 Notificaciones recargadas sin caché');
     } catch (err) {
       console.error('Error al recargar notificaciones:', err);
     }
@@ -91,6 +95,19 @@ export function NotificationsProvider({ children, token }) {
         !n.read_status?.read_at && // No leída
         !n.isArchived // No archivada
     ).length;
+    
+    console.log('🔢 Calculando contador de no leídas:', {
+      total: notifications.length,
+      unread: count,
+      notificationsPreview: notifications.slice(0, 3).map(n => ({
+        id: n.id,
+        status: n.status,
+        hasReadStatus: !!n.read_status,
+        readAt: n.read_status?.read_at,
+        isArchived: n.isArchived
+      }))
+    });
+    
     setUnreadCount(count);
   }, [notifications]);
 
@@ -137,13 +154,15 @@ export function NotificationsProvider({ children, token }) {
 
     // Listener para nuevas notificaciones
     const handleNewNotification = async (notification) => {
-      console.log('📩 Nueva notificación recibida:', notification);
+      console.log('📩 Nueva notificación recibida por socket:', notification);
       
       // Invalidar caché y recargar todas las notificaciones para obtener la estructura completa
       invalidate();
+      console.log('🗑️ Caché invalidado');
       
       // Usar la función de recarga sin caché
       await reloadNotifications();
+      console.log('✅ Recarga completada después de nueva notificación');
       
       // Mostrar notificación del navegador si está permitido
       if ('Notification' in window && Notification.permission === 'granted') {
