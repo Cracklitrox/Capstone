@@ -7,7 +7,12 @@ const prisma = new PrismaClient();
  * Crea una notificación y la envía en tiempo real
  */
 async function createNotification(data) {
-  const { senderId, targetRoleId, targetUserId, title, message, notificationType, category } = data;
+  const { senderId, targetRoleId, targetUserId, targetUserIds, title, message, notificationType, category } = data;
+
+  // Validar que al menos haya un targetRoleId
+  if (!targetRoleId) {
+    throw new Error('targetRoleId es requerido');
+  }
 
   // Preparar los datos de la notificación
   const notificationData = {
@@ -17,14 +22,10 @@ async function createNotification(data) {
     users: {
       connect: { id: senderId }
     },
-  };
-
-  // Solo agregar la relación con roles si targetRoleId existe
-  if (targetRoleId) {
-    notificationData.roles = {
+    roles: {
       connect: { id: targetRoleId }
-    };
-  }
+    },
+  };
 
   // Crear la notificación en la base de datos
   const notification = await prisma.notifications.create({
@@ -46,35 +47,37 @@ async function createNotification(data) {
     },
   });
 
-  // Si la notificación es para un usuario específico, crear el estado de lectura
-  if (targetUserId) {
-    await prisma.notification_read_status.create({
-      data: {
-        notification_id: notification.id,
-        user_id: targetUserId,
-        status: 'unread',
+  console.log('🎯 Notificación creada con target_role_id:', targetRoleId);
+
+  // Determinar qué usuarios deben recibir la notificación
+  let targetUsers = [];
+
+  // Si se especificaron usuarios específicos (targetUserId o targetUserIds)
+  if (targetUserId || (targetUserIds && targetUserIds.length > 0)) {
+    // Usar la lista de IDs especificada
+    const userIds = targetUserIds && targetUserIds.length > 0 
+      ? targetUserIds 
+      : [targetUserId];
+    
+    console.log('👤 Enviando a usuarios específicos:', userIds);
+    
+    // Obtener información de los usuarios
+    targetUsers = await prisma.users.findMany({
+      where: {
+        id: { in: userIds },
+        status: 'active',
+      },
+      select: {
+        id: true,
+        first_name: true,
+        email: true,
       },
     });
-
-    // Emitir por Socket.io al usuario específico
-    emitNotification(targetUserId, null, {
-      id: notification.id,
-      title: notification.title,
-      message: notification.message,
-      category: notification.category || 'general',
-      sender: {
-        id: notification.users.id,
-        name: `${notification.users.first_name} ${notification.users.paternal_last_name}`,
-      },
-      sentAt: notification.sent_at,
-      status: 'unread',
-      type: notificationType || 'general',
-    });
-  }
-
-  // Si la notificación es para un rol, obtener usuarios con ese rol y crear estados
-  if (targetRoleId) {
-    const usersWithRole = await prisma.users.findMany({
+  } else {
+    // Enviar a TODOS los usuarios del rol
+    console.log('👥 Enviando a todos los usuarios del rol:', targetRoleId);
+    
+    targetUsers = await prisma.users.findMany({
       where: {
         status: 'active',
         user_roles: {
@@ -82,45 +85,53 @@ async function createNotification(data) {
             role_id: targetRoleId,
           },
         },
-        // Excluir al remitente para que no se envíe notificación a sí mismo
+        // Excluir al remitente
         NOT: {
           id: senderId,
         },
       },
       select: {
         id: true,
+        first_name: true,
+        email: true,
       },
-    });
-
-    // Crear estados de lectura para cada usuario del rol
-    const readStatusPromises = usersWithRole.map((user) =>
-      prisma.notification_read_status.create({
-        data: {
-          notification_id: notification.id,
-          user_id: user.id,
-          status: 'unread',
-        },
-      })
-    );
-
-    await Promise.all(readStatusPromises);
-
-    // Emitir por Socket.io al rol
-    const roleName = notification.roles?.name;
-    emitNotification(null, roleName, {
-      id: notification.id,
-      title: notification.title,
-      message: notification.message,
-      category: notification.category || 'general',
-      sender: {
-        id: notification.users.id,
-        name: `${notification.users.first_name} ${notification.users.paternal_last_name}`,
-      },
-      sentAt: notification.sent_at,
-      status: 'unread',
-      type: notificationType || 'general',
     });
   }
+
+  console.log('✅ Usuarios destinatarios:', targetUsers.map(u => ({ id: u.id, name: u.first_name })));
+
+  // Crear estados de lectura para cada usuario destinatario
+  const readStatusPromises = targetUsers.map((user) =>
+    prisma.notification_read_status.create({
+      data: {
+        notification_id: notification.id,
+        user_id: user.id,
+        status: 'unread',
+      },
+    })
+  );
+
+  await Promise.all(readStatusPromises);
+
+  // Emitir por Socket.io a cada usuario específico
+  const notificationPayload = {
+    id: notification.id,
+    title: notification.title,
+    message: notification.message,
+    category: notification.category || 'general',
+    sender: {
+      id: notification.users.id,
+      name: `${notification.users.first_name} ${notification.users.paternal_last_name}`,
+    },
+    sentAt: notification.sent_at,
+    status: 'unread',
+    type: notificationType || 'general',
+  };
+
+  // Emitir a cada usuario específico
+  targetUsers.forEach(user => {
+    emitNotification(user.id, null, notificationPayload);
+  });
 
   return notification;
 }

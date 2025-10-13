@@ -6,8 +6,10 @@ const notificationService = require('./notifications.realtime.service');
  */
 async function createNotification(req, res, next) {
   try {
-    const { targetRoleId, targetUserId, title, message, notificationType } = req.body;
+    const { targetRoleId, targetUserId, targetUserIds, title, message, notificationType, category } = req.body;
     const senderId = req.user.id; // Cambiado de req.user.userId a req.user.id
+
+    console.log('📤 Recibiendo petición para crear notificación:', req.body);
 
     // Validaciones
     if (!title) {
@@ -17,10 +19,10 @@ async function createNotification(req, res, next) {
       });
     }
 
-    if (!targetRoleId && !targetUserId) {
+    if (!targetRoleId) {
       return res.status(400).json({
         success: false,
-        message: 'Debe especificar un rol o usuario destinatario',
+        message: 'targetRoleId es requerido',
       });
     }
 
@@ -28,9 +30,11 @@ async function createNotification(req, res, next) {
       senderId,
       targetRoleId,
       targetUserId,
+      targetUserIds,
       title,
       message,
       notificationType,
+      category,
     });
 
     res.status(201).json({

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bell, Check, Archive, Trash2, Send, Users, User } from 'lucide-react';
+import { Bell, Check, Archive, Trash2, Send, Users, User, ArchiveRestore } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
@@ -170,12 +170,13 @@ export function NotificationPanel({
         const users = data.data || [];
         setAvailableUsers(users);
         
-        // Si solo hay 1 usuario, seleccionarlo automáticamente
+        // Si solo hay 1 usuario, mantener sendToAll en true para enviar al rol
+        // Esto asegura que la notificación se envíe correctamente por el rol
         if (users.length === 1) {
           setNewNotification(prev => ({
             ...prev,
-            sendToAll: false,
-            targetUserIds: [users[0].id.toString()],
+            sendToAll: true,
+            targetUserIds: [],
           }));
         }
       } catch (error) {
@@ -188,6 +189,20 @@ export function NotificationPanel({
 
     loadUsers();
   }, [newNotification.targetRole, cachedFetch]);
+
+  // Resetear el formulario cuando se abre el diálogo
+  useEffect(() => {
+    if (isDialogOpen) {
+      setNewNotification({
+        title: '',
+        message: '',
+        targetRole: '',
+        category: 'general',
+        sendToAll: true,
+        targetUserIds: [],
+      });
+    }
+  }, [isDialogOpen]);
 
   const filteredNotifications = notifications.filter((notif) => {
     if (activeTab === 'all') return !notif.isArchived;
@@ -236,6 +251,13 @@ export function NotificationPanel({
       return;
     }
 
+    console.log('📋 Estado de newNotification antes de enviar:', {
+      sendToAll: newNotification.sendToAll,
+      targetRole: newNotification.targetRole,
+      targetUserIds: newNotification.targetUserIds,
+      availableUsersCount: availableUsers.length,
+    });
+
     try {
       // Mapear nombres de roles a IDs (ajustar según tu BD)
       const roleMap = {
@@ -243,32 +265,24 @@ export function NotificationPanel({
         receptionist: 2,
       };
 
-      // Enviar a todos los usuarios del rol
-      if (newNotification.sendToAll) {
-        const notificationData = {
-          title: newNotification.title,
-          message: newNotification.message,
-          category: newNotification.category,
-          notificationType: 'message',
-          targetRoleId: roleMap[newNotification.targetRole],
-        };
-        
-        await onSendNotification(notificationData);
+      // SIEMPRE enviar con targetRoleId para mantener consistencia en la BD
+      const notificationData = {
+        title: newNotification.title,
+        message: newNotification.message,
+        category: newNotification.category,
+        notificationType: 'message',
+        targetRoleId: roleMap[newNotification.targetRole],
+      };
+
+      // Si es para usuarios específicos, agregar el array de IDs
+      if (!newNotification.sendToAll && newNotification.targetUserIds.length > 0) {
+        notificationData.targetUserIds = newNotification.targetUserIds.map(id => parseInt(id));
+        console.log('👤 Enviando a usuarios específicos del rol con targetRoleId:', notificationData);
       } else {
-        // Enviar a múltiples usuarios específicos
-        const promises = newNotification.targetUserIds.map((userId) => {
-          const notificationData = {
-            title: newNotification.title,
-            message: newNotification.message,
-            category: newNotification.category,
-            notificationType: 'message',
-            targetUserId: parseInt(userId),
-          };
-          return onSendNotification(notificationData);
-        });
-        
-        await Promise.all(promises);
+        console.log('👥 Enviando a TODOS los usuarios del rol con targetRoleId:', notificationData);
       }
+      
+      await onSendNotification(notificationData);
 
       console.log('📤 Notificación enviada, limpiando formulario...');
       
@@ -686,7 +700,7 @@ export function NotificationPanel({
                                       size="sm"
                                       onClick={() => onUnarchive(notification.id)}
                                     >
-                                      <RefreshCw className="h-3 w-3 mr-1" />
+                                      <ArchiveRestore className="h-3 w-3 mr-1" />
                                       Restaurar
                                     </Button>
                                   )}
