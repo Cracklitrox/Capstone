@@ -145,6 +145,7 @@ async function getUserNotifications(userId, filters = {}) {
   // 1. Obtener notificaciones RECIBIDAS
   const whereReceived = {
     user_id: userId,
+    deleted_at: null, // ✅ NO mostrar notificaciones eliminadas
   };
 
   // Filtrar por estado (read/unread)
@@ -344,21 +345,29 @@ async function deleteNotification(notificationId, userId) {
     },
   });
 
-  // Si el usuario es el emisor, eliminar la notificación completa
+  // Si el usuario es el emisor, marcar como eliminado para TODOS los receptores
   if (sentNotification) {
-    await prisma.notifications.delete({
+    await prisma.notification_read_status.updateMany({
       where: {
-        id: notificationId,
+        notification_id: notificationId,
+      },
+      data: {
+        deleted_at: new Date(),
       },
     });
-    return { success: true, message: 'Notificación eliminada' };
+    
+    console.log(`🗑️ Emisor ${userId} marcó notificación ${notificationId} como eliminada para todos`);
+    return { success: true, message: 'Notificación marcada como eliminada para todos los receptores' };
   }
 
-  // Si no es el emisor, eliminar solo el registro de lectura (receptor)
-  const readStatus = await prisma.notification_read_status.deleteMany({
+  // Si no es el emisor, marcar como eliminado solo para este receptor
+  const readStatus = await prisma.notification_read_status.updateMany({
     where: {
       notification_id: notificationId,
       user_id: userId,
+    },
+    data: {
+      deleted_at: new Date(),
     },
   });
 
@@ -366,7 +375,8 @@ async function deleteNotification(notificationId, userId) {
     throw new Error('Notificación no encontrada para este usuario');
   }
 
-  return { success: true, message: 'Notificación eliminada' };
+  console.log(`🗑️ Receptor ${userId} marcó notificación ${notificationId} como eliminada`);
+  return { success: true, message: 'Notificación marcada como eliminada' };
 }
 
 /**
@@ -378,6 +388,7 @@ async function getUnreadCount(userId) {
       user_id: userId,
       status: 'unread',
       archived_at: null,
+      deleted_at: null, // ✅ NO contar notificaciones eliminadas
     },
   });
 
