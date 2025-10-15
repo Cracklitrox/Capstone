@@ -1,12 +1,9 @@
 const prisma = require("../../db/prisma.client");
 
-/**
- * Obtiene un historial paginado y filtrado de reservas completadas.
- * MEJORADO: Ahora incluye más información para mostrar en cards modernas
- */
 const getHistory = async (filters, pagination) => {
   const {
     identification_number,
+    reservationCode, // <-- NUEVO
     roomId,
     floor,
     startDate,
@@ -16,68 +13,76 @@ const getHistory = async (filters, pagination) => {
   } = filters;
   const { page, limit } = pagination;
 
-  const where = {
-    status: "completed",
+  let where = {
     AND: [],
   };
 
-  // Filtro por RUT/Pasaporte
-  if (identification_number) {
+  // CASO 1: Se busca por un código de reserva específico.
+  if (reservationCode) {
     where.AND.push({
-      users_reservations_main_guest_idTousers: {
-        identification_number: {
-          contains: identification_number,
-          mode: "insensitive",
-        },
+      code: {
+        equals: reservationCode,
+        mode: "insensitive",
       },
     });
   }
+  // CASO 2: Se busca por huésped o filtros generales (solo completadas)
+  else {
+    // Por defecto, solo mostramos las completadas en el historial general
+    where.AND.push({ status: "completed" });
 
-  // Filtros de habitaciones
-  const roomFilters = {};
-  if (roomId) {
-    roomFilters.room_number = String(roomId);
-  }
-  if (floor) {
-    roomFilters.floor = parseInt(floor, 10);
-  }
-  if (Object.keys(roomFilters).length > 0) {
-    where.AND.push({
-      reservation_rooms: {
-        some: {
-          rooms: roomFilters,
+    // Filtro por RUT/Pasaporte
+    if (identification_number) {
+      where.AND.push({
+        users_reservations_main_guest_idTousers: {
+          identification_number: {
+            contains: identification_number,
+            mode: "insensitive",
+          },
         },
-      },
-    });
-  }
+      });
+    }
 
-  // Filtro por fecha de Check-in
-  if (startDate) {
-    where.AND.push({ check_in_date: { gte: new Date(startDate) } });
-  }
-
-  // Filtro por fecha de Check-out
-  if (endDate) {
-    const nextDay = new Date(endDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-    where.AND.push({ check_out_date: { lte: nextDay } });
-  }
-
-  // Filtro por precio mínimo
-  if (minPrice) {
-    where.AND.push({ total_amount: { gte: parseInt(minPrice, 10) } });
-  }
-
-  // Filtro por precio máximo
-  if (maxPrice) {
-    where.AND.push({ total_amount: { lte: parseInt(maxPrice, 10) } });
+    // Filtros de habitaciones
+    const roomFilters = {};
+    if (roomId) {
+      roomFilters.room_number = String(roomId);
+    }
+    if (floor) {
+      roomFilters.floor = parseInt(floor, 10);
+    }
+    if (Object.keys(roomFilters).length > 0) {
+      where.AND.push({
+        reservation_rooms: {
+          some: {
+            rooms: roomFilters,
+          },
+        },
+      });
+    }
+    
+    // Otros filtros...
+    if (startDate) {
+      where.AND.push({ check_in_date: { gte: new Date(startDate) } });
+    }
+    if (endDate) {
+      const nextDay = new Date(endDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      where.AND.push({ check_out_date: { lte: nextDay } });
+    }
+    if (minPrice) {
+      where.AND.push({ total_amount: { gte: parseInt(minPrice, 10) } });
+    }
+    if (maxPrice) {
+      where.AND.push({ total_amount: { lte: parseInt(maxPrice, 10) } });
+    }
   }
 
   // Si no hay filtros, eliminar el array AND vacío
   if (where.AND.length === 0) {
     delete where.AND;
   }
-
+  
   const skip = (page - 1) * limit;
 
   const [reservations, total] = await prisma.$transaction([

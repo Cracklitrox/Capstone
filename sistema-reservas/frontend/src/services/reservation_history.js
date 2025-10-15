@@ -1,8 +1,8 @@
-const API_URL = 'http://localhost:3001/api/v1';
+const API_URL = "http://localhost:3001/api/v1";
 
 /**
  * Obtiene la lista paginada y filtrada del historial de reservas.
- * @param {object} filters - Objeto con los filtros (rut, roomId, page, etc.).
+ * @param {object} filters - Objeto con los filtros (rut, roomId, reservation, guest, etc.).
  * @param {string} token - Token de autenticación.
  */
 export const getReservationHistory = async (filters, token) => {
@@ -14,16 +14,19 @@ export const getReservationHistory = async (filters, token) => {
     }
   }
   const queryParams = new URLSearchParams(activeFilters).toString();
-  
-  const response = await fetch(`${API_URL}/reservation_history?${queryParams}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
+
+  const response = await fetch(
+    `${API_URL}/reservation_history?${queryParams}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
-  });
+  );
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.message || 'Error al obtener el historial.');
+    throw new Error(errorData.message || "Error al obtener el historial.");
   }
 
   return response.json();
@@ -35,15 +38,20 @@ export const getReservationHistory = async (filters, token) => {
  * @param {string} token - Token de autenticación.
  */
 export const getReservationDetailsById = async (reservationId, token) => {
-  const response = await fetch(`${API_URL}/reservation_history/${reservationId}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
+  const response = await fetch(
+    `${API_URL}/reservation_history/${reservationId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
-  });
+  );
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.message || 'Error al obtener los detalles de la reserva.');
+    throw new Error(
+      errorData.message || "Error al obtener los detalles de la reserva."
+    );
   }
 
   return response.json();

@@ -5,14 +5,24 @@ const historyService = require("./reservation_history.service");
  */
 const getHistory = async (req, res) => {
   try {
-    const { rut, roomId, floor, startDate, endDate, minPrice, maxPrice } =
-      req.query;
+    const {
+      rut,
+      roomId,
+      floor,
+      startDate,
+      endDate,
+      minPrice,
+      maxPrice,
+      guest, // <-- NUEVO
+      reservation, // <-- NUEVO
+    } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
-    // ✅ FIX: Mapear correctamente 'rut' a 'identification_number'
     const filters = {
-      identification_number: rut,
+      // Usamos 'guest' si viene de la URL, si no, usamos 'rut' del filtro manual
+      identification_number: guest || rut,
+      reservationCode: reservation, // <-- NUEVO
       roomId,
       floor,
       startDate,

@@ -14,15 +14,26 @@ import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
 import TapeChart from "./pages/Receptionist/TapeChart.jsx";
 import ReservationHistory from "./pages/Receptionist/ReservationHistory.jsx";
 import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlerts.jsx";
+import GuestHistory from "./pages/Receptionist/GuestHistory.jsx";
 import NewReservation from "./pages/Reservations/NewReservation.jsx";
 
 import "./index.css";
 
 // --- Páginas de Contenido (Placeholder) ---
-const ReservationsPage = () => <h1 className="text-3xl font-bold">Gestionar Reservas</h1>;
-const UsersPage = () => <h1 className="text-3xl font-bold">Gestionar Usuarios</h1>;
-const SettingsPage = () => <h1 className="text-3xl font-bold">Configuración</h1>;
-const NotFoundPage = () => <h1 className="text-3xl font-bold text-center mt-10">404 - Página no encontrada</h1>;
+const ReservationsPage = () => (
+  <h1 className="text-3xl font-bold">Gestionar Reservas</h1>
+);
+const UsersPage = () => (
+  <h1 className="text-3xl font-bold">Gestionar Usuarios</h1>
+);
+const SettingsPage = () => (
+  <h1 className="text-3xl font-bold">Configuración</h1>
+);
+const NotFoundPage = () => (
+  <h1 className="text-3xl font-bold text-center mt-10">
+    404 - Página no encontrada
+  </h1>
+);
 
 // --- Componente Inteligente para el Dashboard ---
 const DashboardSelector = () => {
@@ -30,9 +41,9 @@ const DashboardSelector = () => {
   if (!user) return <div>Cargando...</div>;
 
   switch (user.role) {
-    case 'administrator':
+    case "administrator":
       return <AdminDashboard />;
-    case 'receptionist':
+    case "receptionist":
       return <ReceptionistDashboard />;
     default:
       return <div>Rol de usuario no reconocido.</div>;
@@ -46,12 +57,20 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
 
       {/* Rutas Protegidas */}
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<DashboardSelector />} />
         <Route path="planning" element={<TapeChart />} />
         <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} />
         <Route path="reservations" element={<ReservationsPage />} />
-        <Route path="history" element={<ReservationHistory />} /> 
+        <Route path="history" element={<ReservationHistory />} />
+        <Route path="guests" element={<GuestHistory />} />
         <Route path="reservations/new" element={<NewReservation />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />

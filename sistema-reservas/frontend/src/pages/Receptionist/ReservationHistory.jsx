@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/services/authContext.jsx";
 import {
   getReservationHistory,
@@ -50,11 +57,13 @@ import { ReservationDetailView } from "@/components/HistoryDetailViews";
 
 const ReservationHistory = () => {
   const { token } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [history, setHistory] = useState([]);
   const [meta, setMeta] = useState({ page: 1, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allRooms, setAllRooms] = useState([]);
+  const isInitialMount = useRef(true);
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -63,6 +72,8 @@ const ReservationHistory = () => {
     roomId: "",
     startDate: null,
     endDate: null,
+    reservation: "", // Para filtrar por código de reserva desde la URL
+    guest: "", // Para filtrar por RUT de huésped desde la URL
   });
 
   // Modal de detalle
@@ -89,25 +100,27 @@ const ReservationHistory = () => {
 
   // Fetch historial
   const fetchHistory = useCallback(
-    async (page = 1) => {
+    async (page = 1, currentFilters) => {
       if (!token) return;
       setLoading(true);
       setError(null);
       try {
         const apiFilters = {
           page,
-          rut: filters.rut || undefined,
+          rut: currentFilters.rut || undefined,
           roomId:
-            filters.roomId && !isNaN(filters.roomId)
-              ? Number(filters.roomId)
+            currentFilters.roomId && !isNaN(currentFilters.roomId)
+              ? Number(currentFilters.roomId)
               : undefined,
-          floor: filters.floor || undefined,
-          startDate: filters.startDate
-            ? format(filters.startDate, "yyyy-MM-dd")
+          floor: currentFilters.floor || undefined,
+          startDate: currentFilters.startDate
+            ? format(currentFilters.startDate, "yyyy-MM-dd")
             : undefined,
-          endDate: filters.endDate
-            ? format(filters.endDate, "yyyy-MM-dd")
+          endDate: currentFilters.endDate
+            ? format(currentFilters.endDate, "yyyy-MM-dd")
             : undefined,
+          guest: currentFilters.guest || undefined,
+          reservation: currentFilters.reservation || undefined,
         };
         const response = await getReservationHistory(apiFilters, token);
         setHistory(response.data || []);
@@ -118,32 +131,77 @@ const ReservationHistory = () => {
         setLoading(false);
       }
     },
-    [token, filters]
+    [token]
   );
 
-  // Debounce de filtros
+  // Efecto para leer los parámetros de la URL al cargar la página
   useEffect(() => {
+    const guestParam = searchParams.get("guest");
+    const reservationParam = searchParams.get("reservation");
+
+    // Solo se ejecuta si hay parámetros en la URL
+    if (guestParam || reservationParam) {
+      const initialFilters = {
+        ...filters,
+        guest: guestParam || "",
+        reservation: reservationParam || "",
+        rut: guestParam || "", // Rellena el input de RUT si viene el parámetro
+      };
+      setFilters(initialFilters);
+      fetchHistory(1, initialFilters);
+      // Limpiamos los parámetros de la URL para que no interfieran con filtros manuales
+      setSearchParams({});
+    } else {
+      // Si no hay parámetros, carga el historial general
+      fetchHistory(1, filters);
+    }
+  }, []); // Se ejecuta solo una vez
+
+  // Debounce para filtros manuales del usuario
+  useEffect(() => {
+    // Evita que se ejecute en la carga inicial
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     const handler = setTimeout(() => {
-      fetchHistory(1);
+      fetchHistory(1, filters);
     }, 500);
+
     return () => clearTimeout(handler);
-  }, [filters, fetchHistory]);
+  }, [
+    filters.rut,
+    filters.floor,
+    filters.roomId,
+    filters.startDate,
+    filters.endDate,
+  ]);
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+      // Limpiamos los filtros de URL si el usuario interactúa manualmente
+      guest: "",
+      reservation: "",
+    }));
   };
 
   const resetFilters = () => {
-    setFilters({
+    const clearedFilters = {
       rut: "",
       floor: "",
       roomId: "",
       startDate: null,
       endDate: null,
-    });
+      guest: "",
+      reservation: "",
+    };
+    setFilters(clearedFilters);
+    fetchHistory(1, clearedFilters);
   };
 
-  // Verificar si filtros están por defecto
   const isFiltersDefault = useMemo(() => {
     return (
       filters.rut === "" &&
@@ -169,11 +227,10 @@ const ReservationHistory = () => {
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= meta.totalPages) {
-      fetchHistory(newPage);
+      fetchHistory(newPage, filters);
     }
   };
 
-  // Mapeo de canales
   const channelLabels = {
     chatbot: "ChatBot/WhatsApp",
     reception: "Llamada Telefónica",
@@ -190,7 +247,6 @@ const ReservationHistory = () => {
     web: "success",
   };
 
-  // Formato de moneda
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("es-CL", {
       style: "currency",
@@ -198,7 +254,6 @@ const ReservationHistory = () => {
     }).format(amount);
   };
 
-  // Iconos de servicios (simplificado, mapear según nombre)
   const getServiceIcon = (serviceName) => {
     const name = serviceName.toLowerCase();
     if (name.includes("desayuno") || name.includes("comida")) return "🍽️";
@@ -241,7 +296,6 @@ const ReservationHistory = () => {
 
             {/* Filtros adicionales */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Piso */}
               <Select
                 value={filters.floor}
                 onValueChange={(value) =>
@@ -260,16 +314,12 @@ const ReservationHistory = () => {
                   ))}
                 </SelectContent>
               </Select>
-
-              {/* Habitación */}
               <Input
                 placeholder="Nº Habitación"
                 className="w-full sm:w-[150px]"
                 value={filters.roomId}
                 onChange={(e) => handleFilterChange("roomId", e.target.value)}
               />
-
-              {/* Fecha inicio */}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -294,8 +344,6 @@ const ReservationHistory = () => {
                   />
                 </PopoverContent>
               </Popover>
-
-              {/* Fecha fin */}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -320,8 +368,6 @@ const ReservationHistory = () => {
                   />
                 </PopoverContent>
               </Popover>
-
-              {/* Botón limpiar */}
               <Button
                 variant="outline"
                 onClick={resetFilters}
@@ -336,7 +382,7 @@ const ReservationHistory = () => {
         </CardContent>
       </Card>
 
-      {/* Estados de carga */}
+      {/* Estados de carga y Grid de cards */}
       {loading ? (
         <p className="text-center text-muted-foreground py-10">
           Cargando historial...
@@ -345,7 +391,6 @@ const ReservationHistory = () => {
         <p className="text-center text-destructive py-10">{error}</p>
       ) : (
         <>
-          {/* Grid de cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {history.length > 0 ? (
               history.map((item) => {
@@ -353,6 +398,15 @@ const ReservationHistory = () => {
                   item.total_amount > 0
                     ? (item.paid_amount / item.total_amount) * 100
                     : 0;
+                const statusBadgeVariant =
+                  {
+                    completed: "success",
+                    confirmed: "default",
+                    in_progress: "info",
+                    pending: "secondary",
+                    canceled: "destructive",
+                    no_show: "destructive",
+                  }[item.status] || "secondary";
 
                 return (
                   <Card
@@ -361,7 +415,6 @@ const ReservationHistory = () => {
                   >
                     <CardContent className="pt-6">
                       <div className="space-y-4">
-                        {/* Header con código y canal */}
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -379,10 +432,10 @@ const ReservationHistory = () => {
                               {channelLabels[item.channel] || item.channel}
                             </Badge>
                           </div>
-                          <Badge variant="success">Completada</Badge>
+                          <Badge variant={statusBadgeVariant}>
+                            {item.status}
+                          </Badge>
                         </div>
-
-                        {/* Cliente */}
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 text-sm">
                             <UserIcon className="h-4 w-4 text-muted-foreground" />
@@ -394,8 +447,6 @@ const ReservationHistory = () => {
                             {item.identification_number}
                           </p>
                         </div>
-
-                        {/* Habitación y huéspedes */}
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2">
                             <HomeIcon className="h-4 w-4 text-muted-foreground" />
@@ -409,8 +460,6 @@ const ReservationHistory = () => {
                             <span className="text-xs">{item.guest_count}</span>
                           </div>
                         </div>
-
-                        {/* Duración */}
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <MoonIcon className="h-4 w-4" />
                           <span>
@@ -423,8 +472,6 @@ const ReservationHistory = () => {
                             {format(parseISO(item.check_out_date), "dd/MM/yy")}
                           </span>
                         </div>
-
-                        {/* Servicios */}
                         {item.services && item.services.length > 0 && (
                           <div className="flex items-center gap-2">
                             <ShoppingBagIcon className="h-4 w-4 text-muted-foreground" />
@@ -446,8 +493,6 @@ const ReservationHistory = () => {
                             </div>
                           </div>
                         )}
-
-                        {/* Estado de pago con progress bar */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <div className="flex items-center gap-2">
@@ -471,8 +516,6 @@ const ReservationHistory = () => {
                           </div>
                           <Progress value={paymentProgress} className="h-2" />
                         </div>
-
-                        {/* Botón ver más */}
                         <Button
                           variant="outline"
                           className="w-full"
@@ -493,16 +536,15 @@ const ReservationHistory = () => {
                     No se encontraron reservas
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Intenta ajustar los filtros de búsqueda.
+                    Prueba a cambiar los filtros o a limpiar la búsqueda.
                   </p>
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {/* Paginación */}
           {meta.totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2">
+            <div className="flex justify-center items-center gap-2 pt-4">
               <Button
                 variant="outline"
                 size="sm"

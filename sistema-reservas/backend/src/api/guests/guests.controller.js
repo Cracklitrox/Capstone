@@ -2,6 +2,11 @@ const {
   searchGuestByIdentification,
   createGuest: createGuestService,
   updateGuest: updateGuestService,
+  searchAllGuestsService,
+  getGuestProfileById,
+  getGuestReservationsHistory,
+  updateGuestObservationsService,
+  updateGuestProfileService,
 } = require("./guests.service");
 const { logError } = require("../../utils/errorLogger");
 
@@ -163,8 +168,202 @@ async function updateGuest(req, res) {
   }
 }
 
+/**
+ * ✅ Obtener todos los huéspedes con búsqueda y paginación
+ */
+async function getAllGuests(req, res) {
+  try {
+    const { search = "", page = 1, limit = 20 } = req.query;
+
+    const result = await searchAllGuestsService(search, {
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error al obtener huéspedes:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener huéspedes: ${error.message}`,
+      originModule: "guests.controller - getAllGuests",
+      severity: "medium",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al obtener huéspedes",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * ✅ Obtener perfil completo de huésped
+ */
+async function getGuestProfile(req, res) {
+  try {
+    const { id } = req.params;
+
+    const profile = await getGuestProfileById(parseInt(id));
+
+    return res.status(200).json({
+      found: true,
+      profile,
+    });
+  } catch (error) {
+    console.error("Error al obtener perfil de huésped:", error);
+
+    if (error.message.includes("no encontrado")) {
+      return res.status(404).json({
+        found: false,
+        message: error.message,
+      });
+    }
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener perfil de huésped: ${error.message}`,
+      originModule: "guests.controller - getGuestProfile",
+      severity: "medium",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al obtener perfil de huésped",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * ✅ Obtener historial de reservas de huésped
+ */
+async function getGuestReservations(req, res) {
+  try {
+    const { id } = req.params;
+    const { status, startDate, endDate, page = 1, limit = 10 } = req.query;
+
+    const filters = {};
+    if (status) filters.status = status;
+    if (startDate) filters.startDate = startDate;
+    if (endDate) filters.endDate = endDate;
+
+    const pagination = { page: parseInt(page), limit: parseInt(limit) };
+
+    const result = await getGuestReservationsHistory(
+      parseInt(id),
+      filters,
+      pagination
+    );
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error al obtener reservas de huésped:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener reservas de huésped: ${error.message}`,
+      originModule: "guests.controller - getGuestReservations",
+      severity: "low",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al obtener reservas de huésped",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * ✅ Actualizar observaciones de huésped
+ */
+async function updateGuestObservations(req, res) {
+  try {
+    const { id } = req.params;
+    const { observations } = req.body;
+
+    const result = await updateGuestObservationsService(
+      parseInt(id),
+      observations
+    );
+
+    if (!result.found) {
+      return res.status(404).json({
+        found: false,
+        message: "Huésped no encontrado",
+      });
+    }
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error al actualizar observaciones:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al actualizar observaciones: ${error.message}`,
+      originModule: "guests.controller - updateGuestObservations",
+      severity: "low",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al actualizar observaciones",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * ✅ Actualizar perfil de huésped
+ */
+async function updateGuestProfile(req, res) {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const result = await updateGuestProfileService(parseInt(id), updateData);
+
+    if (!result.found) {
+      return res.status(404).json({
+        found: false,
+        message: "Huésped no encontrado",
+      });
+    }
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error al actualizar perfil de huésped:", error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al actualizar perfil de huésped: ${error.message}`,
+      originModule: "guests.controller - updateGuestProfile",
+      severity: "low",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al actualizar perfil de huésped",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   searchGuest,
   createGuest,
   updateGuest,
+  getAllGuests,
+  getGuestProfile,
+  getGuestReservations,
+  updateGuestObservations,
+  updateGuestProfile,
 };
