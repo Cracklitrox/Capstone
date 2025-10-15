@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { fetchCheckoutAlertsCount } from "../services/notifications.js";
-import { useApiCache } from "../hooks/useApiCache.js";
+import { useSocketNotifications } from "../hooks/useSocketNotifications.js";
 import { Button } from "@/components/ui/Button.jsx";
 import {
   HomeIcon,
@@ -129,29 +128,12 @@ const NavLink = ({
 };
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
-  const { user, token } = useAuth();
-  const { cachedFetch } = useApiCache(5000);
+  const { user } = useAuth();
   const closeSidebar = () => setSidebarOpen(false);
   const [roomsOpen, setRoomsOpen] = useState(false);
-  const [checkoutCount, setCheckoutCount] = useState(0);
-
-  useEffect(() => {
-    const loadCheckoutCount = async () => {
-      if (!token) return;
-      try {
-        const data = await cachedFetch('sidebar-checkout-count', () => fetchCheckoutAlertsCount(token));
-        setCheckoutCount(data.count || 0);
-      } catch (error) {
-        console.error("Error al cargar conteo de check-outs:", error);
-        setCheckoutCount(0);
-      }
-    };
-
-    loadCheckoutCount();
-
-    const interval = setInterval(loadCheckoutCount, 10 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [token, cachedFetch]);
+  
+  // ⭐ Usar WebSocket en lugar de polling
+  const { checkoutCount, isConnected } = useSocketNotifications();
 
   return (
     <>
@@ -250,7 +232,15 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 )}
             </ul>
           </nav>
-          <div className="mt-auto">
+          <div className="mt-auto space-y-2">
+            {(user.role === 'receptionist' || user.role === 'administrator') && (
+              <div className="px-2 py-1 text-xs text-muted-foreground flex items-center gap-2">
+                <span className={isConnected ? 'text-green-500' : 'text-red-500'}>
+                  {isConnected ? '🟢' : '🔴'}
+                </span>
+                <span>{isConnected ? 'Conectado' : 'Desconectado'}</span>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               © 2025 Hotel Don Teo
             </p>

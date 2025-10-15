@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const { emitNotification } = require('../../config/socket');
+const { PrismaClient } = require("@prisma/client");
+const { emitNotification, emitCheckoutAlerts } = require("../../config/socket");
 
 const prisma = new PrismaClient();
 
@@ -7,23 +7,32 @@ const prisma = new PrismaClient();
  * Crea una notificación y la envía en tiempo real
  */
 async function createNotification(data) {
-  const { senderId, targetRoleId, targetUserId, targetUserIds, title, message, notificationType, category } = data;
+  const {
+    senderId,
+    targetRoleId,
+    targetUserId,
+    targetUserIds,
+    title,
+    message,
+    notificationType,
+    category,
+  } = data;
 
   // Validar que al menos haya un targetRoleId
   if (!targetRoleId) {
-    throw new Error('targetRoleId es requerido');
+    throw new Error("targetRoleId es requerido");
   }
 
   // Preparar los datos de la notificación
   const notificationData = {
     title,
     message: message || null,
-    category: category || 'general', // Categoría por defecto
+    category: category || "general", // Categoría por defecto
     users: {
-      connect: { id: senderId }
+      connect: { id: senderId },
     },
     roles: {
-      connect: { id: targetRoleId }
+      connect: { id: targetRoleId },
     },
   };
 
@@ -47,7 +56,7 @@ async function createNotification(data) {
     },
   });
 
-  console.log('🎯 Notificación creada con target_role_id:', targetRoleId);
+  console.log("🎯 Notificación creada con target_role_id:", targetRoleId);
 
   // Determinar qué usuarios deben recibir la notificación
   let targetUsers = [];
@@ -55,17 +64,18 @@ async function createNotification(data) {
   // Si se especificaron usuarios específicos (targetUserId o targetUserIds)
   if (targetUserId || (targetUserIds && targetUserIds.length > 0)) {
     // Usar la lista de IDs especificada
-    const userIds = targetUserIds && targetUserIds.length > 0 
-      ? targetUserIds 
-      : [targetUserId];
-    
-    console.log('👤 Enviando a usuarios específicos:', userIds);
-    
+    const userIds =
+      targetUserIds && targetUserIds.length > 0
+        ? targetUserIds
+        : [targetUserId];
+
+    console.log("👤 Enviando a usuarios específicos:", userIds);
+
     // Obtener información de los usuarios
     targetUsers = await prisma.users.findMany({
       where: {
         id: { in: userIds },
-        status: 'active',
+        status: "active",
       },
       select: {
         id: true,
@@ -75,11 +85,11 @@ async function createNotification(data) {
     });
   } else {
     // Enviar a TODOS los usuarios del rol
-    console.log('👥 Enviando a todos los usuarios del rol:', targetRoleId);
-    
+    console.log("👥 Enviando a todos los usuarios del rol:", targetRoleId);
+
     targetUsers = await prisma.users.findMany({
       where: {
-        status: 'active',
+        status: "active",
         user_roles: {
           some: {
             role_id: targetRoleId,
@@ -98,7 +108,10 @@ async function createNotification(data) {
     });
   }
 
-  console.log('✅ Usuarios destinatarios:', targetUsers.map(u => ({ id: u.id, name: u.first_name })));
+  console.log(
+    "✅ Usuarios destinatarios:",
+    targetUsers.map((u) => ({ id: u.id, name: u.first_name }))
+  );
 
   // Crear estados de lectura para cada usuario destinatario
   const readStatusPromises = targetUsers.map((user) =>
@@ -106,7 +119,7 @@ async function createNotification(data) {
       data: {
         notification_id: notification.id,
         user_id: user.id,
-        status: 'unread',
+        status: "unread",
       },
     })
   );
@@ -118,18 +131,18 @@ async function createNotification(data) {
     id: notification.id,
     title: notification.title,
     message: notification.message,
-    category: notification.category || 'general',
+    category: notification.category || "general",
     sender: {
       id: notification.users.id,
       name: `${notification.users.first_name} ${notification.users.paternal_last_name}`,
     },
     sentAt: notification.sent_at,
-    status: 'unread',
-    type: notificationType || 'general',
+    status: "unread",
+    type: notificationType || "general",
   };
 
   // Emitir a cada usuario específico
-  targetUsers.forEach(user => {
+  targetUsers.forEach((user) => {
     emitNotification(user.id, null, notificationPayload);
   });
 
@@ -214,25 +227,27 @@ async function getUserNotifications(userId, filters = {}) {
     id: readStatus.notifications.id,
     title: readStatus.notifications.title,
     message: readStatus.notifications.message,
-    category: readStatus.notifications.category || 'general',
+    category: readStatus.notifications.category || "general",
     sender: {
       id: readStatus.notifications.users.id,
-      name: `${readStatus.notifications.users.first_name} ${readStatus.notifications.users.paternal_last_name}${
+      name: `${readStatus.notifications.users.first_name} ${
+        readStatus.notifications.users.paternal_last_name
+      }${
         readStatus.notifications.users.maternal_last_name
-          ? ' ' + readStatus.notifications.users.maternal_last_name
-          : ''
+          ? " " + readStatus.notifications.users.maternal_last_name
+          : ""
       }`,
     },
     targetRole: readStatus.notifications.roles?.name || null,
     sentAt: readStatus.notifications.sent_at,
     status: readStatus.status,
-    readAt: readStatus.status === 'read' ? readStatus.updated_at : null,
+    readAt: readStatus.status === "read" ? readStatus.updated_at : null,
     archivedAt: readStatus.archived_at,
     isArchived: !!readStatus.archived_at,
     // Incluir objeto read_status para compatibilidad con el frontend
     read_status: {
       status: readStatus.status,
-      read_at: readStatus.status === 'read' ? readStatus.updated_at : null,
+      read_at: readStatus.status === "read" ? readStatus.updated_at : null,
       updated_at: readStatus.updated_at,
     },
   }));
@@ -242,18 +257,20 @@ async function getUserNotifications(userId, filters = {}) {
     id: notification.id,
     title: notification.title,
     message: notification.message,
-    category: notification.category || 'general',
+    category: notification.category || "general",
     sender: {
       id: notification.users.id,
-      name: `${notification.users.first_name} ${notification.users.paternal_last_name}${
+      name: `${notification.users.first_name} ${
+        notification.users.paternal_last_name
+      }${
         notification.users.maternal_last_name
-          ? ' ' + notification.users.maternal_last_name
-          : ''
+          ? " " + notification.users.maternal_last_name
+          : ""
       }`,
     },
     targetRole: notification.roles?.name || null,
     sentAt: notification.sent_at,
-    status: 'sent', // Estado especial para notificaciones enviadas
+    status: "sent", // Estado especial para notificaciones enviadas
     readAt: null,
     archivedAt: null,
     isArchived: false,
@@ -279,16 +296,16 @@ async function markAsRead(notificationId, userId) {
       user_id: userId,
     },
     data: {
-      status: 'read',
+      status: "read",
       updated_at: new Date(),
     },
   });
 
   if (readStatus.count === 0) {
-    throw new Error('Notificación no encontrada para este usuario');
+    throw new Error("Notificación no encontrada para este usuario");
   }
 
-  return { success: true, message: 'Notificación marcada como leída' };
+  return { success: true, message: "Notificación marcada como leída" };
 }
 
 /**
@@ -306,10 +323,10 @@ async function markAsArchived(notificationId, userId) {
   });
 
   if (readStatus.count === 0) {
-    throw new Error('Notificación no encontrada para este usuario');
+    throw new Error("Notificación no encontrada para este usuario");
   }
 
-  return { success: true, message: 'Notificación archivada' };
+  return { success: true, message: "Notificación archivada" };
 }
 
 /**
@@ -327,10 +344,10 @@ async function unarchiveNotification(notificationId, userId) {
   });
 
   if (readStatus.count === 0) {
-    throw new Error('Notificación no encontrada para este usuario');
+    throw new Error("Notificación no encontrada para este usuario");
   }
 
-  return { success: true, message: 'Notificación restaurada' };
+  return { success: true, message: "Notificación restaurada" };
 }
 
 /**
@@ -355,9 +372,14 @@ async function deleteNotification(notificationId, userId) {
         deleted_at: new Date(),
       },
     });
-    
-    console.log(`🗑️ Emisor ${userId} marcó notificación ${notificationId} como eliminada para todos`);
-    return { success: true, message: 'Notificación marcada como eliminada para todos los receptores' };
+
+    console.log(
+      `🗑️ Emisor ${userId} marcó notificación ${notificationId} como eliminada para todos`
+    );
+    return {
+      success: true,
+      message: "Notificación marcada como eliminada para todos los receptores",
+    };
   }
 
   // Si no es el emisor, marcar como eliminado solo para este receptor
@@ -372,11 +394,13 @@ async function deleteNotification(notificationId, userId) {
   });
 
   if (readStatus.count === 0) {
-    throw new Error('Notificación no encontrada para este usuario');
+    throw new Error("Notificación no encontrada para este usuario");
   }
 
-  console.log(`🗑️ Receptor ${userId} marcó notificación ${notificationId} como eliminada`);
-  return { success: true, message: 'Notificación marcada como eliminada' };
+  console.log(
+    `🗑️ Receptor ${userId} marcó notificación ${notificationId} como eliminada`
+  );
+  return { success: true, message: "Notificación marcada como eliminada" };
 }
 
 /**
@@ -386,7 +410,7 @@ async function getUnreadCount(userId) {
   const count = await prisma.notification_read_status.count({
     where: {
       user_id: userId,
-      status: 'unread',
+      status: "unread",
       archived_at: null,
       deleted_at: null, // ✅ NO contar notificaciones eliminadas
     },
@@ -402,18 +426,18 @@ async function markAllAsRead(userId) {
   const result = await prisma.notification_read_status.updateMany({
     where: {
       user_id: userId,
-      status: 'unread',
+      status: "unread",
       archived_at: null,
     },
     data: {
-      status: 'read',
+      status: "read",
       updated_at: new Date(),
     },
   });
 
-  return { 
-    success: true, 
-    message: `${result.count} notificaciones marcadas como leídas` 
+  return {
+    success: true,
+    message: `${result.count} notificaciones marcadas como leídas`,
   };
 }
 
@@ -423,7 +447,7 @@ async function markAllAsRead(userId) {
 async function getUsersByRole(roleId, currentUserId) {
   const users = await prisma.users.findMany({
     where: {
-      status: 'active',
+      status: "active",
       user_roles: {
         some: {
           role_id: roleId,
@@ -441,11 +465,11 @@ async function getUsersByRole(roleId, currentUserId) {
       email: true,
     },
     orderBy: {
-      first_name: 'asc',
+      first_name: "asc",
     },
   });
 
-  return users.map(user => ({
+  return users.map((user) => ({
     id: user.id,
     name: `${user.first_name} ${user.paternal_last_name}`,
     fullName: `${user.first_name} ${user.paternal_last_name} ${user.maternal_last_name}`,
@@ -468,9 +492,9 @@ async function deleteOldNotifications(daysOld = 90) {
     },
   });
 
-  return { 
-    success: true, 
-    message: `${result.count} notificaciones antiguas eliminadas` 
+  return {
+    success: true,
+    message: `${result.count} notificaciones antiguas eliminadas`,
   };
 }
 
@@ -491,7 +515,9 @@ async function getNotificationReadStats(notificationId, userId) {
   });
 
   if (!notification) {
-    throw new Error('Notificación no encontrada o no tienes permiso para ver sus estadísticas');
+    throw new Error(
+      "Notificación no encontrada o no tienes permiso para ver sus estadísticas"
+    );
   }
 
   // Obtener todos los estados de lectura de esta notificación
@@ -512,10 +538,10 @@ async function getNotificationReadStats(notificationId, userId) {
     },
     orderBy: [
       {
-        status: 'asc', // 'read' primero, luego 'unread'
+        status: "asc", // 'read' primero, luego 'unread'
       },
       {
-        updated_at: 'desc',
+        updated_at: "desc",
       },
     ],
   });
@@ -528,12 +554,14 @@ async function getNotificationReadStats(notificationId, userId) {
     const userData = {
       id: status.users.id,
       name: `${status.users.first_name} ${status.users.paternal_last_name}`,
-      fullName: `${status.users.first_name} ${status.users.paternal_last_name} ${status.users.maternal_last_name || ''}`.trim(),
+      fullName: `${status.users.first_name} ${
+        status.users.paternal_last_name
+      } ${status.users.maternal_last_name || ""}`.trim(),
       email: status.users.email,
-      readAt: status.status === 'read' ? status.updated_at : null,
+      readAt: status.status === "read" ? status.updated_at : null,
     };
 
-    if (status.status === 'read') {
+    if (status.status === "read") {
       readBy.push(userData);
     } else {
       unreadBy.push(userData);
@@ -552,6 +580,23 @@ async function getNotificationReadStats(notificationId, userId) {
   };
 }
 
+// ⭐ NUEVA FUNCIÓN: Emitir notificaciones de checkout
+/**
+ * Emite notificaciones de checkout a todos los recepcionistas y administradores conectados
+ * @param {number} count - Número de checkouts pendientes
+ * @param {Array} data - Array con los datos de los checkouts
+ */
+async function emitCheckoutNotifications(count, data) {
+  try {
+    emitCheckoutAlerts(count, data);
+    console.log(
+      `📬 Notificación de ${count} checkout(s) emitida a recepcionistas`
+    );
+  } catch (error) {
+    console.error("❌ Error al emitir notificaciones de checkout:", error);
+  }
+}
+
 module.exports = {
   createNotification,
   getUserNotifications,
@@ -564,4 +609,5 @@ module.exports = {
   getUsersByRole,
   deleteOldNotifications,
   getNotificationReadStats,
+  emitCheckoutNotifications,
 };

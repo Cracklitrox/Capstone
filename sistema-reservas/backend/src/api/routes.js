@@ -15,29 +15,49 @@ const reservationsRoutes = require("./reservations/reservations.routes");
 const systemRoutes = require("./system/system.routes");
 const notificationsRoutes = require('./notifications/notifications.routes');
 
-// Define specific rate limiter for notifications routes
-const cummonLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-});
-
 const { authenticate } = require("../middleware/auth.middleware");
+
+// ⭐ Rate limiter mejorado: por usuario autenticado, no por IP
+const cummonLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: false,
+  skipSuccessfulRequests: false,
+  
+  // ⭐ Usar ID de usuario si está autenticado, sino usar IP por defecto
+  keyGenerator: (req, res) => {
+    if (req.user && req.user.id) {
+      return `user_${req.user.id}`;
+    }
+    return req.ip; // Esto usa el generador por defecto que maneja IPv6
+  },
+  
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Demasiadas peticiones. Por favor, espera un momento e intenta de nuevo.',
+      retryAfter: res.getHeader('Retry-After'),
+    });
+  },
+});
 
 router.get("/", (req, res) => {
   res.status(200).json({ message: "Bienvenido a la API v1 del Hotel Don Teo" });
 });
 
+// ⚠️ /auth NO lleva authenticate, solo cummonLimiter directo
 router.use("/auth", authRoutes);
-router.use("/rooms", cummonLimiter, authenticate, roomsRoutes);
-router.use('/reservation_history', cummonLimiter, authenticate, reservationHistoryRoutes); 
-router.use('/admin/rooms', adminRoomsRoutes);
-router.use("/staff", cummonLimiter, authenticate, staffRoutes);
-router.use("/planning", cummonLimiter, authenticate, planningRoutes);
-router.use('/notifications', cummonLimiter, authenticate, notificationsRoutes);
-router.use("/guests", cummonLimiter, authenticate, guestsRoutes);
-router.use("/reservations", cummonLimiter, authenticate, reservationsRoutes);
-router.use("/system", cummonLimiter, authenticate, systemRoutes);
+
+// ⭐ Todas las demás rutas: authenticate PRIMERO, luego cummonLimiter
+router.use("/rooms", authenticate, cummonLimiter, roomsRoutes);
+router.use('/reservation_history', authenticate, cummonLimiter, reservationHistoryRoutes); 
+router.use('/admin/rooms', authenticate, cummonLimiter, adminRoomsRoutes);
+router.use("/staff", authenticate, cummonLimiter, staffRoutes);
+router.use("/planning", authenticate, cummonLimiter, planningRoutes);
+router.use('/notifications', authenticate, cummonLimiter, notificationsRoutes);
+router.use("/guests", authenticate, cummonLimiter, guestsRoutes);
+router.use("/reservations", authenticate, cummonLimiter, reservationsRoutes);
+router.use("/system", authenticate, cummonLimiter, systemRoutes);
 
 module.exports = router;
