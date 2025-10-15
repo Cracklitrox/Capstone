@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useAuth } from "@/services/authContext.jsx";
+import { useAuth } from "@/hooks/useAuth";
 import {
   getReservationHistory,
   getReservationDetailsById,

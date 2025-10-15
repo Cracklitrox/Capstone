@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/services/authContext.jsx";
+import { useAuth } from "@/hooks/useAuth";
 import { guestHistoryService } from "@/services/guestHistory";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
