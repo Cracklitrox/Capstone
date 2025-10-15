@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { useAuth } from '../services/authContext.jsx';
+import { useAuth } from '../hooks/useAuth';
 import { useCheckoutCount } from '../hooks/useCheckoutCount';
+import { useNotificationsContext } from '../hooks/useNotificationsContext';
 import CheckoutNotificationPopover from './CheckoutNotificationPopover';
-import { Button } from "@/components/ui/Button.jsx";
+import { NotificationBell } from './NotificationBell';
+import { Button } from '@/components/ui/Button';
 import { Switch } from "@/components/ui/Switch.jsx";
 import { Label } from "@/components/ui/Label.jsx";
 import { ArrowLeftOnRectangleIcon, Bars3Icon, SunIcon, MoonIcon, BellAlertIcon } from '@heroicons/react/24/outline';
@@ -12,6 +14,18 @@ const Navbar = ({ toggleSidebar, markAsRead }) => {
     const { logout, user, isDarkMode, toggleTheme } = useAuth();
     const { count, refetch } = useCheckoutCount();
     const [showPopover, setShowPopover] = useState(false);
+    
+    // Hook de notificaciones en tiempo real desde el contexto global
+    const {
+        notifications,
+        unreadCount,
+        markAsRead: markNotificationAsRead,
+        markAsArchived,
+        markAllRead,
+    } = useNotificationsContext();
+    
+    // Solo mostrar notificaciones en tiempo real para admin y recepcionista
+    const showRealtimeNotifications = ['administrator', 'receptionist'].includes(user?.role);
 
     const navLinks = [
         { href: "/", label: "Inicio", roles: ["administrator", "receptionist"] }
@@ -38,7 +52,18 @@ const Navbar = ({ toggleSidebar, markAsRead }) => {
             </div>
             
             <div className="flex items-center space-x-4">
-                {/* Campanita de notificaciones - Solo para recepcionistas */}
+                {/* Notificaciones en Tiempo Real - Admin y Recepcionista */}
+                {showRealtimeNotifications && (
+                    <NotificationBell
+                        notifications={notifications.slice(0, 10)}
+                        unreadCount={unreadCount}
+                        onMarkAsRead={markNotificationAsRead}
+                        onMarkAsArchived={markAsArchived}
+                        onMarkAllRead={markAllRead}
+                    />
+                )}
+                
+                {/* Campanita de notificaciones de checkout - Solo para recepcionistas */}
                 {user?.role === 'receptionist' && (
                     <>
                         <Button 

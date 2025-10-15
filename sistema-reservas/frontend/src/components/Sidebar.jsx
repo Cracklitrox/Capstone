@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "../services/authContext.jsx";
+import { useAuth } from "../hooks/useAuth";
 import { fetchCheckoutAlertsCount } from "../services/notifications.js";
+import { useApiCache } from "../hooks/useApiCache.js";
 import { Button } from "@/components/ui/Button.jsx";
 import {
   HomeIcon,
@@ -10,6 +11,7 @@ import {
   ViewColumnsIcon,
   ClockIcon,
   BellAlertIcon,
+  BellIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { PlusCircle } from "lucide-react";
@@ -39,6 +41,12 @@ const navLinks = [
     href: "/guests",
     label: "Huéspedes",
     icon: UserGroupIcon,
+    roles: ["administrator", "receptionist"],
+  },
+  {
+    href: "/notifications",
+    label: "Notificaciones",
+    icon: BellIcon,
     roles: ["administrator", "receptionist"],
   },
   {
@@ -122,6 +130,7 @@ const NavLink = ({
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { user, token } = useAuth();
+  const { cachedFetch } = useApiCache(5000);
   const closeSidebar = () => setSidebarOpen(false);
   const [roomsOpen, setRoomsOpen] = useState(false);
   const [checkoutCount, setCheckoutCount] = useState(0);
@@ -130,8 +139,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     const loadCheckoutCount = async () => {
       if (!token) return;
       try {
-        const response = await fetchCheckoutAlertsCount(token);
-        setCheckoutCount(response.count || 0);
+        const data = await cachedFetch('sidebar-checkout-count', () => fetchCheckoutAlertsCount(token));
+        setCheckoutCount(data.count || 0);
       } catch (error) {
         console.error("Error al cargar conteo de check-outs:", error);
         setCheckoutCount(0);
@@ -142,7 +151,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
     const interval = setInterval(loadCheckoutCount, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [token]);
+  }, [token, cachedFetch]);
 
   return (
     <>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
-import { useAuth } from '../services/authContext';
+import { useAuth } from '../hooks/useAuth';
 import { useAlertTime } from '../hooks/useCheckoutNotifications';
 import { Toaster } from 'sonner';
 

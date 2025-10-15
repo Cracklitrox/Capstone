@@ -1,7 +1,5 @@
 import React, {
-  createContext,
   useState,
-  useContext,
   useEffect,
   useCallback,
   useMemo,
@@ -9,12 +7,8 @@ import React, {
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import { profileService } from "./profileService";
-
-const AuthContext = createContext();
-
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+import { useApiCache } from "../hooks/useApiCache";
+import { AuthContext } from "../contexts/AuthContext";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -23,6 +17,7 @@ export const AuthProvider = ({ children }) => {
   );
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { cachedFetch } = useApiCache(5000); // 5 segundos de caché
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("theme");
@@ -53,10 +48,10 @@ export const AuthProvider = ({ children }) => {
     navigate("/login");
   }, [navigate]);
 
-  // Función para aplicar preferencias del usuario
+  // Función para aplicar preferencias del usuario CON CACHÉ
   const applyUserPreferences = useCallback(async () => {
     try {
-      const preferences = await profileService.getMyPreferences();
+      const preferences = await cachedFetch('user-preferences', () => profileService.getMyPreferences());
 
       if (preferences.defaultTheme) {
         if (preferences.defaultTheme === "system") {
@@ -82,7 +77,7 @@ export const AuthProvider = ({ children }) => {
         console.error("Error al aplicar preferencias:", error);
       }
     }
-  }, [navigate]);
+  }, [navigate, cachedFetch]);
 
   useEffect(() => {
     if (!token) {

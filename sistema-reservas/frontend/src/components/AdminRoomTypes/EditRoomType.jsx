@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "@/services/authContext.jsx";
+import { useAuth } from "@/hooks/useAuth";
 import { updateAdminRoomType } from "@/services/adminRooms";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";

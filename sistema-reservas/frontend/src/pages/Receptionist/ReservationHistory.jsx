@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useAuth } from "@/services/authContext.jsx";
+import { useAuth } from "@/hooks/useAuth";
 import {
   getReservationHistory,
   getReservationDetailsById,

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "../services/authContext.jsx";
+import { useAuth } from "../hooks/useAuth";
 import { authService } from "../services/services";
 
 // --- 1. Importamos los nuevos componentes de Shadcn/ui ---

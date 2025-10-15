@@ -7,7 +7,8 @@ import {
   updateRoomStatus,
 } from "../services/rooms.js";
 import { fetchRoomDetails } from "../services/roomDetails.js";
-import { useAuth } from "../services/authContext.jsx";
+import { useAuth } from "../hooks/useAuth";
+import { useApiCache } from "../hooks/useApiCache.js";
 import { Button } from "@/components/ui/Button.jsx";
 import { Card, CardContent } from "@/components/ui/Card.jsx";
 import {
@@ -93,6 +94,7 @@ const StatusSummary = ({ rooms }) => {
 
 function RoomBoard() {
   const { token } = useAuth();
+  const { cachedFetch } = useApiCache(5000); // 5 segundos de caché
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [roomTypes, setRoomTypes] = useState([]);
@@ -126,8 +128,8 @@ function RoomBoard() {
       if (isInitialLoad) setLoading(true);
       try {
         const [roomsData, typesData] = await Promise.all([
-          fetchRooms(token),
-          fetchRoomTypes(token),
+          cachedFetch('rooms-list', () => fetchRooms(token)),
+          cachedFetch('room-types', () => fetchRoomTypes(token)),
         ]);
         setRooms(Array.isArray(roomsData) ? roomsData : []);
         setRoomTypes(Array.isArray(typesData) ? typesData : []);
@@ -137,7 +139,7 @@ function RoomBoard() {
         if (isInitialLoad) setLoading(false);
       }
     },
-    [token]
+    [token, cachedFetch]
   );
 
   useEffect(() => {

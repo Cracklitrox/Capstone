@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "@/services/authContext.jsx";
+import { useAuth } from "@/hooks/useAuth";
 import { deleteAdminRoomType } from "@/services/adminRooms";
 import { Button } from "@/components/ui/Button";
 import {

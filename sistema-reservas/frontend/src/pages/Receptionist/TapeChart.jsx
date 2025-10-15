@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useAuth } from "@/services/authContext";
+import { useAuth } from "@/hooks/useAuth";
+import { useApiCache } from "@/hooks/useApiCache";
 import { getPlanningData } from "@/services/planning";
 import { fetchRooms, fetchRoomTypes } from "@/services/rooms";
 import {
@@ -91,6 +92,7 @@ const serviceEmojis = {
 
 function TapeChart() {
   const { token } = useAuth();
+  const { cachedFetch } = useApiCache(5000); // 5 segundos de caché
 
   const [dateRange, setDateRange] = useState({
     from: startOfDay(new Date()),
@@ -148,7 +150,10 @@ function TapeChart() {
   useEffect(() => {
     if (token) {
       setLoading(true);
-      Promise.all([fetchRooms(token), fetchRoomTypes(token)])
+      Promise.all([
+        cachedFetch('rooms-list', () => fetchRooms(token)),
+        cachedFetch('room-types', () => fetchRoomTypes(token))
+      ])
         .then(([rooms, types]) => {
           setAllRooms(rooms.sort((a, b) => a.number.localeCompare(b.number)));
           setRoomTypes(types);
@@ -156,8 +161,7 @@ function TapeChart() {
         .catch((e) => setError(e.message))
         .finally(() => setLoading(false));
     }
-  }, [token]);
-
+  }, [token, cachedFetch]);
   useEffect(() => {
     if (token && dateRange.from && dateRange.to && allRooms.length > 0) {
       setLoading(true);

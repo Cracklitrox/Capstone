@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchCheckoutAlertsCount } from '../services/notifications';
-import { useAuth } from '../services/authContext';
+import { useAuth } from '../hooks/useAuth';
+import { useApiCache } from './useApiCache';
 
 /**
  * Hook para obtener el conteo de checkouts pendientes
@@ -10,6 +11,7 @@ export function useCheckoutCount() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { user, token } = useAuth();
+  const { cachedFetch } = useApiCache(5000); // 5 segundos de caché
 
   const fetchCount = useCallback(async () => {
     if (!user || !token || user.role !== 'receptionist') {
@@ -28,8 +30,8 @@ export function useCheckoutCount() {
         // Si ya fue marcado como leído, mostrar 0
         setCount(0);
       } else {
-        // Si no, obtener el conteo del backend
-        const data = await fetchCheckoutAlertsCount(token);
+        // Si no, obtener el conteo del backend CON CACHÉ
+        const data = await cachedFetch('checkout-count', () => fetchCheckoutAlertsCount(token));
         setCount(data.count || 0);
       }
     } catch (error) {
@@ -38,7 +40,7 @@ export function useCheckoutCount() {
     } finally {
       setLoading(false);
     }
-  }, [user, token]);
+  }, [user, token, cachedFetch]);
 
   useEffect(() => {
     // Solo ejecutar si es recepcionista y tiene token
