@@ -91,20 +91,23 @@ model notification_read_status {
   user_id         Int
   status          notification_status_enum? @default(unread)
   updated_at      DateTime?                 @default(now()) @db.Timestamp(6)
+  archived_at     DateTime?                 @db.Timestamp(6)
+  deleted_at      DateTime?                 @db.Timestamp(6)
   notifications   notifications             @relation(fields: [notification_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users           users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model notifications {
-  id                       Int                        @id @default(autoincrement())
+  id                       Int                          @id @default(autoincrement())
   sender_id                Int
   target_role_id           Int?
-  title                    String                     @db.VarChar(120)
-  message                  String?
-  sent_at                  DateTime?                  @default(now()) @db.Timestamp(6)
+  title                    String                       @db.VarChar(120)
+  message                  String
+  category                 notification_category_enum?  @default(general)
+  sent_at                  DateTime?                    @default(now()) @db.Timestamp(6)
   notification_read_status notification_read_status[]
-  users                    users                      @relation(fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  roles                    roles?                     @relation(fields: [target_role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                    users                        @relation(fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles                    roles?                       @relation(fields: [target_role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model payments {
@@ -300,14 +303,14 @@ model users {
   identification_number                            String                     @unique @db.VarChar(15)
   first_name                                       String                     @db.VarChar(100)
   paternal_last_name                               String                     @db.VarChar(80)
-  maternal_last_name                               String                     @db.VarChar(80)
+  maternal_last_name                               String?                    @db.VarChar(80)
   email                                            String?                    @unique @db.VarChar(150)
-  phone_number                                     String                     @db.VarChar(30)
+  phone_number                                     String?                    @db.VarChar(30)
   birth_date                                       DateTime?                  @db.Date
   gender                                           gender_enum?
-  country                                          String                     @db.VarChar(100)
-  region                                           String                     @db.VarChar(100)
-  city                                             String                     @db.VarChar(100)
+  country                                          String?                    @db.VarChar(100)
+  region                                           String?                    @db.VarChar(100)
+  city                                             String?                    @db.VarChar(100)
   password_hash                                    String                     @db.VarChar(255)
   status                                           user_status_enum?          @default(active)
   is_fully_registered                              Boolean?                   @default(true)
@@ -402,7 +405,7 @@ model room_service_daily {
 model reservation_drafts {
   id           Int      @id @default(autoincrement())
   user_id      Int
-  draft_data   Json     // JSON con todos los datos del formulario
+  draft_data   Json
   current_step Int      @default(1)
   created_at   DateTime @default(now()) @db.Timestamp(6)
   expires_at   DateTime? @db.Timestamp(6)
@@ -489,6 +492,16 @@ enum notification_status_enum {
   archived
 }
 
+enum notification_category_enum {
+  general
+  operational
+  administrative
+  alert
+  maintenance
+  reservation
+  payment
+}
+
 enum payment_method_enum {
   bank_transfer
   cash
@@ -507,6 +520,7 @@ enum payment_status_enum {
 enum reservation_channel_enum {
   chatbot
   reception
+  in_person
   walk_in
   web
 }

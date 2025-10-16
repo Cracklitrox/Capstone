@@ -798,7 +798,7 @@ async function createComplexScenarios(
         code: `CHECKOUT-TODAY-${String(i + 1).padStart(3, "0")}`,
         main_guest_id: mainGuest.id,
         receptionist_id: receptionist.id,
-        channel: faker.helpers.arrayElement(["reception", "web", "chatbot"]),
+        channel: faker.helpers.arrayElement(["reception", "web", "chatbot", "in_person", "walk_in"]),
         status: "in_progress",
         check_in_date: checkInDate,
         check_out_date: checkOutToday,
@@ -899,7 +899,7 @@ async function createComplexScenarios(
         code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
         main_guest_id: mainGuest.id,
         receptionist_id: receptionist.id,
-        channel: faker.helpers.arrayElement(["reception", "chatbot", "web"]),
+        channel: faker.helpers.arrayElement(["reception", "chatbot", "web", "in_person", "walk_in"]),
         status: isPast
           ? "completed"
           : faker.helpers.arrayElement(["pending", "confirmed", "in_progress"]),

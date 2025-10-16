@@ -211,35 +211,97 @@ const ReservationStepper = () => {
     try {
       // PASO 1: Obtener/Crear huésped principal
       let mainGuestId;
-      
+
       if (reservationData.mainGuest.id) {
-        // El huésped YA EXISTE (fue encontrado y actualizado)
+        // ✅ El huésped YA EXISTE
         mainGuestId = reservationData.mainGuest.id;
+        console.log("✅ Usando huésped existente ID:", mainGuestId);
       } else {
-        // El huésped NO EXISTE, crear uno nuevo
-        const mainGuestPayload = {
-          ...reservationData.mainGuest,
-          isMainGuest: true,
-        };
-        const mainGuestResult = await guestsService.createGuest(mainGuestPayload);
-        mainGuestId = mainGuestResult.guest.id;
+        // ✅ El huésped NO EXISTE, crear uno nuevo
+        console.log("➕ Creando nuevo huésped principal...");
+        try {
+          const mainGuestPayload = {
+            ...reservationData.mainGuest,
+            isMainGuest: true,
+          };
+          const response = await guestsService.createGuest(mainGuestPayload);
+          
+          // ✅ FIX CRÍTICO: Acceder a response.data (Axios envuelve la respuesta)
+          const guestData = response.data?.guest || response.guest || response;
+          mainGuestId = guestData.id;
+          
+          if (!mainGuestId) {
+            console.error("❌ Respuesta completa del backend:", response);
+            throw new Error("No se pudo obtener el ID del huésped principal creado");
+          }
+          
+          console.log("✅ Huésped principal creado con ID:", mainGuestId);
+        } catch (createError) {
+          // ✅ Si da 409, significa que ya existe
+          if (createError.response?.status === 409) {
+            const existingGuest = createError.response?.data?.guest;
+            if (existingGuest && existingGuest.id) {
+              mainGuestId = existingGuest.id;
+              console.log("⚠️ Huésped ya existía, usando ID:", mainGuestId);
+            } else {
+              throw new Error("No se pudo determinar el ID del huésped existente");
+            }
+          } else {
+            throw createError;
+          }
+        }
       }
 
       // PASO 2: Obtener/Crear huéspedes adicionales
       const additionalGuestIds = [];
+      
       for (const guestData of reservationData.additionalGuests) {
         if (guestData.id) {
-          // El huésped YA EXISTE
+          // ✅ El huésped YA EXISTE
           additionalGuestIds.push(guestData.id);
+          console.log("✅ Usando huésped adicional existente ID:", guestData.id);
         } else {
-          // El huésped NO EXISTE, crear uno nuevo
-          const payload = {
-            ...guestData,
-            isMainGuest: false,
-          };
-          const result = await guestsService.createGuest(payload);
-          additionalGuestIds.push(result.guest.id);
+          // ✅ El huésped NO EXISTE, crear uno nuevo
+          console.log("➕ Creando huésped adicional...");
+          try {
+            const payload = {
+              ...guestData,
+              isMainGuest: false,
+            };
+            const response = await guestsService.createGuest(payload);
+            
+            // ✅ FIX CRÍTICO: Acceder a response.data (Axios envuelve la respuesta)
+            const newGuestData = response.data?.guest || response.guest || response;
+            const newGuestId = newGuestData.id;
+            
+            if (!newGuestId) {
+              console.error("❌ Respuesta completa del backend:", response);
+              throw new Error("No se pudo obtener el ID del huésped adicional creado");
+            }
+            
+            additionalGuestIds.push(newGuestId);
+            console.log("✅ Huésped adicional creado con ID:", newGuestId);
+          } catch (createError) {
+            // ✅ Si da 409, usar el ID del existente
+            if (createError.response?.status === 409) {
+              const existingGuest = createError.response?.data?.guest;
+              if (existingGuest && existingGuest.id) {
+                additionalGuestIds.push(existingGuest.id);
+                console.log("⚠️ Huésped adicional ya existía, usando ID:", existingGuest.id);
+              } else {
+                throw new Error("No se pudo determinar el ID del huésped adicional existente");
+              }
+            } else {
+              throw createError;
+            }
+          }
         }
+      }
+
+      // ✅ VALIDACIÓN CRÍTICA: Verificar que no haya IDs nulos
+      if (additionalGuestIds.some(id => id === null || id === undefined)) {
+        console.error("❌ IDs de huéspedes adicionales:", additionalGuestIds);
+        throw new Error("Algunos huéspedes adicionales no tienen ID válido");
       }
 
       // PASO 3: Crear reserva
@@ -255,12 +317,14 @@ const ReservationStepper = () => {
         checkInDate: reservationData.checkInDate,
         checkOutDate: reservationData.checkOutDate,
         guestCount: reservationData.guests,
-        channel: "reception",
+        channel: reservationData.channel,
         paymentMethod: reservationData.paymentMethod,
         paymentAmount: reservationData.paymentAmount,
         isDeposit: reservationData.isDeposit,
         multiplePayments: reservationData.multiplePayments,
       };
+
+      console.log("📝 Creando reserva con payload:", payload);
 
       const result = await reservationsService.createReservation(payload);
 
@@ -270,7 +334,7 @@ const ReservationStepper = () => {
 
       navigate("/");
     } catch (error) {
-      console.error("Error al crear reserva:", error);
+      console.error("❌ Error al crear reserva:", error);
       toast.error("Error al crear reserva", {
         description: error.response?.data?.message || error.message,
       });

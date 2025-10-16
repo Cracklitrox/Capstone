@@ -2,12 +2,6 @@ import React from "react";
 import { Badge } from "@/components/ui/Badge.jsx";
 import { Button } from "@/components/ui/Button.jsx";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/Dropdown-menu.jsx";
-import {
   UserIcon,
   CalendarDaysIcon,
   ArrowRightOnRectangleIcon,
@@ -33,16 +27,10 @@ const statusLabels = {
   reservado: "Reservado",
 };
 
-function RoomCard({ room, onDetails, onStatusChange, onCheckIn, onCheckOut }) {
+function RoomCard({ room, onDetails, onCheckIn, onCheckOut }) {
   const status = (room.status || "unknown").toLowerCase();
   const variant = statusVariants[status] || "secondary";
   const label = statusLabels[status] || "Desconocido";
-
-  const menuOptions = [
-    { label: "Marcar como Limpieza", value: "cleaning" },
-    { label: "Poner en Mantenimiento", value: "maintenance" },
-    { label: "Marcar como Disponible", value: "available" },
-  ];
 
   const guestName = room.reservation?.guest
     ? `${room.reservation.guest.first_name || ""} ${room.reservation.guest.paternal_last_name || ""}`.trim()
@@ -73,18 +61,16 @@ function RoomCard({ room, onDetails, onStatusChange, onCheckIn, onCheckOut }) {
   return (
     <div
       className={cn(
-        "relative flex flex-col justify-between rounded-lg border-l-4 p-3 shadow-sm transition-all hover:shadow-lg hover:-translate-y-1 bg-card text-card-foreground",
+        "relative flex flex-col justify-between rounded-lg border-l-4 p-3 shadow-sm transition-all hover:shadow-lg hover:-translate-y-1 bg-card text-card-foreground cursor-pointer",
         status === "available" && "border-green-500",
         status === "occupied" && "border-red-500",
         status === "cleaning" && "border-blue-500",
         status === "maintenance" && "border-slate-500",
         (status === "pending" || status === "reservado") && "border-orange-500"
       )}
+      onClick={() => onDetails?.(room)}
     >
-      <div
-        onClick={() => onDetails?.(room)}
-        className="flex flex-col flex-grow cursor-pointer"
-      >
+      <div className="flex flex-col flex-grow">
         <div className="flex items-start justify-between">
           <div>
             <p className="font-bold text-lg text-foreground">{room.number}</p>
@@ -94,7 +80,9 @@ function RoomCard({ room, onDetails, onStatusChange, onCheckIn, onCheckOut }) {
           </div>
           <p className="text-xs text-muted-foreground">P.{room.floor}</p>
         </div>
+
         <div className="flex-grow" />
+
         <div className="flex items-end justify-between">
           {guestName && dateRange ? (
             <div className="space-y-1 text-xs text-muted-foreground overflow-hidden">
@@ -111,44 +99,22 @@ function RoomCard({ room, onDetails, onStatusChange, onCheckIn, onCheckOut }) {
             <div />
           )}
 
-          {/* 🔥 FIX: Detener propagación del evento */}
-          <div onClick={(e) => e.stopPropagation()}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Badge
-                  variant={variant}
-                  className="cursor-pointer hover:brightness-90 transition-all"
-                >
-                  {label}
-                </Badge>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {menuOptions
-                  .filter((opt) => opt.value !== room.status)
-                  .map((opt) => (
-                    <DropdownMenuItem
-                      key={opt.value}
-                      onSelect={() => onStatusChange(room.id, opt.value)}
-                    >
-                      {opt.label}
-                    </DropdownMenuItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {/* Badge de estado - SOLO INFORMATIVO */}
+          <Badge variant={variant}>{label}</Badge>
         </div>
       </div>
 
+      {/* Botones de Check-in/Check-out - DETIENEN PROPAGACIÓN */}
       {(showCheckIn || showCheckOut) && (
-        <div className="mt-2 border-t border-border pt-2 flex gap-2">
+        <div
+          className="mt-2 border-t border-border pt-2 flex gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
           {showCheckIn && (
             <Button
               size="sm"
               className="w-full bg-green-600 hover:bg-green-700 text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCheckIn(room.id, room.reservation.id);
-              }}
+              onClick={() => onCheckIn(room.id, room.reservation.id)}
             >
               <ArrowRightOnRectangleIcon className="h-4 w-4 mr-2" />
               Check-in
@@ -159,10 +125,7 @@ function RoomCard({ room, onDetails, onStatusChange, onCheckIn, onCheckOut }) {
               size="sm"
               variant="destructive"
               className="w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCheckOut(room.id, room.reservation.id);
-              }}
+              onClick={() => onCheckOut(room.id, room.reservation.id)}
             >
               <ArrowLeftOnRectangleIcon className="h-4 w-4 mr-2" />
               Check-out

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Country, State, City } from "country-state-city";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -33,6 +33,24 @@ const MAX_LENGTHS = {
   identificationNumber: 15,
 };
 
+// ✅ Helper para normalizar valores null a string vacío
+const normalizeGuestData = (guestData = {}) => {
+  return {
+    id: guestData.id || undefined, // ✅ CRÍTICO: Preservar id si existe
+    identificationNumber: guestData.identificationNumber || "",
+    firstName: guestData.firstName || "",
+    paternalLastName: guestData.paternalLastName || "",
+    maternalLastName: guestData.maternalLastName || "",
+    email: guestData.email || "",
+    phoneNumber: guestData.phoneNumber || "",
+    birthDate: guestData.birthDate || "",
+    gender: guestData.gender || "",
+    country: guestData.country || "",
+    region: guestData.region || "",
+    city: guestData.city || "",
+  };
+};
+
 const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
   const [additionalGuests, setAdditionalGuests] = useState(
     data.additionalGuests || []
@@ -64,6 +82,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
   const totalGuests = data.guests;
   const remainingGuests = totalGuests - 1;
 
+  // ✅ Memoizar opciones de países/estados/ciudades
   const countries = useMemo(
     () =>
       Country.getAllCountries().map((c) => ({
@@ -95,64 +114,49 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     [formData.country, formData.region]
   );
 
+  // ✅ Validación con debounce de 300ms
   useEffect(() => {
-    const errors = {};
+    const timeoutId = setTimeout(() => {
+      const errors = {};
 
-    if (touched.identificationNumber && formData.identificationNumber) {
-      if (nationality === "chileno") {
-        const cleaned = cleanRut(formData.identificationNumber);
-        const rutPart = cleaned.slice(0, -1);
-        const dvPart = cleaned.slice(-1);
+      if (touched.identificationNumber && formData.identificationNumber) {
+        if (nationality === "chileno") {
+          const cleaned = cleanRut(formData.identificationNumber);
+          const rutPart = cleaned.slice(0, -1);
+          const dvPart = cleaned.slice(-1);
 
-        if (!validateRutFormat(rutPart)) {
-          errors.identificationNumber = "RUT ingresado erróneo";
-        } else if (!validateRutDv(rutPart, dvPart)) {
-          errors.identificationNumber = "RUT ingresado erróneo";
-        }
-      } else {
-        if (!/^[A-Z0-9]{8,15}$/i.test(formData.identificationNumber)) {
-          errors.identificationNumber =
-            "Pasaporte debe tener 8-15 caracteres alfanuméricos";
+          if (!validateRutFormat(rutPart)) {
+            errors.identificationNumber = "RUT ingresado erróneo";
+          } else if (!validateRutDv(rutPart, dvPart)) {
+            errors.identificationNumber = "RUT ingresado erróneo";
+          }
+        } else {
+          if (!/^[A-Z0-9]{8,15}$/i.test(formData.identificationNumber)) {
+            errors.identificationNumber =
+              "Pasaporte debe tener 8-15 caracteres alfanuméricos";
+          }
         }
       }
-    }
 
-    if (touched.firstName && !formData.firstName) {
-      errors.firstName = "Nombre es obligatorio";
-    }
-
-    if (touched.paternalLastName && !formData.paternalLastName) {
-      errors.paternalLastName = "Apellido paterno es obligatorio";
-    }
-
-    if (touched.maternalLastName && !formData.maternalLastName) {
-      errors.maternalLastName = "Apellido materno es obligatorio";
-    }
-
-    if (touched.phoneNumber && !formData.phoneNumber) {
-      errors.phoneNumber = "Teléfono es obligatorio";
-    }
-
-    if (touched.country && !formData.country) {
-      errors.country = "País es obligatorio";
-    }
-
-    if (touched.region && !formData.region) {
-      errors.region = "Región es obligatoria";
-    }
-
-    if (touched.city && !formData.city) {
-      errors.city = "Ciudad es obligatoria";
-    }
-
-    if (touched.email && formData.email) {
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailPattern.test(formData.email)) {
-        errors.email = "Email inválido";
+      if (touched.firstName && !formData.firstName) {
+        errors.firstName = "Nombre es obligatorio";
       }
-    }
 
-    setValidationErrors(errors);
+      if (touched.paternalLastName && !formData.paternalLastName) {
+        errors.paternalLastName = "Apellido paterno es obligatorio";
+      }
+
+      if (touched.email && formData.email && formData.email.trim() !== "") {
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(formData.email)) {
+          errors.email = "Email inválido";
+        }
+      }
+
+      setValidationErrors(errors);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [formData, touched, nationality]);
 
   const handleSearchGuest = async () => {
@@ -203,20 +207,26 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
             )
           : null;
 
-        setGuestFound({
-          ...result.guest,
-          country: countryData?.isoCode || "",
-          region: stateData?.isoCode || "",
-        });
+        // ✅ Normalizar datos encontrados Y PRESERVAR ID
+        setGuestFound(
+          normalizeGuestData({
+            ...result.guest,
+            id: result.guest.id, // ✅ CRÍTICO: Preservar el ID
+            country: countryData?.isoCode || "",
+            region: stateData?.isoCode || "",
+          })
+        );
         toast.success("Huésped encontrado");
       } else {
         setGuestFound(null);
         toast.info("Huésped no encontrado. Complete el formulario.");
         setSearchMode(false);
-        setFormData((prev) => ({
-          ...prev,
-          identificationNumber: cleaned,
-        }));
+        // ✅ Normalizar al crear nuevo (sin id)
+        setFormData(
+          normalizeGuestData({
+            identificationNumber: cleaned,
+          })
+        );
       }
     } catch (error) {
       console.error("Error al buscar huésped:", error);
@@ -227,8 +237,15 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
   };
 
   const handleUseFoundGuest = () => {
+    // ✅ CRÍTICO: Asegurar que guestFound tenga todos los datos necesarios
+    const guestToAdd = {
+      ...guestFound,
+      id: guestFound.id, // ✅ Preservar ID si existe
+      isMainGuest: false,
+    };
+
     const newGuests = [...additionalGuests];
-    newGuests[currentGuestIndex] = guestFound;
+    newGuests[currentGuestIndex] = guestToAdd;
     setAdditionalGuests(newGuests);
 
     toast.success(`Huésped adicional ${currentGuestIndex + 1} agregado`);
@@ -245,24 +262,16 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
       identificationNumber: true,
       firstName: true,
       paternalLastName: true,
-      maternalLastName: true,
-      phoneNumber: true,
-      country: true,
-      region: true,
-      city: true,
     });
 
     if (
       !formData.identificationNumber ||
       !formData.firstName ||
-      !formData.paternalLastName ||
-      !formData.maternalLastName ||
-      !formData.phoneNumber ||
-      !formData.country ||
-      !formData.region ||
-      !formData.city
+      !formData.paternalLastName
     ) {
-      toast.error("Complete todos los campos obligatorios");
+      toast.error(
+        "Complete los campos obligatorios: RUT/Pasaporte, Nombre y Apellido Paterno"
+      );
       return;
     }
 
@@ -289,14 +298,19 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     }
 
     const countryName =
-      countries.find((c) => c.value === formData.country)?.label || "";
+      (formData.country &&
+        countries.find((c) => c.value === formData.country)?.label) ||
+      "";
     const stateName =
-      states.find((s) => s.value === formData.region)?.label || "";
+      (formData.region &&
+        states.find((s) => s.value === formData.region)?.label) ||
+      "";
 
+    // ✅ Preparar datos del huésped (sin id, se creará en el backend)
     const guestData = {
       ...formData,
-      country: countryName,
-      region: stateName,
+      country: countryName || "Chile",
+      region: stateName || "",
       isMainGuest: false,
     };
 
@@ -313,20 +327,18 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     }
   };
 
+  const handleSkipGuest = () => {
+    toast.info(`Huésped adicional ${currentGuestIndex + 1} omitido`);
+    resetForm();
+
+    if (currentGuestIndex < remainingGuests - 1) {
+      setCurrentGuestIndex(currentGuestIndex + 1);
+    }
+  };
+
   const resetForm = () => {
-    setFormData({
-      identificationNumber: "",
-      firstName: "",
-      paternalLastName: "",
-      maternalLastName: "",
-      email: "",
-      phoneNumber: "",
-      birthDate: "",
-      gender: "",
-      country: "",
-      region: "",
-      city: "",
-    });
+    // ✅ Normalizar al resetear (sin id)
+    setFormData(normalizeGuestData());
     setTouched({});
     setValidationErrors({});
     setGuestFound(null);
@@ -357,52 +369,67 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
     onNext();
   };
 
-  const updateFormField = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  // ✅ useCallback para evitar recrear función
+  const updateFormField = useCallback((field, value) => {
+    setFormData((prev) => {
+      if (prev[field] === value) return prev;
+      return { ...prev, [field]: value };
+    });
+  }, []);
 
-  const handleFieldBlur = (field) => {
+  const handleFieldBlur = useCallback((field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
-  };
+  }, []);
 
-  const handleIdentificationChange = (e) => {
-    const value = e.target.value;
+  // ✅ Memoizar handlers de identificación
+  const handleIdentificationChange = useCallback(
+    (e) => {
+      const value = e.target.value;
 
-    if (nationality === "chileno") {
-      const formatted = formatRutInput(value);
-      setIdentificationSearch(formatted);
-    } else {
-      setIdentificationSearch(value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
-    }
-  };
+      if (nationality === "chileno") {
+        const formatted = formatRutInput(value);
+        setIdentificationSearch(formatted);
+      } else {
+        setIdentificationSearch(value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+      }
+    },
+    [nationality]
+  );
 
-  const handleFormIdentificationChange = (e) => {
-    const value = e.target.value;
+  const handleFormIdentificationChange = useCallback(
+    (e) => {
+      const value = e.target.value;
 
-    if (nationality === "chileno") {
-      const formatted = formatRutInput(value);
-      updateFormField("identificationNumber", formatted);
-    } else {
-      updateFormField(
-        "identificationNumber",
-        value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+      if (nationality === "chileno") {
+        const formatted = formatRutInput(value);
+        updateFormField("identificationNumber", formatted);
+      } else {
+        updateFormField(
+          "identificationNumber",
+          value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+        );
+      }
+    },
+    [nationality, updateFormField]
+  );
+
+  // ✅ Memoizar getCharacterCount
+  const getCharacterCount = useCallback(
+    (field, maxLength) => {
+      const current = formData[field]?.length || 0;
+      const percentage = (current / maxLength) * 100;
+      const isWarning = percentage >= 75;
+
+      return (
+        <span
+          className={`text-xs ${isWarning ? "text-orange-500" : "text-muted-foreground"}`}
+        >
+          {current}/{maxLength}
+        </span>
       );
-    }
-  };
-
-  const getCharacterCount = (field, maxLength) => {
-    const current = formData[field]?.length || 0;
-    const percentage = (current / maxLength) * 100;
-    const isWarning = percentage >= 75;
-
-    return (
-      <span
-        className={`text-xs ${isWarning ? "text-orange-500" : "text-muted-foreground"}`}
-      >
-        {current}/{maxLength}
-      </span>
-    );
-  };
+    },
+    [formData]
+  );
 
   const canContinue = () => {
     return additionalGuests.length === remainingGuests;
@@ -410,7 +437,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
 
   const hasPartialData = () => {
     return Object.values(formData).some(
-      (value) => value && value.trim() !== ""
+      (value) => value && String(value).trim() !== ""
     );
   };
 
@@ -666,7 +693,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Apellido Materno *</Label>
+                      <Label>Apellido Materno (opcional)</Label>
                       {getCharacterCount(
                         "maternalLastName",
                         MAX_LENGTHS.maternalLastName
@@ -679,18 +706,8 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                       }
                       onBlur={() => handleFieldBlur("maternalLastName")}
                       maxLength={MAX_LENGTHS.maternalLastName}
-                      className={
-                        validationErrors.maternalLastName
-                          ? "border-destructive"
-                          : ""
-                      }
+                      placeholder="Opcional"
                     />
-                    {validationErrors.maternalLastName && (
-                      <div className="flex items-center gap-1 text-destructive text-sm">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>{validationErrors.maternalLastName}</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -706,6 +723,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                       }
                       onBlur={() => handleFieldBlur("email")}
                       maxLength={MAX_LENGTHS.email}
+                      placeholder="Opcional"
                       className={
                         validationErrors.email ? "border-destructive" : ""
                       }
@@ -720,7 +738,7 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Teléfono *</Label>
+                      <Label>Teléfono (opcional)</Label>
                       {getCharacterCount(
                         "phoneNumber",
                         MAX_LENGTHS.phoneNumber
@@ -732,22 +750,13 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                         updateFormField("phoneNumber", e.target.value)
                       }
                       onBlur={() => handleFieldBlur("phoneNumber")}
-                      placeholder="+56 9 1234 5678"
+                      placeholder="Opcional"
                       maxLength={MAX_LENGTHS.phoneNumber}
-                      className={
-                        validationErrors.phoneNumber ? "border-destructive" : ""
-                      }
                     />
-                    {validationErrors.phoneNumber && (
-                      <div className="flex items-center gap-1 text-destructive text-sm">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>{validationErrors.phoneNumber}</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label>País *</Label>
+                    <Label>País (opcional)</Label>
                     <LocationCombobox
                       options={countries}
                       value={formData.country}
@@ -760,19 +769,13 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                         }));
                         handleFieldBlur("country");
                       }}
-                      placeholder="País"
+                      placeholder="Opcional"
                     />
-                    {validationErrors.country && (
-                      <div className="flex items-center gap-1 text-destructive text-sm">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>{validationErrors.country}</span>
-                      </div>
-                    )}
                   </div>
 
                   {formData.country && (
                     <div className="space-y-2 animate-fade-in">
-                      <Label>Región *</Label>
+                      <Label>Región (opcional)</Label>
                       <LocationCombobox
                         options={states}
                         value={formData.region}
@@ -784,20 +787,14 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                           }));
                           handleFieldBlur("region");
                         }}
-                        placeholder="Región"
+                        placeholder="Opcional"
                       />
-                      {validationErrors.region && (
-                        <div className="flex items-center gap-1 text-destructive text-sm">
-                          <AlertCircle className="h-4 w-4" />
-                          <span>{validationErrors.region}</span>
-                        </div>
-                      )}
                     </div>
                   )}
 
                   {formData.region && (
                     <div className="space-y-2 animate-fade-in">
-                      <Label>Ciudad *</Label>
+                      <Label>Ciudad (opcional)</Label>
                       <LocationCombobox
                         options={cities}
                         value={formData.city}
@@ -805,14 +802,8 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                           setFormData((p) => ({ ...p, city: value }));
                           handleFieldBlur("city");
                         }}
-                        placeholder="Ciudad"
+                        placeholder="Opcional"
                       />
-                      {validationErrors.city && (
-                        <div className="flex items-center gap-1 text-destructive text-sm">
-                          <AlertCircle className="h-4 w-4" />
-                          <span>{validationErrors.city}</span>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -851,13 +842,22 @@ const Step5AdditionalGuests = ({ data, onUpdate, onNext, onBack }) => {
                     </div>
                   </div>
 
-                  <Button
-                    onClick={handleCreateGuest}
-                    disabled={Object.keys(validationErrors).length > 0}
-                    className="w-full"
-                  >
-                    Guardar Huésped
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleSkipGuest}
+                      className="flex-1"
+                    >
+                      Omitir Huésped
+                    </Button>
+                    <Button
+                      onClick={handleCreateGuest}
+                      disabled={Object.keys(validationErrors).length > 0}
+                      className="flex-1"
+                    >
+                      Guardar Huésped
+                    </Button>
+                  </div>
                 </div>
               </>
             )}

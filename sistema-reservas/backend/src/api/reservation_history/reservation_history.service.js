@@ -1,47 +1,88 @@
-const prisma = require('../../db/prisma.client');
+const prisma = require("../../db/prisma.client");
 
-/**
- * Obtiene un historial paginado y filtrado de reservas completadas.
- */
 const getHistory = async (filters, pagination) => {
-  const { rut, roomId, floor, startDate, endDate, minPrice, maxPrice } = filters;
+  const {
+    identification_number,
+    reservationCode, // <-- NUEVO
+    roomId,
+    floor,
+    startDate,
+    endDate,
+    minPrice,
+    maxPrice,
+  } = filters;
   const { page, limit } = pagination;
 
-  const where = {
-    status: 'completed',
+  let where = {
     AND: [],
   };
 
-  if (rut) {
+  // CASO 1: Se busca por un código de reserva específico.
+  if (reservationCode) {
     where.AND.push({
-      users_reservations_main_guest_idTousers: { rut: { contains: rut, mode: 'insensitive' } }
+      code: {
+        equals: reservationCode,
+        mode: "insensitive",
+      },
     });
   }
-  if (roomId) {
-    where.AND.push({ reservation_rooms: { some: { rooms: { room_number: parseInt(roomId) } } } });
-  }
-  if (floor) {
-    where.AND.push({ reservation_rooms: { some: { rooms: { floor: parseInt(floor) } } } });
-  }
-  if (startDate) {
-    where.AND.push({ check_in_date: { gte: new Date(startDate) } });
-  }
-  if (endDate) {
-    const nextDay = new Date(endDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-    where.AND.push({ check_out_date: { lte: nextDay } });
-  }
-  if (minPrice) {
-    where.AND.push({ total_amount: { gte: parseInt(minPrice) } });
-  }
-  if (maxPrice) {
-    where.AND.push({ total_amount: { lte: parseInt(maxPrice) } });
+  // CASO 2: Se busca por huésped o filtros generales (solo completadas)
+  else {
+    // Por defecto, solo mostramos las completadas en el historial general
+    where.AND.push({ status: "completed" });
+
+    // Filtro por RUT/Pasaporte
+    if (identification_number) {
+      where.AND.push({
+        users_reservations_main_guest_idTousers: {
+          identification_number: {
+            contains: identification_number,
+            mode: "insensitive",
+          },
+        },
+      });
+    }
+
+    // Filtros de habitaciones
+    const roomFilters = {};
+    if (roomId) {
+      roomFilters.room_number = String(roomId);
+    }
+    if (floor) {
+      roomFilters.floor = parseInt(floor, 10);
+    }
+    if (Object.keys(roomFilters).length > 0) {
+      where.AND.push({
+        reservation_rooms: {
+          some: {
+            rooms: roomFilters,
+          },
+        },
+      });
+    }
+    
+    // Otros filtros...
+    if (startDate) {
+      where.AND.push({ check_in_date: { gte: new Date(startDate) } });
+    }
+    if (endDate) {
+      const nextDay = new Date(endDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      where.AND.push({ check_out_date: { lte: nextDay } });
+    }
+    if (minPrice) {
+      where.AND.push({ total_amount: { gte: parseInt(minPrice, 10) } });
+    }
+    if (maxPrice) {
+      where.AND.push({ total_amount: { lte: parseInt(maxPrice, 10) } });
+    }
   }
 
+  // Si no hay filtros, eliminar el array AND vacío
   if (where.AND.length === 0) {
     delete where.AND;
   }
-
+  
   const skip = (page - 1) * limit;
 
   const [reservations, total] = await prisma.$transaction([
@@ -50,54 +91,118 @@ const getHistory = async (filters, pagination) => {
       skip,
       take: limit,
       orderBy: {
-        check_in_date: 'desc', 
+        check_in_date: "desc",
       },
       select: {
         id: true,
+        code: true,
+        channel: true,
+        status: true,
         guest_count: true,
+        total_amount: true,
         check_in_date: true,
         check_out_date: true,
         users_reservations_main_guest_idTousers: {
-          select: { rut: true, first_name: true, paternal_last_name: true, guest_details: { select: { observations: true } } }
+          select: {
+            identification_number: true,
+            first_name: true,
+            paternal_last_name: true,
+            guest_details: { select: { observations: true } },
+          },
         },
         reservation_rooms: {
-          select: { rooms: { select: { room_number: true } } },
-          take: 1
-        }
-      }
+          select: {
+            rooms: {
+              select: {
+                room_number: true,
+                room_types: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
+        },
+        reservation_services: {
+          select: {
+            quantity: true,
+            services: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        payments: {
+          select: {
+            amount: true,
+            status: true,
+          },
+        },
+      },
     }),
-    prisma.reservations.count({ where })
+    prisma.reservations.count({ where }),
   ]);
 
   return {
-    data: reservations.map(r => ({
-      reservation_id: r.id,
-      rut: r.users_reservations_main_guest_idTousers.rut,
-      nombre_cliente: `${r.users_reservations_main_guest_idTousers.first_name} ${r.users_reservations_main_guest_idTousers.paternal_last_name}`,
-      grupo_asignado: r.guest_count,
-      habitacion_reservada: r.reservation_rooms[0]?.rooms?.room_number || 'N/A',
-      observacion: r.users_reservations_main_guest_idTousers.guest_details?.observations || 'Sin observaciones',
-      check_in_date: r.check_in_date,
-      check_out_date: r.check_out_date
-    })),
+    data: reservations.map((r) => {
+      // Calcular monto pagado (solo pagos confirmados)
+      const paid_amount = r.payments
+        .filter((p) => p.status === "confirmed")
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      // Calcular duración en noches
+      const checkIn = new Date(r.check_in_date);
+      const checkOut = new Date(r.check_out_date);
+      const diffTime = Math.abs(checkOut - checkIn);
+      const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Servicios simplificados (máximo 3 para mostrar)
+      const services = r.reservation_services.slice(0, 3).map((rs) => ({
+        name: rs.services.name,
+        quantity: rs.quantity,
+      }));
+
+      return {
+        reservation_id: r.id,
+        code: r.code,
+        channel: r.channel,
+        status: r.status,
+        identification_number:
+          r.users_reservations_main_guest_idTousers.identification_number,
+        nombre_cliente: `${r.users_reservations_main_guest_idTousers.first_name} ${r.users_reservations_main_guest_idTousers.paternal_last_name}`,
+        guest_count: r.guest_count,
+        habitacion_reservada:
+          r.reservation_rooms[0]?.rooms?.room_number || "N/A",
+        room_type: r.reservation_rooms[0]?.rooms?.room_types?.name || "N/A",
+        observacion:
+          r.users_reservations_main_guest_idTousers.guest_details
+            ?.observations || "Sin observaciones",
+        check_in_date: r.check_in_date,
+        check_out_date: r.check_out_date,
+        total_amount: r.total_amount,
+        paid_amount,
+        nights,
+        services,
+        total_services: r.reservation_services.length,
+      };
+    }),
     meta: {
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    }
+    },
   };
 };
 
 /**
  * Obtiene todos los detalles de una reserva específica por su ID.
- * (Esta función de tu código original no necesita cambios)
  */
 const getHistoryDetailById = async (id) => {
   const reservation = await prisma.reservations.findUnique({
     where: {
       id: id,
-      status: 'completed',
+      status: "completed",
     },
     include: {
       users_reservations_main_guest_idTousers: {
@@ -106,22 +211,23 @@ const getHistoryDetailById = async (id) => {
           paternal_last_name: true,
           email: true,
           phone_number: true,
+          identification_number: true,
           guest_details: true,
-        }
+        },
       },
       reservation_rooms: {
         include: {
           rooms: {
             include: {
               room_types: true,
-            }
-          }
-        }
+            },
+          },
+        },
       },
       reservation_services: {
         include: {
           services: true,
-        }
+        },
       },
       reservation_guests: {
         include: {
@@ -129,16 +235,16 @@ const getHistoryDetailById = async (id) => {
             select: {
               first_name: true,
               paternal_last_name: true,
-            }
-          }
-        }
+            },
+          },
+        },
       },
       payments: true,
-    }
+    },
   });
 
   if (!reservation) {
-    throw new Error('Reserva no encontrada o no está completada.');
+    throw new Error("Reserva no encontrada o no está completada.");
   }
 
   const checkIn = new Date(reservation.check_in_date);
@@ -146,26 +252,27 @@ const getHistoryDetailById = async (id) => {
   const diffTime = Math.abs(checkOut - checkIn);
   const days_stayed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  // Cálculo del monto pagado y precio por noche
-  const paid_amount = reservation.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const price_per_night = reservation.total_amount && days_stayed > 0
-    ? reservation.total_amount / days_stayed
-    : 0;
+  const paid_amount = reservation.payments
+    .filter((p) => p.status === "confirmed")
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+  const price_per_night =
+    reservation.total_amount && days_stayed > 0
+      ? reservation.total_amount / days_stayed
+      : 0;
 
   return {
     ...reservation,
     days_stayed,
     paid_amount,
-    price_per_night
+    price_per_night,
   };
 };
 
-
-/** * Actualiza la observación de una reserva específica.
- * (Esta función de tu código original no necesita cambios)
+/**
+ * Actualiza la observación de una reserva específica.
  */
 const updateObservation = async (id, observation) => {
-  // Buscamos la reserva por su ID
   const reservation = await prisma.reservations.update({
     where: { id: parseInt(id) },
     data: {
@@ -173,7 +280,7 @@ const updateObservation = async (id, observation) => {
         update: {
           guest_details: {
             update: {
-              observations: observation,  
+              observations: observation,
             },
           },
         },

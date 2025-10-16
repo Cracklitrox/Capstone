@@ -26,13 +26,16 @@ CREATE TYPE "public"."maintenance_status_enum" AS ENUM ('pending', 'in_progress'
 CREATE TYPE "public"."notification_status_enum" AS ENUM ('read', 'unread', 'archived');
 
 -- CreateEnum
+CREATE TYPE "public"."notification_category_enum" AS ENUM ('general', 'operational', 'administrative', 'alert', 'maintenance', 'reservation', 'payment');
+
+-- CreateEnum
 CREATE TYPE "public"."payment_method_enum" AS ENUM ('bank_transfer', 'cash', 'credit_card', 'debit_card', 'multiple');
 
 -- CreateEnum
 CREATE TYPE "public"."payment_status_enum" AS ENUM ('pending', 'confirmed', 'rejected', 'refunded');
 
 -- CreateEnum
-CREATE TYPE "public"."reservation_channel_enum" AS ENUM ('chatbot', 'reception', 'walk_in', 'web');
+CREATE TYPE "public"."reservation_channel_enum" AS ENUM ('chatbot', 'reception', 'in_person', 'walk_in', 'web');
 
 -- CreateEnum
 CREATE TYPE "public"."reservation_status_enum" AS ENUM ('pending', 'confirmed', 'in_progress', 'canceled', 'completed', 'no_show');
@@ -143,6 +146,8 @@ CREATE TABLE "public"."notification_read_status" (
     "user_id" INTEGER NOT NULL,
     "status" "public"."notification_status_enum" DEFAULT 'unread',
     "updated_at" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
+    "archived_at" TIMESTAMP(6),
+    "deleted_at" TIMESTAMP(6),
 
     CONSTRAINT "notification_read_status_pkey" PRIMARY KEY ("id")
 );
@@ -153,7 +158,8 @@ CREATE TABLE "public"."notifications" (
     "sender_id" INTEGER NOT NULL,
     "target_role_id" INTEGER,
     "title" VARCHAR(120) NOT NULL,
-    "message" TEXT,
+    "message" TEXT NOT NULL,
+    "category" "public"."notification_category_enum" DEFAULT 'general',
     "sent_at" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
@@ -354,14 +360,14 @@ CREATE TABLE "public"."users" (
     "identification_number" VARCHAR(15) NOT NULL,
     "first_name" VARCHAR(100) NOT NULL,
     "paternal_last_name" VARCHAR(80) NOT NULL,
-    "maternal_last_name" VARCHAR(80) NOT NULL,
+    "maternal_last_name" VARCHAR(80),
     "email" VARCHAR(150),
-    "phone_number" VARCHAR(30) NOT NULL,
+    "phone_number" VARCHAR(30),
     "birth_date" DATE,
     "gender" "public"."gender_enum",
-    "country" VARCHAR(100) NOT NULL,
-    "region" VARCHAR(100) NOT NULL,
-    "city" VARCHAR(100) NOT NULL,
+    "country" VARCHAR(100),
+    "region" VARCHAR(100),
+    "city" VARCHAR(100),
     "password_hash" VARCHAR(255) NOT NULL,
     "status" "public"."user_status_enum" DEFAULT 'active',
     "is_fully_registered" BOOLEAN DEFAULT true,

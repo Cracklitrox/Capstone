@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import RoomBoard from "../../components/RoomBoard.jsx";
 import { Button } from "@/components/ui/Button";
@@ -6,19 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Plus } from "lucide-react";
 import { profileService } from "@/services/profileService";
 import { formatActivity } from "@/lib/activityFormatter";
+import { useApiCache } from "@/hooks/useApiCache";
 
 const ReceptionistDashboard = () => {
   const navigate = useNavigate();
   const [activities, setActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
+  const { cachedFetch } = useApiCache(5000); // 5 segundos de caché
 
-  useEffect(() => {
-    loadActivities();
-  }, []);
-
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async () => {
     try {
-      const data = await profileService.getMyActivity(5);
+      const data = await cachedFetch('my-activities', () => profileService.getMyActivity(5));
       setActivities(data);
     } catch (error) {
       if (error.response?.status === 400) {
@@ -30,7 +28,11 @@ const ReceptionistDashboard = () => {
     } finally {
       setLoadingActivities(false);
     }
-  };
+  }, [cachedFetch]);
+
+  useEffect(() => {
+    loadActivities();
+  }, [loadActivities]);
 
   return (
     <div className="space-y-6">

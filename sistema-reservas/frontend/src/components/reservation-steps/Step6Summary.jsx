@@ -12,6 +12,12 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { reservationsService } from '@/services/reservations';
 import { GuestDetailsModal } from '@/components/GuestDetailsModal';
+import {
+  PhoneIcon,
+  ChatBubbleLeftRightIcon,
+  UserIcon
+} from '@heroicons/react/24/outline';
+import { CheckBadgeIcon } from '@heroicons/react/24/solid';
 
 const PAYMENT_PRESETS = {
   FULL: 'full',
@@ -27,6 +33,7 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
   const [pricing, setPricing] = useState(data.pricing || null);
   const [loading, setLoading] = useState(!data.pricing);
   const [creating, setCreating] = useState(false);
+  const [channel, setChannel] = useState(data.channel || '');
 
   // Pagos múltiples
   const [multiplePayments, setMultiplePayments] = useState([]);
@@ -194,11 +201,17 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
       return;
     }
 
+    if (!channel) {
+      toast.error('Debe seleccionar el canal de contacto');
+      return;
+    }
+
     const paymentData = {
       paymentMethod: showMultiplePayments ? 'multiple' : paymentMethod,
       paymentAmount: totalPaid,
       isDeposit: pricing ? totalPaid < pricing.total : false,
       multiplePayments: showMultiplePayments ? multiplePayments : undefined,
+      channel: channel,
     };
 
     onUpdate(paymentData);
@@ -221,6 +234,68 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
       </div>
 
       {/* Reservation Details */}
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <PhoneIcon className="h-5 w-5" /> {/* O ChatBubbleIcon */}
+            ¿Cómo contactó el cliente?
+          </h3>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant={channel === 'chatbot' ? 'default' : 'outline'}
+              onClick={() => setChannel('chatbot')}
+              className="h-auto py-4"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <ChatBubbleLeftRightIcon className="h-6 w-6" />
+                <span className="text-sm font-medium">ChatBot/WhatsApp</span>
+              </div>
+            </Button>
+            
+            <Button
+              variant={channel === 'reception' ? 'default' : 'outline'}
+              onClick={() => setChannel('reception')}
+              className="h-auto py-4"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <PhoneIcon className="h-6 w-6" />
+                <span className="text-sm font-medium">Llamada Telefónica</span>
+              </div>
+            </Button>
+            
+            <Button
+              variant={channel === 'walk_in' ? 'default' : 'outline'}
+              onClick={() => setChannel('walk_in')}
+              className="h-auto py-4"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <UserIcon className="h-6 w-6" />
+                <span className="text-sm font-medium">Walk-in</span>
+                <span className="text-xs text-muted-foreground">Sin reserva previa</span>
+              </div>
+            </Button>
+            
+            <Button
+              variant={channel === 'in_person' ? 'default' : 'outline'}
+              onClick={() => setChannel('in_person')}
+              className="h-auto py-4"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <CheckBadgeIcon className="h-6 w-6" />
+                <span className="text-sm font-medium">Presencial con Cita</span>
+              </div>
+            </Button>
+          </div>
+          
+          {!channel && (
+            <p className="text-sm text-destructive flex items-center gap-1">
+              <AlertCircle className="h-4 w-4" />
+              Por favor selecciona cómo contactó el cliente
+            </p>
+          )}
+        </CardContent>
+      </Card>
       <Card>
         <CardContent className="pt-6 space-y-4">
           <h3 className="font-semibold text-foreground flex items-center gap-2">

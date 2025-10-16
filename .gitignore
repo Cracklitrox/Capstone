@@ -13,6 +13,7 @@ yarn-error.log*
 # --- Dependencias ---
 # Ignorar las carpetas de módulos de Node en CUALQUIER lugar del proyecto.
 node_modules/
+docs/
 
 # Ignorar entornos virtuales de Python.
 .venv/

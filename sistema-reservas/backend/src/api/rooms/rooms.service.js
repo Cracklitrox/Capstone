@@ -234,6 +234,11 @@ async function getRoomById(roomId) {
     });
 
     if (fullReservation) {
+      // 🔧 CALCULAR PAID_AMOUNT SUMANDO PAGOS CONFIRMADOS
+      const calculatedPaidAmount = fullReservation.payments
+        .filter(p => p.status === 'completed' || p.status === 'confirmed')
+        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
       currentReservation = {
         reservationId: fullReservation.id,
         code: fullReservation.code,
@@ -254,8 +259,8 @@ async function getRoomById(roomId) {
         checkIn: fullReservation.check_in_date,
         checkOut: fullReservation.check_out_date,
         guestCount: fullReservation.guest_count,
-        totalAmount: fullReservation.total_amount,
-        paidAmount: fullReservation.paid_amount,
+        totalAmount: parseFloat(fullReservation.total_amount || 0),
+        paidAmount: calculatedPaidAmount,
         rooms: fullReservation.reservation_rooms.map((rr) => ({
           number: rr.rooms.room_number,
           type: rr.rooms.room_types.name,
@@ -263,10 +268,10 @@ async function getRoomById(roomId) {
         services: fullReservation.reservation_services.map((rs) => ({
           name: rs.services.name,
           quantity: rs.quantity,
-          unitPrice: rs.unit_price,
+          unitPrice: parseFloat(rs.unit_price || 0),
         })),
         payments: fullReservation.payments.map((p) => ({
-          amount: p.amount,
+          amount: parseFloat(p.amount || 0),
           method: p.payment_method,
           status: p.status,
         })),
@@ -295,34 +300,41 @@ async function getRoomById(roomId) {
 
     maintenanceHistory: room.maintenance_tasks,
 
-    reservationHistory: pastReservations.map((res) => ({
-      reservationId: res.id,
-      code: res.code,
-      guestName: `${res.users_reservations_main_guest_idTousers.first_name} ${res.users_reservations_main_guest_idTousers.paternal_last_name} ${res.users_reservations_main_guest_idTousers.maternal_last_name || ""}`.trim(),
-      guestIdentification:
-        res.users_reservations_main_guest_idTousers.identification_number,
-      guestEmail: res.users_reservations_main_guest_idTousers.email,
-      guestPhone: res.users_reservations_main_guest_idTousers.phone_number,
-      checkIn: res.check_in_date,
-      checkOut: res.check_out_date,
-      guestCount: res.guest_count,
-      totalAmount: res.total_amount,
-      paidAmount: res.paid_amount,
-      rooms: res.reservation_rooms.map((rr) => ({
-        number: rr.rooms.room_number,
-        type: rr.rooms.room_types.name,
-      })),
-      services: res.reservation_services.map((rs) => ({
-        name: rs.services.name,
-        quantity: rs.quantity,
-        unitPrice: rs.unit_price,
-      })),
-      payments: res.payments.map((p) => ({
-        amount: p.amount,
-        method: p.payment_method,
-        status: p.status,
-      })),
-    })),
+    reservationHistory: pastReservations.map((res) => {
+      // 🔧 CALCULAR PAID_AMOUNT SUMANDO PAGOS CONFIRMADOS
+      const calculatedPaidAmount = res.payments
+        .filter(p => p.status === 'completed' || p.status === 'confirmed')
+        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
+      return {
+        reservationId: res.id,
+        code: res.code,
+        guestName: `${res.users_reservations_main_guest_idTousers.first_name} ${res.users_reservations_main_guest_idTousers.paternal_last_name} ${res.users_reservations_main_guest_idTousers.maternal_last_name || ""}`.trim(),
+        guestIdentification:
+          res.users_reservations_main_guest_idTousers.identification_number,
+        guestEmail: res.users_reservations_main_guest_idTousers.email,
+        guestPhone: res.users_reservations_main_guest_idTousers.phone_number,
+        checkIn: res.check_in_date,
+        checkOut: res.check_out_date,
+        guestCount: res.guest_count,
+        totalAmount: parseFloat(res.total_amount || 0),
+        paidAmount: calculatedPaidAmount,
+        rooms: res.reservation_rooms.map((rr) => ({
+          number: rr.rooms.room_number,
+          type: rr.rooms.room_types.name,
+        })),
+        services: res.reservation_services.map((rs) => ({
+          name: rs.services.name,
+          quantity: rs.quantity,
+          unitPrice: parseFloat(rs.unit_price || 0),
+        })),
+        payments: res.payments.map((p) => ({
+          amount: parseFloat(p.amount || 0),
+          method: p.payment_method,
+          status: p.status,
+        })),
+      };
+    }),
   };
 }
 

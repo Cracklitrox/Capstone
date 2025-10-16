@@ -3,7 +3,22 @@ import { createAdminRoom } from "../../services/adminRooms";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/Dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/Dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
+import { PlusIcon } from "@heroicons/react/24/outline";
 
 const initialState = {
   room_number: "",
@@ -23,16 +38,11 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     let val = value;
+
     // Validaciones en tiempo real
     if (name === "room_number") {
-      // Solo números, rango 0-999
       val = val.replace(/\D/g, "");
       if (val !== "" && (Number(val) < 0 || Number(val) > 999)) return;
-    }
-    if (name === "floor") {
-      // Solo 1, 2, 3
-      val = val.replace(/\D/g, "");
-      if (val !== "" && !["1","2","3"].includes(val)) return;
     }
     if (name === "capacity") {
       val = val.replace(/\D/g, "");
@@ -45,6 +55,7 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
     if (name === "description") {
       if (val.length > 150) return;
     }
+
     setForm((prev) => ({
       ...prev,
       [name]: val,
@@ -55,7 +66,8 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    // Validaciones finales antes de enviar
+
+    // Validaciones finales
     if (
       form.room_number === "" ||
       isNaN(form.room_number) ||
@@ -66,10 +78,7 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
       setLoading(false);
       return;
     }
-    if (
-      form.floor === "" ||
-      !["1","2","3"].includes(form.floor)
-    ) {
+    if (form.floor === "" || !["1", "2", "3"].includes(form.floor)) {
       setError("El piso solo puede ser 1, 2 o 3.");
       setLoading(false);
       return;
@@ -99,15 +108,19 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
       setLoading(false);
       return;
     }
+
     try {
-      await createAdminRoom({
-        room_number: form.room_number,
-        floor: Number(form.floor),
-        room_type_id: Number(form.room_type_id),
-        capacity: Number(form.capacity),
-        base_price: Number(form.base_price),
-        description: form.description,
-      }, token);
+      await createAdminRoom(
+        {
+          room_number: form.room_number,
+          floor: Number(form.floor),
+          room_type_id: Number(form.room_type_id),
+          capacity: Number(form.capacity),
+          base_price: Number(form.base_price),
+          description: form.description,
+        },
+        token
+      );
       setForm(initialState);
       setOpen(false);
       if (onCreated) onCreated();
@@ -120,109 +133,177 @@ const CreateRoom = ({ token, onCreated, roomTypes }) => {
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        variant="primary"
-        className="bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold px-6 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all duration-200"
-        style={{letterSpacing: "0.5px"}}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-        Crear habitación
+      <Button onClick={() => setOpen(true)} className="gap-2">
+        <PlusIcon className="h-5 w-5" />
+        Crear Habitación
       </Button>
+
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-gradient-to-br from-card via-card/80 to-card/60 text-card-foreground border border-input rounded-3xl shadow-2xl p-4 md:p-8 max-w-lg w-full">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle className="text-center text-2xl md:text-3xl font-extrabold mb-2 text-[var(--primary)]">Crear habitación</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">
+              Crear Nueva Habitación
+            </DialogTitle>
+            <DialogDescription>
+              Completa los datos para crear una nueva habitación en el sistema.
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="grid gap-6 mt-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <Label className="font-semibold text-[var(--secondary)]">Número</Label>
+
+          <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+            {/* Primera fila: Número y Piso */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="room_number">Número de Habitación *</Label>
                 <Input
+                  id="room_number"
                   name="room_number"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Ej: 101"
                   value={form.room_number}
                   onChange={handleChange}
                   required
-                  pattern="\d{1,3}"
-                  min="0"
-                  max="999"
-                  inputMode="numeric"
-                  placeholder="Ej: 101"
-                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                 />
+                <p className="text-xs text-muted-foreground">Entre 1 y 999</p>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label className="font-semibold text-[var(--secondary)]">Piso</Label>
-                <select name="floor" value={form.floor} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition">
-                  <option value="">Selecciona piso</option>
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                </select>
+
+              <div className="space-y-2">
+                <Label htmlFor="floor">Piso *</Label>
+                <Select
+                  value={form.floor}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({ ...prev, floor: value }))
+                  }
+                >
+                  <SelectTrigger id="floor">
+                    <SelectValue placeholder="Selecciona piso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Piso 1</SelectItem>
+                    <SelectItem value="2">Piso 2</SelectItem>
+                    <SelectItem value="3">Piso 3</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label className="font-semibold text-[var(--secondary)]">Tipo de habitación</Label>
-                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition">
-                  <option value="">Selecciona tipo</option>
-                  {roomTypes.map((type) => (
-                    <option key={type.id} value={type.id}>{type.name}</option>
-                  ))}
-                </select>
+            </div>
+
+            {/* Segunda fila: Tipo y Capacidad */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="room_type_id">Tipo de Habitación *</Label>
+                <Select
+                  value={form.room_type_id}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({ ...prev, room_type_id: value }))
+                  }
+                >
+                  <SelectTrigger id="room_type_id">
+                    <SelectValue placeholder="Selecciona tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roomTypes.map((type) => (
+                      <SelectItem key={type.id} value={String(type.id)}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label className="font-semibold text-[var(--secondary)]">Capacidad</Label>
+
+              <div className="space-y-2">
+                <Label htmlFor="capacity">Capacidad *</Label>
                 <Input
+                  id="capacity"
                   name="capacity"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Ej: 2"
                   value={form.capacity}
                   onChange={handleChange}
                   required
-                  pattern="\d{1,2}"
-                  min="0"
-                  max="10"
-                  inputMode="numeric"
-                  placeholder="Ej: 2"
-                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Máximo 10 personas
+                </p>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label className="font-semibold text-[var(--secondary)]">Precio base</Label>
+            </div>
+
+            {/* Tercera fila: Precio */}
+            <div className="space-y-2">
+              <Label htmlFor="base_price">Precio Base *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
                 <Input
+                  id="base_price"
                   name="base_price"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="35000"
+                  className="pl-7"
                   value={form.base_price}
                   onChange={handleChange}
                   required
-                  pattern="\d{1,6}"
-                  min="0"
-                  max="100000"
-                  inputMode="numeric"
-                  placeholder="Ej: 35000"
-                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Máximo $100.000 por noche
+              </p>
             </div>
-            <div className="flex flex-col gap-1 md:col-span-2">
-              <Label className="font-semibold text-[var(--secondary)]">Descripción (opcional)</Label>
+
+            {/* Descripción */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción (Opcional)</Label>
               <textarea
+                id="description"
                 name="description"
-                className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition resize-none"
-                placeholder="Máximo 150 caracteres"
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                placeholder="Describe características especiales de la habitación..."
                 value={form.description}
                 onChange={handleChange}
                 maxLength={150}
                 rows={3}
               />
-              <span className="text-xs text-muted-foreground self-end">{form.description.length}/150</span>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">
+                  Máximo 150 caracteres
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {form.description.length}/150
+                </p>
+              </div>
             </div>
-            {error && <p className="text-destructive text-sm text-center mt-2">{error}</p>}
-            <DialogFooter className="flex flex-row gap-2 justify-center mt-4">
-              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg shadow hover:bg-primary/80 transition">Crear</Button>
-              <Button type="button" onClick={() => setOpen(false)} variant="secondary" className="bg-secondary text-primary font-semibold px-4 py-2 rounded-lg shadow">Cancelar</Button>
+
+            {/* Mensaje de error */}
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive text-center">{error}</p>
+              </div>
+            )}
+
+            {/* Footer con botones */}
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setForm(initialState);
+                  setOpen(false);
+                }}
+                disabled={loading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Creando..." : "Crear Habitación"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
     </>
   );
-}
+};
 
 export default CreateRoom;

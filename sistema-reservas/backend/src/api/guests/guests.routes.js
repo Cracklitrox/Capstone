@@ -6,31 +6,66 @@ const {
   searchGuest,
   createGuest,
   updateGuest,
+  getAllGuests,
+  getGuestProfile,
+  getGuestReservations,
+  updateGuestObservations,
+  updateGuestProfile,
 } = require("./guests.controller");
 
-// Define rate limiter for guest update route
+// Define rate limiters
 const guestUpdateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per 15 minutes
-  message: "Too many update requests from this IP, please try again later."
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Too many update requests from this IP, please try again later.",
 });
 
-// Define rate limiter for guest search route
 const guestSearchLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // Limit each IP to 50 search requests per 15 minutes
-  message: "Too many search requests from this IP, please try again later."
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  message: "Too many search requests from this IP, please try again later.",
 });
 
-// Define rate limiter for guest creation route
 const guestCreateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per 15 minutes
-  message: "Too many create requests from this IP, please try again later."
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Too many create requests from this IP, please try again later.",
 });
+
+// ✅ NUEVAS RUTAS - Deben ir ANTES de las rutas con parámetros
+// Obtener todos los huéspedes (búsqueda principal)
+router.get("/", authenticate, guestSearchLimiter, getAllGuests);
 
 // Buscar huésped por identificación
-router.get("/search/:identificationNumber", guestSearchLimiter, authenticate, searchGuest);
+router.get(
+  "/search/:identificationNumber",
+  guestSearchLimiter,
+  authenticate,
+  searchGuest
+);
+
+// ✅ RUTAS CON ID - Van después
+// Obtener perfil completo de huésped
+router.get("/:id/profile", authenticate, getGuestProfile);
+
+// Obtener historial de reservas de huésped
+router.get("/:id/reservations", authenticate, getGuestReservations);
+
+// Actualizar observaciones de huésped
+router.put(
+  "/:id/observations",
+  authenticate,
+  guestUpdateLimiter,
+  updateGuestObservations
+);
+
+// Actualizar perfil de huésped
+router.put(
+  "/:id/profile",
+  authenticate,
+  guestUpdateLimiter,
+  updateGuestProfile
+);
 
 // Crear nuevo huésped
 router.post("/", authenticate, guestCreateLimiter, createGuest);

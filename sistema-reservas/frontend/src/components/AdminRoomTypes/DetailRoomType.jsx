@@ -1,58 +1,195 @@
 import React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
+import { Badge } from "@/components/ui/Badge";
+import { Card, CardContent } from "@/components/ui/Card";
+import {
+  TagIcon,
+  UsersIcon,
+  DocumentTextIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  HashtagIcon,
+} from "@heroicons/react/24/outline";
 
-const DetailRoomType = ({ roomType }) => {
-  const [open, setOpen] = React.useState(false);
+const DetailRoomType = ({ open, onClose, roomType }) => {
   if (!roomType) return null;
 
-  // Mapeo de estado
-  const estado = roomType.is_active ? 'Activo' : 'Inactivo';
-  const estadoColor = roomType.is_active ? 'bg-green-500' : 'bg-red-500';
-
   return (
-    <>
-      <Button onClick={() => setOpen(true)} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg shadow-md hover:bg-primary/80 transition">Ver detalle</Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-gradient-to-br from-card via-card/80 to-card/60 text-card-foreground border border-input rounded-3xl shadow-2xl p-4 md:p-8 max-w-md w-full">
-          <DialogHeader>
-            <DialogTitle className="text-center text-3xl md:text-4xl font-extrabold mb-4 text-[var(--primary)] tracking-tight flex items-center justify-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V6a2 2 0 012-2h2m8 0h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2m-8 0H6a2 2 0 01-2-2v-2" /></svg>
-              Detalle tipo de habitación
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-6 mt-2">
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col">
-                <span className="font-semibold text-[var(--secondary)]">Nombre</span>
-                <span className="text-[var(--foreground)] text-lg font-bold">{roomType.name}</span>
-              </div>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <DialogTitle className="text-3xl font-bold text-primary flex items-center gap-2">
+                <TagIcon className="h-8 w-8" />
+                {roomType.name}
+              </DialogTitle>
+              <DialogDescription className="text-base">
+                Información completa del tipo de habitación
+              </DialogDescription>
             </div>
-            <div className="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[var(--secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17l4 4 4-4m0-5V3a1 1 0 00-1-1H9a1 1 0 00-1 1v9m0 0l4 4 4-4" /></svg>
-              <div className="flex flex-col">
-                <span className="font-semibold text-[var(--secondary)]">Capacidad base</span>
-                <span className="text-[var(--foreground)] text-lg">{roomType.base_capacity}</span>
+            <Badge
+              variant={roomType.is_active ? "success" : "destructive"}
+              className="text-base px-3 py-1"
+            >
+              {roomType.is_active ? "Activo" : "Inactivo"}
+            </Badge>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-6 mt-4">
+          {/* Información principal en cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Capacidad base */}
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <UsersIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Capacidad Base
+                    </p>
+                    <p className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                      {roomType.base_capacity}{" "}
+                      {roomType.base_capacity === 1 ? "persona" : "personas"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ID del tipo */}
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <HashtagIcon className="h-6 w-6 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-1" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                      Identificador
+                    </p>
+                    <p className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                      ID #{roomType.id}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Estado de activación */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {roomType.is_active ? (
+                    <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                  ) : (
+                    <XCircleIcon className="h-6 w-6 text-red-600" />
+                  )}
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      Estado de Activación
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {roomType.is_active
+                        ? "El tipo está activo y puede ser asignado a habitaciones"
+                        : "El tipo está inactivo y no puede ser asignado"}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant={roomType.is_active ? "success" : "destructive"}
+                  className="text-base"
+                >
+                  {roomType.is_active ? "Activo" : "Inactivo"}
+                </Badge>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Descripción (si existe) */}
+          {roomType.description ? (
+            <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 border-slate-200 dark:border-slate-800">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <DocumentTextIcon className="h-6 w-6 text-slate-600 dark:text-slate-400 flex-shrink-0 mt-1" />
+                  <div className="space-y-2 flex-1">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      Descripción
+                    </p>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {roomType.description}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-muted/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <DocumentTextIcon className="h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground italic">
+                    Sin descripción proporcionada
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Información adicional en grid pequeño */}
+          <div className="grid grid-cols-2 gap-3 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                ID del Tipo
+              </p>
+              <p className="text-sm font-mono font-semibold text-foreground">
+                #{roomType.id}
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[var(--secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8m-4-4v8" /></svg>
-              <div className="flex flex-col">
-                <span className="font-semibold text-[var(--secondary)]">Descripción</span>
-                <span className="text-[var(--foreground)]">{roomType.description || <span className="text-muted-foreground">Sin descripción</span>}</span>
-              </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Nombre
+              </p>
+              <p className="text-sm font-mono font-semibold text-foreground">
+                {roomType.name}
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[var(--secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={2} fill={roomType.is_active ? '#22c55e' : '#ef4444'} /></svg>
-              <div className="flex flex-col">
-                <span className="font-semibold text-[var(--secondary)]">Estado</span>
-                <span className={`px-2 py-1 rounded-full text-white text-sm font-semibold shadow ${estadoColor}`}>{estado}</span>
-              </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Capacidad Base
+              </p>
+              <p className="text-sm font-mono font-semibold text-foreground">
+                {roomType.base_capacity}{" "}
+                {roomType.base_capacity === 1 ? "persona" : "personas"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Estado
+              </p>
+              <p className="text-sm font-mono font-semibold text-foreground">
+                {roomType.is_active ? "Activo" : "Inactivo"}
+              </p>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+
+        <DialogFooter className="mt-6">
+          <Button onClick={onClose} className="w-full sm:w-auto">
+            Cerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

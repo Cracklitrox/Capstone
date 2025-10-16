@@ -1,0 +1,239 @@
+const { Server } = require("socket.io");
+const jwt = require("jsonwebtoken");
+
+let io;
+
+const initializeSocket = (server) => {
+  io = new Server(server, {
+    cors: {
+      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+    // Configuración de transporte
+    transports: ["websocket", "polling"],
+    // Configuración de ping/pong
+    pingTimeout: 60000,
+    pingInterval: 25000,
+  });
+
+  // Middleware de autenticación para sockets
+  io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+
+    if (!token) {
+      return next(new Error("Authentication error: No token provided"));
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // El token usa 'id' no 'userId'
+      socket.userId = decoded.id;
+      socket.userRole = decoded.role;
+      next();
+    } catch (error) {
+      next(new Error("Authentication error: Invalid token"));
+    }
+  });
+
+  io.on("connection", (socket) => {
+    console.log(
+      `✅ Usuario conectado: ${socket.userId} - Role: ${socket.userRole}`
+    );
+
+    // Unir al usuario a su sala personal y sala de rol
+    socket.join(`user:${socket.userId}`);
+    socket.join(`role:${socket.userRole}`);
+    socket.on('checkout:requestUpdate', async () => {
+      try {
+        const notificationsService = require('../api/notifications/notifications.service');
+        const alerts = await notificationsService.getCheckoutAlertsForToday();
+        
+        socket.emit('checkout:update', {
+          count: alerts.length,
+          data: alerts,
+          timestamp: new Date().toISOString(),
+        });
+        
+        console.log(`📤 Checkout alerts enviados a usuario ${socket.userId}: ${alerts.length} checkouts`);
+      } catch (error) {
+        console.error('Error al enviar checkout alerts:', error);
+        socket.emit('checkout:error', { message: 'Error al obtener checkouts' });
+      }
+    });
+
+    // ⭐ NUEVO: Unir a recepcionistas y admins a sala de checkout alerts
+    if (
+      socket.userRole === "receptionist" ||
+      socket.userRole === "administrator"
+    ) {
+      socket.join("checkout_alerts");
+      console.log(`📢 Usuario ${socket.userId} unido a sala 'checkout_alerts'`);
+    }
+
+    console.log(
+      `👤 Usuario ${socket.userId} unido a salas:`,
+      [
+        `user:${socket.userId}`,
+        `role:${socket.userRole}`,
+        socket.userRole === "receptionist" ||
+        socket.userRole === "administrator"
+          ? "checkout_alerts"
+          : null,
+      ].filter(Boolean)
+    );
+
+    // Evento: Usuario se conecta
+    socket.on("user:connected", () => {
+      console.log(`Usuario ${socket.userId} está en línea`);
+      socket.broadcast.emit("user:status", {
+        userId: socket.userId,
+        status: "online",
+      });
+    });
+
+    // ⭐ NUEVO: Solicitar actualización inmediata de checkout alerts
+    socket.on("checkout:requestUpdate", async () => {
+      try {
+        const notificationsService = require("../api/notifications/notifications.service");
+        const alerts = await notificationsService.getCheckoutAlertsForToday();
+
+        socket.emit("checkout:update", {
+          count: alerts.length,
+          data: alerts,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(
+          `📬 Checkout alerts enviados a usuario ${socket.userId}: ${alerts.length} alertas`
+        );
+      } catch (error) {
+        console.error("❌ Error al enviar checkout alerts:", error);
+        socket.emit("checkout:error", {
+          message: "Error al obtener alertas de checkout",
+        });
+      }
+    });
+
+    // Evento: Enviar notificación
+    socket.on("notification:send", async (data) => {
+      try {
+        console.log("📤 Enviando notificación:", data);
+
+        // Emitir a usuarios específicos o roles
+        if (data.targetUserId) {
+          io.to(`user:${data.targetUserId}`).emit("notification:new", data);
+        } else if (data.targetRole) {
+          io.to(`role:${data.targetRole}`).emit("notification:new", data);
+        }
+      } catch (error) {
+        console.error("Error al enviar notificación:", error);
+        socket.emit("notification:error", {
+          message: "Error al enviar notificación",
+        });
+      }
+    });
+
+    // Evento: Marcar como leída
+    socket.on("notification:markAsRead", (data) => {
+      console.log(
+        `📖 Notificación ${data.notificationId} marcada como leída por usuario ${socket.userId}`
+      );
+      // Emitir actualización a todos los clientes del usuario (múltiples tabs)
+      io.to(`user:${socket.userId}`).emit("notification:updated", {
+        notificationId: data.notificationId,
+        status: "read",
+      });
+    });
+
+    // Evento: Marcar como archivada
+    socket.on("notification:markAsArchived", (data) => {
+      console.log(
+        `📦 Notificación ${data.notificationId} archivada por usuario ${socket.userId}`
+      );
+      // Emitir actualización a todos los clientes del usuario
+      io.to(`user:${socket.userId}`).emit("notification:updated", {
+        notificationId: data.notificationId,
+        status: "archived",
+      });
+    });
+
+    // Evento: Solicitar notificaciones no leídas
+    socket.on("notification:requestUnread", () => {
+      socket.emit("notification:requestUnreadCount");
+    });
+
+    // Evento: Desconexión
+    socket.on("disconnect", (reason) => {
+      console.log(
+        `❌ Usuario desconectado: ${socket.userId} (razón: ${reason})`
+      );
+      socket.broadcast.emit("user:status", {
+        userId: socket.userId,
+        status: "offline",
+      });
+    });
+  });
+
+  console.log("✅ Socket.IO inicializado correctamente");
+  return io;
+};
+
+const getIO = () => {
+  if (!io) {
+    throw new Error("Socket.io no ha sido inicializado");
+  }
+  return io;
+};
+
+// Función auxiliar para emitir notificaciones desde cualquier parte del backend
+const emitNotification = (targetUserId, targetRole, notification) => {
+  const socketIO = getIO();
+
+  console.log("📤 Emitiendo notificación:", {
+    targetUserId,
+    targetRole,
+    notificationId: notification.id,
+    roomName: targetUserId ? `user:${targetUserId}` : `role:${targetRole}`,
+  });
+
+  if (targetUserId) {
+    socketIO.to(`user:${targetUserId}`).emit("notification:new", notification);
+    console.log(`✅ Notificación emitida a user:${targetUserId}`);
+  } else if (targetRole) {
+    socketIO.to(`role:${targetRole}`).emit("notification:new", notification);
+    console.log(`✅ Notificación emitida a role:${targetRole}`);
+  }
+};
+
+// ==================== CHECKOUT ALERTS WEBSOCKET ====================
+
+/**
+ * Emite notificaciones de checkout a todos los recepcionistas y administradores conectados
+ * @param {number} count - Número de checkouts pendientes
+ * @param {Array} data - Array con los datos de los checkouts
+ */
+function emitCheckoutAlerts(count, data) {
+  const socketIO = getIO();
+  
+  const payload = {
+    count,
+    data,
+    timestamp: new Date().toISOString(),
+  };
+  
+  // Emitir a recepcionistas
+  socketIO.to('role:receptionist').emit('checkout:update', payload);
+  console.log(`📬 Checkout alerts emitidos a recepcionistas: ${count} checkouts`);
+  
+  // Emitir a administradores
+  socketIO.to('role:administrator').emit('checkout:update', payload);
+  console.log(`📬 Checkout alerts emitidos a administradores: ${count} checkouts`);
+}
+
+module.exports = {
+  initializeSocket,
+  getIO,
+  emitNotification,
+  emitCheckoutAlerts, // ⭐ Agregar esta exportación
+};

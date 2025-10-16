@@ -3,16 +3,40 @@ import { updateAdminRoom } from "../../services/adminRooms";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/Dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/Dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
+import { Switch } from "@/components/ui/Switch";
 
 const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
   const [open, setOpen] = useState(false);
-  // Solo los campos editables
   const [form, setForm] = useState({
-    floor: room.floor !== undefined && room.floor !== null ? String(room.floor) : "",
-    room_type_id: room.room_type_id !== undefined && room.room_type_id !== null ? String(room.room_type_id) : "",
-    capacity: room.capacity !== undefined && room.capacity !== null ? String(room.capacity) : "",
-    base_price: room.base_price !== undefined && room.base_price !== null ? String(room.base_price) : "",
+    floor:
+      room.floor !== undefined && room.floor !== null ? String(room.floor) : "",
+    room_type_id:
+      room.room_type_id !== undefined && room.room_type_id !== null
+        ? String(room.room_type_id)
+        : "",
+    capacity:
+      room.capacity !== undefined && room.capacity !== null
+        ? String(room.capacity)
+        : "",
+    base_price:
+      room.base_price !== undefined && room.base_price !== null
+        ? String(room.base_price)
+        : "",
     description: room.description ?? "",
     is_active: room.is_active ?? true,
   });
@@ -22,11 +46,8 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     let val = value;
+
     // Validaciones en tiempo real
-    if (name === "floor") {
-      val = val.replace(/\D/g, "");
-      if (val !== "" && !["1","2","3"].includes(val)) return;
-    }
     if (name === "capacity") {
       val = val.replace(/\D/g, "");
       if (val !== "" && (Number(val) < 0 || Number(val) > 10)) return;
@@ -38,6 +59,7 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
     if (name === "description") {
       if (val.length > 150) return;
     }
+
     setForm((prev) => ({
       ...prev,
       [name]: val,
@@ -48,6 +70,7 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
     // Validación: no permitir duplicidad de número (aunque no se edita)
     const roomNumberExists = rooms.some(
       (r) => r.room_number === room.room_number && r.id !== room.id
@@ -57,11 +80,9 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
       setLoading(false);
       return;
     }
+
     // Validaciones finales
-    if (
-      form.floor === "" ||
-      !["1","2","3"].includes(form.floor)
-    ) {
+    if (form.floor === "" || !["1", "2", "3"].includes(form.floor)) {
       setError("El piso solo puede ser 1, 2 o 3.");
       setLoading(false);
       return;
@@ -91,15 +112,20 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
       setLoading(false);
       return;
     }
+
     try {
-      await updateAdminRoom(room.id, {
-        floor: Number(form.floor),
-        room_type_id: Number(form.room_type_id),
-        capacity: Number(form.capacity),
-        base_price: Number(form.base_price),
-        description: form.description,
-        is_active: !!form.is_active,
-      }, token);
+      await updateAdminRoom(
+        room.id,
+        {
+          floor: Number(form.floor),
+          room_type_id: Number(form.room_type_id),
+          capacity: Number(form.capacity),
+          base_price: Number(form.base_price),
+          description: form.description,
+          is_active: !!form.is_active,
+        },
+        token
+      );
       setOpen(false);
       if (onUpdated) onUpdated();
     } catch (err) {
@@ -115,102 +141,207 @@ const EditRoom = ({ token, room, roomTypes, onUpdated, rooms }) => {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} variant="outline">Modificar</Button>
+      <Button
+        onClick={() => setOpen(true)}
+        variant="outline"
+        size="sm"
+        className="w-full"
+      >
+        Modificar
+      </Button>
+
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-gradient-to-br from-card via-card/80 to-card/60 text-card-foreground border border-input rounded-3xl shadow-2xl p-4 md:p-8 max-w-lg w-full">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle className="text-center text-2xl md:text-3xl font-extrabold mb-2 text-[var(--primary)]">Modificar habitación</DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground">Edita los datos permitidos de la habitación seleccionada.</DialogDescription>
+            <DialogTitle className="text-2xl font-bold">
+              Modificar Habitación
+            </DialogTitle>
+            <DialogDescription>
+              Edita los datos permitidos de la habitación seleccionada.
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="grid gap-6 mt-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1 col-span-1">
-                <Label className="font-semibold text-[var(--secondary)]">Número</Label>
-                <div className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 font-bold text-lg w-full">{room.room_number}</div>
-              </div>
-              <div className="flex flex-col gap-1 col-span-1">
-                <Label className="font-semibold text-[var(--secondary)]">Estado</Label>
-                <div className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 font-semibold w-full">
-                  {room.status === 'available' ? 'Disponible' : room.status === 'occupied' ? 'Ocupada' : room.status === 'pending' ? 'Pendiente' : room.status}
+
+          <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+            {/* Campos NO editables - Solo lectura */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Número (No editable)
+                </Label>
+                <div className="flex items-center justify-center h-10 bg-muted/50 rounded-md border border-input">
+                  <span className="text-lg font-bold text-foreground">
+                    {room.room_number}
+                  </span>
                 </div>
               </div>
-              <div className="flex flex-col gap-1 col-span-1">
-                <Label className="font-semibold text-[var(--secondary)]">Piso</Label>
-                <select name="floor" value={form.floor} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full">
-                  <option value="">Selecciona piso</option>
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                </select>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Estado (No editable)
+                </Label>
+                <div className="flex items-center justify-center h-10 bg-muted/50 rounded-md border border-input">
+                  <span className="text-sm font-semibold text-foreground capitalize">
+                    {room.status === "available"
+                      ? "Disponible"
+                      : room.status === "occupied"
+                        ? "Ocupada"
+                        : room.status === "pending"
+                          ? "Pendiente"
+                          : room.status}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col gap-1 col-span-1">
-                <Label className="font-semibold text-[var(--secondary)]">Tipo de habitación</Label>
-                <select name="room_type_id" value={form.room_type_id} onChange={handleChange} required className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full">
-                  <option value="">Selecciona tipo</option>
-                  {roomTypes.map((type) => (
-                    <option key={type.id} value={type.id}>{type.name}</option>
-                  ))}
-                </select>
+            </div>
+
+            {/* Campos editables */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Piso */}
+              <div className="space-y-2">
+                <Label htmlFor="floor">Piso *</Label>
+                <Select
+                  value={form.floor}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({ ...prev, floor: value }))
+                  }
+                >
+                  <SelectTrigger id="floor">
+                    <SelectValue placeholder="Selecciona piso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Piso 1</SelectItem>
+                    <SelectItem value="2">Piso 2</SelectItem>
+                    <SelectItem value="3">Piso 3</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex flex-col gap-1 col-span-1">
-                <Label className="font-semibold text-[var(--secondary)]">Capacidad</Label>
+
+              {/* Tipo de habitación */}
+              <div className="space-y-2">
+                <Label htmlFor="room_type_id">Tipo de Habitación *</Label>
+                <Select
+                  value={form.room_type_id}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({ ...prev, room_type_id: value }))
+                  }
+                >
+                  <SelectTrigger id="room_type_id">
+                    <SelectValue placeholder="Selecciona tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roomTypes.map((type) => (
+                      <SelectItem key={type.id} value={String(type.id)}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Capacidad */}
+              <div className="space-y-2">
+                <Label htmlFor="capacity">Capacidad *</Label>
                 <Input
+                  id="capacity"
                   name="capacity"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Ej: 2"
                   value={form.capacity}
                   onChange={handleChange}
                   required
-                  pattern="\d{1,2}"
-                  min="0"
-                  max="10"
-                  inputMode="numeric"
-                  placeholder="Ej: 2"
-                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Máximo 10 personas
+                </p>
               </div>
-              <div className="flex flex-col gap-1 col-span-1">
-                <Label className="font-semibold text-[var(--secondary)]">Precio base</Label>
-                <Input
-                  name="base_price"
-                  value={form.base_price}
-                  onChange={handleChange}
-                  required
-                  pattern="\d{1,6}"
-                  min="0"
-                  max="100000"
-                  inputMode="numeric"
-                  placeholder="Ej: 35000"
-                  className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition w-full"
-                />
+
+              {/* Precio base */}
+              <div className="space-y-2">
+                <Label htmlFor="base_price">Precio Base *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    $
+                  </span>
+                  <Input
+                    id="base_price"
+                    name="base_price"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="35000"
+                    className="pl-7"
+                    value={form.base_price}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Máximo $100.000</p>
               </div>
             </div>
-            <div className="flex flex-col gap-1 col-span-2">
-              <Label className="font-semibold text-[var(--secondary)]">Descripción (opcional)</Label>
+
+            {/* Descripción - Ocupa todo el ancho */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción (Opcional)</Label>
               <textarea
+                id="description"
                 name="description"
-                className="border border-input bg-card text-card-foreground rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition resize-none w-full"
-                placeholder="Máximo 150 caracteres"
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                placeholder="Describe características especiales de la habitación..."
                 value={form.description}
                 onChange={handleChange}
                 maxLength={150}
                 rows={3}
               />
-              <span className="text-xs text-muted-foreground self-end">{form.description.length}/150</span>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">
+                  Máximo 150 caracteres
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {form.description.length}/150
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2 col-span-2">
-              <Label className="font-semibold text-[var(--secondary)]">Activo</Label>
-              <input
-                type="checkbox"
-                name="is_active"
+
+            {/* Estado activo/inactivo */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-input">
+              <div className="space-y-0.5">
+                <Label htmlFor="is_active" className="text-base font-medium">
+                  Estado de la Habitación
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {form.is_active
+                    ? "La habitación está activa y disponible"
+                    : "La habitación está inactiva (no acepta reservas)"}
+                </p>
+              </div>
+              <Switch
+                id="is_active"
                 checked={form.is_active}
-                onChange={e => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
-                className="accent-primary w-4 h-4 rounded focus:ring-2 focus:ring-primary"
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({ ...prev, is_active: checked }))
+                }
               />
-              <span className={`font-semibold ${form.is_active ? 'text-green-700 dark:text-green-300' : 'text-destructive'}`}>{form.is_active ? 'Sí' : 'No'}</span>
             </div>
-            {error && <p className="text-destructive text-sm text-center mt-2 col-span-2">{error}</p>}
-            <DialogFooter className="flex flex-row gap-2 justify-center mt-4 col-span-2">
-              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg shadow hover:bg-primary/80 transition">Guardar</Button>
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)} className="bg-secondary text-primary font-semibold px-4 py-2 rounded-lg shadow">Cancelar</Button>
+
+            {/* Mensaje de error */}
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive text-center">{error}</p>
+              </div>
+            )}
+
+            {/* Footer con botones */}
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={loading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Guardando..." : "Guardar Cambios"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

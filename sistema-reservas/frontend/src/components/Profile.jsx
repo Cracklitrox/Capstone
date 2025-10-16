@@ -52,11 +52,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { authService } from "@/services/services";
 import { profileService } from "@/services/profileService";
 import { formatActivity } from "@/lib/activityFormatter";
-import { useAuth } from "@/services/authContext";
 import { toast } from "sonner";
 
 const Profile = () => {
-  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
