@@ -266,6 +266,16 @@ class WhatsAppService {
   }
 
   /**
+   * Limpiar credenciales y generar nuevo QR
+   */
+  async clearAuth() {
+    if (!whatsappClient) {
+      throw new Error('Cliente no inicializado');
+    }
+    return await whatsappClient.clearAuth();
+  }
+
+  /**
    * Obtener estadísticas del bot
    */
   async getStats() {

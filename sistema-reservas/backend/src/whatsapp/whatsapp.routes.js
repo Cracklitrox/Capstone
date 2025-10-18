@@ -37,6 +37,17 @@ router.post('/disconnect',
 );
 
 /**
+ * @route   POST /api/v1/whatsapp/clear-auth
+ * @desc    Limpiar credenciales y generar nuevo QR
+ * @access  Private (Administrator)
+ */
+router.post('/clear-auth',
+  authenticate,
+  authorize(['administrator']),
+  whatsappController.clearAuth
+);
+
+/**
  * @route   POST /api/v1/whatsapp/send
  * @desc    Enviar mensaje manual a un cliente
  * @access  Private (Receptionist, Administrator)

@@ -132,6 +132,26 @@ class WhatsAppController {
   }
 
   /**
+   * Limpiar credenciales y generar nuevo QR
+   */
+  async clearAuth(req, res) {
+    try {
+      await whatsappService.clearAuth();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Credenciales eliminadas. Generando nuevo QR...'
+      });
+    } catch (error) {
+      console.error('❌ Error al limpiar credenciales:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al limpiar credenciales'
+      });
+    }
+  }
+
+  /**
    * Enviar mensaje manual (para recepcionistas/admins)
    */
   async sendManualMessage(req, res) {

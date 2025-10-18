@@ -8,6 +8,7 @@ const {
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
 const path = require('path');
 
 class WhatsAppClient {
@@ -95,9 +96,10 @@ class WhatsAppClient {
       // Estado de conexión
       if (connection === 'close') {
         this.isConnected = false;
-        const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
         
-        console.log('❌ Conexión cerrada. Reconectar:', shouldReconnect);
+        console.log('❌ Conexión cerrada. Código:', statusCode, 'Reconectar:', shouldReconnect);
 
         // Notificar desconexión
         if (this.io) {
@@ -107,13 +109,17 @@ class WhatsAppClient {
           });
         }
 
-        // Intentar reconectar
+        // Intentar reconectar automáticamente
         if (shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;
-          console.log(`🔄 Reintentando conexión (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-          setTimeout(() => this.initialize(), 5000);
+          const delay = Math.min(5000 * this.reconnectAttempts, 30000); // Backoff exponencial hasta 30s
+          console.log(`🔄 Reintentando conexión (${this.reconnectAttempts}/${this.maxReconnectAttempts}) en ${delay/1000}s...`);
+          setTimeout(() => this.initialize(), delay);
         } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          console.error('❌ Máximo de reintentos alcanzado. Deteniendo reconexión.');
+          console.error('❌ Máximo de reintentos alcanzado. Deteniendo reconexión automática.');
+          console.log('💡 Puedes intentar manualmente con: GET /api/v1/whatsapp/qr');
+        } else {
+          console.log('🔴 Sesión cerrada por logout. Elimina las credenciales para generar nuevo QR.');
         }
       } else if (connection === 'open') {
         this.isConnected = true;
@@ -219,6 +225,33 @@ class WhatsAppClient {
       }
     } catch (error) {
       console.error('❌ Error al desconectar:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Limpiar credenciales y permitir nuevo QR
+   */
+  async clearAuth() {
+    try {
+      const authPath = path.join(process.cwd(), this.authPath);
+      
+      if (fs.existsSync(authPath)) {
+        fs.rmSync(authPath, { recursive: true, force: true });
+        console.log('🧹 Credenciales eliminadas. Reiniciando...');
+      }
+      
+      // Resetear estado
+      this.isConnected = false;
+      this.reconnectAttempts = 0;
+      this.qrCode = null;
+      
+      // Reinicializar para generar nuevo QR
+      await this.initialize();
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error al limpiar credenciales:', error);
       throw error;
     }
   }

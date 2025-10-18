@@ -14,6 +14,7 @@ const guestsRoutes = require("./guests/guests.routes");
 const reservationsRoutes = require("./reservations/reservations.routes");
 const systemRoutes = require("./system/system.routes");
 const notificationsRoutes = require('./notifications/notifications.routes');
+const whatsappRoutes = require('../whatsapp/whatsapp.routes');
 
 const { authenticate } = require("../middleware/auth.middleware");
 
@@ -26,12 +27,13 @@ const cummonLimiter = rateLimit({
   skipFailedRequests: false,
   skipSuccessfulRequests: false,
   
-  // ⭐ Usar ID de usuario si está autenticado, sino usar IP por defecto
+  // ⭐ Usar ID de usuario si está autenticado, sino dejar que express-rate-limit maneje la IP
   keyGenerator: (req, res) => {
     if (req.user && req.user.id) {
       return `user_${req.user.id}`;
     }
-    return req.ip; // Esto usa el generador por defecto que maneja IPv6
+    // Retornar undefined permite que express-rate-limit use su lógica por defecto para IPs
+    return undefined;
   },
   
   handler: (req, res) => {
@@ -59,5 +61,6 @@ router.use('/notifications', authenticate, cummonLimiter, notificationsRoutes);
 router.use("/guests", authenticate, cummonLimiter, guestsRoutes);
 router.use("/reservations", authenticate, cummonLimiter, reservationsRoutes);
 router.use("/system", authenticate, cummonLimiter, systemRoutes);
+router.use("/whatsapp", authenticate, cummonLimiter, whatsappRoutes);
 
 module.exports = router;

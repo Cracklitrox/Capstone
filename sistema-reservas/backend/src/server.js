@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const app = require("./app");
 const http = require("http");
-const { initializeSocket } = require("./config/socket");
+const { initializeSocket, getIO } = require("./config/socket");
 
 const port = process.env.PORT || 3001;
 
@@ -10,7 +10,33 @@ if (require.main === module) {
   const server = http.createServer(app);
 
   // Inicializar Socket.io
-  initializeSocket(server);
+  const io = initializeSocket(server);
+
+  // ==================== INICIALIZAR WHATSAPP BOT ====================
+  const whatsappEnabled = process.env.WHATSAPP_ENABLED === 'true';
+  
+  if (whatsappEnabled) {
+    const WhatsAppClient = require('./whatsapp/whatsapp.client');
+    const whatsappController = require('./whatsapp/whatsapp.controller');
+    const whatsappService = require('./whatsapp/whatsapp.service');
+
+    const whatsappClient = new WhatsAppClient(io);
+    
+    // Configurar el cliente en el servicio
+    whatsappService.setClient(whatsappClient);
+    
+    // Configurar el handler de mensajes
+    whatsappClient.setMessageHandler(whatsappController.handleMessage.bind(whatsappController));
+    
+    // Inicializar el cliente (conectar a WhatsApp)
+    whatsappClient.initialize().catch(error => {
+      console.error('❌ Error al inicializar WhatsApp bot:', error);
+    });
+    
+    console.log('🤖 WhatsApp bot habilitado');
+  } else {
+    console.log('⏭️ WhatsApp bot deshabilitado (WHATSAPP_ENABLED=false)');
+  }
 
   server.listen(port, () => {
     console.log(`✅ Servidor corriendo en http://localhost:${port}`);

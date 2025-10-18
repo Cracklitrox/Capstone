@@ -444,6 +444,7 @@ enum alert_type_enum {
   payment
   maintenance
   guest
+  booking_request
 }
 
 enum error_severity_enum {
