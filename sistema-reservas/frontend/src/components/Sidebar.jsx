@@ -11,6 +11,7 @@ import {
   ClockIcon,
   BellAlertIcon,
   BellIcon,
+  ChartBarIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { PlusCircle } from "lucide-react";
@@ -78,6 +79,12 @@ const navLinks = [
     label: "Historial de Reservas",
     icon: ClockIcon,
     roles: ["administrator", "receptionist"],
+  },
+  {
+    href: "/reports",
+    label: "Reportes y Estadísticas",
+    icon: ChartBarIcon,
+    roles: ["administrator"],
   },
   {
     href: "/profile",

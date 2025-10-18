@@ -14,6 +14,7 @@ const guestsRoutes = require("./guests/guests.routes");
 const reservationsRoutes = require("./reservations/reservations.routes");
 const systemRoutes = require("./system/system.routes");
 const notificationsRoutes = require('./notifications/notifications.routes');
+const reportsRoutes = require('./reports/reports.routes');
 
 const { authenticate } = require("../middleware/auth.middleware");
 
@@ -25,14 +26,6 @@ const cummonLimiter = rateLimit({
   legacyHeaders: false,
   skipFailedRequests: false,
   skipSuccessfulRequests: false,
-  
-  // ⭐ Usar ID de usuario si está autenticado, sino usar IP por defecto
-  keyGenerator: (req, res) => {
-    if (req.user && req.user.id) {
-      return `user_${req.user.id}`;
-    }
-    return req.ip; // Esto usa el generador por defecto que maneja IPv6
-  },
   
   handler: (req, res) => {
     res.status(429).json({
@@ -59,5 +52,6 @@ router.use('/notifications', authenticate, cummonLimiter, notificationsRoutes);
 router.use("/guests", authenticate, cummonLimiter, guestsRoutes);
 router.use("/reservations", authenticate, cummonLimiter, reservationsRoutes);
 router.use("/system", authenticate, cummonLimiter, systemRoutes);
+router.use("/reports", authenticate, cummonLimiter, reportsRoutes);
 
 module.exports = router;
