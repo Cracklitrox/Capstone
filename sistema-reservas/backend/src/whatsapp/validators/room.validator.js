@@ -5,74 +5,118 @@
 const whatsappService = require('../whatsapp.service');
 
 /**
- * Tipos de habitación disponibles
+ * Obtener menú de tipos de habitación desde la BD
  */
-const ROOM_TYPES = {
-  'standard': {
-    name: 'Standard',
-    emoji: '🛏️',
-    capacity: '2 personas'
-  },
-  'double': {
-    name: 'Doble',
-    emoji: '🛏️🛏️',
-    capacity: '2-4 personas'
-  },
-  'suite': {
-    name: 'Suite',
-    emoji: '👑',
-    capacity: '2-4 personas'
+async function getRoomTypesMenu() {
+  try {
+    const roomTypes = await whatsappService.getRoomTypes();
+    
+    if (roomTypes.length === 0) {
+      return '❌ No hay tipos de habitación disponibles en este momento.';
+    }
+
+    let menu = '🏨 *Tipos de habitación disponibles:*\n\n';
+    
+    roomTypes.forEach((type, index) => {
+      const number = index + 1;
+      menu += `${number}️⃣ *${type.name}*\n`;
+      menu += `   Capacidad: ${type.base_capacity} persona(s)\n`;
+      if (type.bed_configuration) {
+        menu += `   Camas: ${type.bed_configuration}\n`;
+      }
+      if (type.description) {
+        menu += `   ${type.description}\n`;
+      }
+      menu += '\n';
+    });
+
+    menu += 'Responde con:\n';
+    roomTypes.forEach((type, index) => {
+      menu += `${index + 1} - ${type.name}\n`;
+    });
+    menu += '\nO escribe el nombre del tipo de habitación.';
+
+    return menu;
+  } catch (error) {
+    console.error('Error al obtener tipos de habitación:', error);
+    return '❌ Error al cargar tipos de habitación. Intenta más tarde.';
   }
-};
+}
 
 /**
  * Validar tipo de habitación seleccionado
  */
-function validateRoomType(input) {
-  const normalized = input.toLowerCase().trim();
-  
-  // Mapeo de posibles respuestas del usuario
-  const typeMap = {
-    '1': 'standard',
-    'standard': 'standard',
-    'estandar': 'standard',
-    'estándar': 'standard',
-    'simple': 'standard',
+async function validateRoomType(input) {
+  try {
+    const roomTypes = await whatsappService.getRoomTypes();
     
-    '2': 'double',
-    'double': 'double',
-    'doble': 'double',
-    'matrimonial': 'double',
+    if (roomTypes.length === 0) {
+      return {
+        valid: false,
+        message: '❌ No hay tipos de habitación disponibles.'
+      };
+    }
+
+    const normalized = input.toLowerCase().trim();
     
-    '3': 'suite',
-    'suite': 'suite',
-    'ejecutiva': 'suite',
-    'premium': 'suite'
-  };
+    // Primero intentar por número (1, 2, 3...)
+    const numberInput = parseInt(normalized);
+    if (!isNaN(numberInput) && numberInput > 0 && numberInput <= roomTypes.length) {
+      const selectedType = roomTypes[numberInput - 1];
+      return {
+        valid: true,
+        roomTypeId: selectedType.id,
+        roomTypeName: selectedType.name,
+        roomInfo: {
+          name: selectedType.name,
+          capacity: selectedType.base_capacity,
+          description: selectedType.description,
+          bedConfiguration: selectedType.bed_configuration
+        }
+      };
+    }
 
-  const roomType = typeMap[normalized];
+    // Intentar por nombre
+    const matchedType = roomTypes.find(type => 
+      type.name.toLowerCase() === normalized ||
+      type.name.toLowerCase().includes(normalized) ||
+      normalized.includes(type.name.toLowerCase())
+    );
 
-  if (!roomType) {
+    if (matchedType) {
+      return {
+        valid: true,
+        roomTypeId: matchedType.id,
+        roomTypeName: matchedType.name,
+        roomInfo: {
+          name: matchedType.name,
+          capacity: matchedType.base_capacity,
+          description: matchedType.description,
+          bedConfiguration: matchedType.bed_configuration
+        }
+      };
+    }
+
     return {
       valid: false,
-      message: '❌ Tipo de habitación no reconocido.\n\nResponde con:\n1️⃣ Standard\n2️⃣ Doble\n3️⃣ Suite\n\nO escribe el nombre del tipo.'
+      message: `❌ Tipo de habitación no reconocido.\n\n${await getRoomTypesMenu()}`
+    };
+  } catch (error) {
+    console.error('Error al validar tipo de habitación:', error);
+    return {
+      valid: false,
+      message: '❌ Error al validar tipo de habitación. Intenta más tarde.'
     };
   }
-
-  return {
-    valid: true,
-    roomType: roomType,
-    roomInfo: ROOM_TYPES[roomType]
-  };
 }
 
 /**
  * Verificar disponibilidad de habitación
  */
-async function checkAvailability(roomType, checkInDate, checkOutDate) {
+async function checkAvailability(roomTypeId, checkInDate, checkOutDate) {
   try {
     const availability = await whatsappService.checkRoomAvailability(
-      roomType,
+      roomTypeId,
       checkInDate,
       checkOutDate
     );
@@ -87,14 +131,14 @@ async function checkAvailability(roomType, checkInDate, checkOutDate) {
     if (!availability.available) {
       return {
         available: false,
-        message: `❌ Lo sentimos, no hay habitaciones ${ROOM_TYPES[roomType].name} disponibles para esas fechas.\n\n¿Deseas ver otro tipo de habitación?`
+        message: `❌ Lo sentimos, no hay habitaciones tipo *${availability.roomTypeName || 'seleccionado'}* disponibles para esas fechas.\n\n${await getRoomTypesMenu()}`
       };
     }
 
     return {
       available: true,
       count: availability.count,
-      message: `✅ Hay ${availability.count} habitación(es) ${ROOM_TYPES[roomType].name} disponible(s).`
+      message: `✅ Hay ${availability.count} habitación(es) tipo *${availability.roomTypeName}* disponible(s).`
     };
   } catch (error) {
     console.error('Error al verificar disponibilidad:', error);
@@ -106,71 +150,44 @@ async function checkAvailability(roomType, checkInDate, checkOutDate) {
 }
 
 /**
- * Obtener lista de tipos de habitación con formato
- */
-function getRoomTypesMenu() {
-  return `🏨 *Tipos de habitación disponibles:*
-
-1️⃣ *Standard* 🛏️
-   • Capacidad: 2 personas
-   • Cama matrimonial
-   • Baño privado
-
-2️⃣ *Doble* 🛏️🛏️
-   • Capacidad: 2-4 personas
-   • 2 camas matrimoniales
-   • Baño privado
-
-3️⃣ *Suite* 👑
-   • Capacidad: 2-4 personas
-   • Cama King size
-   • Sala de estar
-   • Baño premium
-
-Responde con el *número* o *nombre* del tipo que prefieres.`;
-}
-
-/**
- * Obtener información de un tipo de habitación específico
- */
-function getRoomTypeInfo(roomType) {
-  const info = ROOM_TYPES[roomType];
-  if (!info) return null;
-
-  return `${info.emoji} *Habitación ${info.name}*\nCapacidad: ${info.capacity}`;
-}
-
-/**
  * Validar combinación de habitación y número de huéspedes
  */
-function validateRoomCapacity(roomType, adults, children) {
-  const totalGuests = adults + children;
-  
-  const capacityLimits = {
-    'standard': 2,
-    'double': 4,
-    'suite': 4
-  };
+async function validateRoomCapacity(roomTypeId, adults, children) {
+  try {
+    const roomTypes = await whatsappService.getRoomTypes();
+    const roomType = roomTypes.find(type => type.id === roomTypeId);
+    
+    if (!roomType) {
+      return {
+        valid: false,
+        message: '❌ Tipo de habitación no encontrado.'
+      };
+    }
 
-  const maxCapacity = capacityLimits[roomType] || 2;
+    const totalGuests = adults + children;
+    const maxCapacity = roomType.base_capacity;
 
-  if (totalGuests > maxCapacity) {
+    if (totalGuests > maxCapacity) {
+      return {
+        valid: false,
+        message: `❌ La habitación *${roomType.name}* tiene capacidad máxima de ${maxCapacity} persona(s).\n\nTotal indicado: ${totalGuests} personas (${adults} adultos + ${children} niños).\n\nPor favor, ajusta el número de huéspedes o elige otro tipo de habitación.`
+      };
+    }
+
     return {
-      valid: false,
-      message: `❌ La habitación ${ROOM_TYPES[roomType].name} tiene capacidad máxima de ${maxCapacity} personas.\n\nTotal indicado: ${totalGuests} personas (${adults} adultos + ${children} niños).\n\nPor favor, ajusta el número de huéspedes o elige otro tipo de habitación.`
+      valid: true
+    };
+  } catch (error) {
+    console.error('Error al validar capacidad:', error);
+    return {
+      valid: true // Permitir continuar si hay error
     };
   }
-
-  return {
-    valid: true
-  };
 }
 
 module.exports = {
-  ROOM_TYPES,
   validateRoomType,
   checkAvailability,
   getRoomTypesMenu,
-  getRoomTypeInfo,
   validateRoomCapacity
 };

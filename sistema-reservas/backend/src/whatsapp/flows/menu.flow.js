@@ -31,7 +31,7 @@ function getHotelInfo() {
   return `🏨 *Hotel Don Teo*
 
 📍 *Ubicación:*
-Chile, región de [Tu región]
+Chile, región de Los Lagos, Puerto Montt
 
 🏢 *Sobre nosotros:*
 Hotel familiar con ambiente acogedor y excelente servicio.

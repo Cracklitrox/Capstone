@@ -16,7 +16,7 @@ function validateRut(rut) {
   if (!match) {
     return {
       valid: false,
-      message: '❌ Formato de RUT inválido.\n\nFormato correcto: 12345678-9 o 12.345.678-9'
+      message: '❌ Formato de RUT inválido.\n\nFormato correcto: 11111111-1 o 11.111.111-1'
     };
   }
 
@@ -46,7 +46,7 @@ function validateRut(rut) {
   if (calculatedVerifier !== verifier) {
     return {
       valid: false,
-      message: '❌ RUT inválido.\n\nVerifica que el número y dígito verificador sean correctos.'
+      message: '❌ RUT inválido.\n\nEl dígito verificador no corresponde al número ingresado.\nVerifica que hayas escrito correctamente tu RUT.\n\nEjemplo válido: 11.111.111-1'
     };
   }
 

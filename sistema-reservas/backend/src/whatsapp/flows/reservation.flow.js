@@ -149,7 +149,7 @@ async function handleNameState(session, messageText, phoneNumber) {
 📝 *Paso 2 de 9*
 ¿Cuál es tu *RUT*?
 
-Formato: 12.345.678-9`;
+Formato: 11.111.111-1`;
 }
 
 /**
@@ -273,14 +273,14 @@ async function handleCheckOutState(session, messageText, phoneNumber) {
 🌙 Total: ${validation.nights} noche(s)
 
 📝 *Paso 7 de 9*
-${roomValidator.getRoomTypesMenu()}`;
+${await roomValidator.getRoomTypesMenu()}`;
 }
 
 /**
  * Capturar tipo de habitación
  */
 async function handleRoomTypeState(session, messageText, phoneNumber) {
-  const validation = roomValidator.validateRoomType(messageText);
+  const validation = await roomValidator.validateRoomType(messageText);
   
   if (!validation.valid) {
     return validation.message;
@@ -288,16 +288,17 @@ async function handleRoomTypeState(session, messageText, phoneNumber) {
 
   // Verificar disponibilidad
   const availability = await roomValidator.checkAvailability(
-    validation.roomType,
+    validation.roomTypeId,
     session.data.checkInDate,
     session.data.checkOutDate
   );
 
   if (!availability.available) {
-    return availability.message + '\n\n' + roomValidator.getRoomTypesMenu();
+    return availability.message;
   }
 
-  session.data.roomType = validation.roomType;
+  session.data.roomTypeId = validation.roomTypeId;
+  session.data.roomTypeName = validation.roomTypeName;
   session.data.roomInfo = validation.roomInfo;
   
   whatsappService.updateSession(phoneNumber, {
@@ -305,7 +306,8 @@ async function handleRoomTypeState(session, messageText, phoneNumber) {
     data: session.data
   });
 
-  return `✅ Habitación seleccionada: ${validation.roomInfo.name} ${validation.roomInfo.emoji}
+  return `✅ Habitación seleccionada: *${validation.roomTypeName}*
+📋 ${validation.roomInfo.description || ''}
 
 📝 *Paso 8 de 9*
 ¿Cuántos *adultos* se hospedarán?
@@ -351,8 +353,8 @@ async function handleChildrenState(session, messageText, phoneNumber) {
   session.data.children = validation.count;
 
   // Validar capacidad de la habitación
-  const capacityValidation = roomValidator.validateRoomCapacity(
-    session.data.roomType,
+  const capacityValidation = await roomValidator.validateRoomCapacity(
+    session.data.roomTypeId,
     session.data.adults,
     session.data.children
   );
@@ -455,7 +457,7 @@ function getConfirmationMessage(data) {
    • Entrada: ${data.checkInDateFormatted}
    • Salida: ${data.checkOutDateFormatted}
    • Noches: ${data.nights}
-   • Habitación: ${data.roomInfo.name} ${data.roomInfo.emoji}
+   • Habitación: ${data.roomTypeName || data.roomInfo?.name || 'N/A'}
    • Adultos: ${data.adults}
    • Niños: ${data.children}
 

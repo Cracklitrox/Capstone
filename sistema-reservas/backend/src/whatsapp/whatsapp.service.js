@@ -161,47 +161,62 @@ class WhatsAppService {
    */
   async checkRoomAvailability(roomType, checkIn, checkOut) {
     try {
-      // Buscar habitaciones del tipo solicitado
+      // Buscar habitaciones del tipo solicitado por nombre o ID
+      const whereClause = isNaN(roomType) 
+        ? { room_types: { name: { equals: roomType, mode: 'insensitive' } } }
+        : { room_type_id: parseInt(roomType) };
+
       const rooms = await prisma.rooms.findMany({
         where: {
-          room_type: roomType,
-          status: 'available'
+          ...whereClause,
+          status: 'available',
+          is_active: true
+        },
+        include: {
+          room_types: true
         }
       });
 
       if (rooms.length === 0) {
-        return { available: false, reason: 'No hay habitaciones de este tipo' };
+        return { 
+          available: false, 
+          reason: 'No hay habitaciones de este tipo disponibles',
+          count: 0,
+          total: 0
+        };
       }
 
       // Verificar reservas existentes que se solapen con las fechas
-      const overlappingReservations = await prisma.reservations.count({
+      const overlappingReservations = await prisma.reservation_rooms.count({
         where: {
           room_id: {
             in: rooms.map(r => r.id)
           },
-          status: {
-            in: ['pending', 'confirmed']
-          },
-          OR: [
-            {
-              AND: [
-                { check_in_date: { lte: new Date(checkIn) } },
-                { check_out_date: { gt: new Date(checkIn) } }
-              ]
+          reservations: {
+            status: {
+              in: ['pending', 'confirmed']
             },
-            {
-              AND: [
-                { check_in_date: { lt: new Date(checkOut) } },
-                { check_out_date: { gte: new Date(checkOut) } }
-              ]
-            },
-            {
-              AND: [
-                { check_in_date: { gte: new Date(checkIn) } },
-                { check_out_date: { lte: new Date(checkOut) } }
-              ]
-            }
-          ]
+            OR: [
+              {
+                AND: [
+                  { check_in_date: { lte: new Date(checkIn) } },
+                  { check_out_date: { gt: new Date(checkIn) } }
+                ]
+              },
+              {
+                AND: [
+                  { check_in_date: { lt: new Date(checkOut) } },
+                  { check_out_date: { gte: new Date(checkOut) } }
+                ]
+              },
+              {
+                AND: [
+                  { check_in_date: { gte: new Date(checkIn) } },
+                  { check_out_date: { lte: new Date(checkOut) } }
+                ]
+              }
+            ]
+          }
         }
       });
 
@@ -210,11 +225,40 @@ class WhatsAppService {
       return {
         available: availableRooms > 0,
         count: availableRooms,
-        total: rooms.length
+        total: rooms.length,
+        roomTypeName: rooms[0]?.room_types?.name || roomType
       };
     } catch (error) {
       console.error('❌ Error al verificar disponibilidad:', error);
-      return { available: false, error: error.message };
+      return { available: false, error: error.message, count: 0, total: 0 };
+    }
+  }
+
+  /**
+   * Obtener tipos de habitación activos desde la BD
+   */
+  async getRoomTypes() {
+    try {
+      const roomTypes = await prisma.room_types.findMany({
+        where: {
+          is_active: true
+        },
+        select: {
+          id: true,
+          name: true,
+          base_capacity: true,
+          description: true,
+          bed_configuration: true
+        },
+        orderBy: {
+          id: 'asc'
+        }
+      });
+
+      return roomTypes;
+    } catch (error) {
+      console.error('❌ Error al obtener tipos de habitación:', error);
+      return [];
     }
   }
 
