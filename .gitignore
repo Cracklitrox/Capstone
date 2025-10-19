@@ -37,3 +37,6 @@ frontend/build/
 # --- Carpetas de editores de código ---
 .vscode/
 .idea/
+
+# Documentos Carlos
+sistema-reservas/docs/
