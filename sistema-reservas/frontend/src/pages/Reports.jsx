@@ -76,11 +76,19 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
   };
 
   const chartData = data?.revenue?.data?.map((item, index) => ({
-    name: item.period || `Período ${index + 1}`,
+    name: item.period || item.periodLabel || `Período ${index + 1}`,
     ingresos: item.total || 0,
     ocupacion: data?.occupancy?.data?.[index]?.percentage || 0,
     checkIns: data?.checkIns?.data?.[index]?.count || 0,
   })) || [];
+
+  console.log('📊 Modal - Data recibida:', {
+    reportType,
+    chartDataLength: chartData.length,
+    revenueTotal: data?.revenue?.total,
+    occupancyAverage: data?.occupancy?.average,
+    firstDataPoint: chartData[0]
+  });
 
   const pieData = [
     { name: 'Habitaciones', value: data?.revenue?.data?.reduce((sum, item) => sum + (item.roomRevenue || 0), 0) || 0 },
@@ -412,7 +420,13 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={topClients} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} stroke="#9ca3af" />
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 12 }} 
+                    stroke="#9ca3af"
+                    domain={[0, (dataMax) => Math.ceil(dataMax * 1.1)]}
+                    tickFormatter={(value) => value >= 1000000 ? `${(value/1000000).toFixed(1)}M` : value >= 1000 ? `${(value/1000).toFixed(0)}K` : value}
+                  />
                   <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} stroke="#9ca3af" />
                   <Tooltip 
                     formatter={(value) => formatCurrency(value)}
@@ -482,30 +496,36 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
           <CardTitle>Detalle de Clientes Destacados</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Cliente</th>
-                  <th className="text-center p-2">Reservas</th>
-                  <th className="text-right p-2">Ingresos Totales</th>
-                  <th className="text-right p-2">Promedio por Reserva</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topClients.map((client, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="p-2 font-medium">{client.name}</td>
-                    <td className="text-center p-2">{client.reservations}</td>
-                    <td className="text-right p-2">{formatCurrency(client.revenue)}</td>
-                    <td className="text-right p-2">
-                      {formatCurrency(client.revenue / client.reservations)}
-                    </td>
+          {topClients.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Cliente</th>
+                    <th className="text-center p-2">Reservas</th>
+                    <th className="text-right p-2">Ingresos Totales</th>
+                    <th className="text-right p-2">Promedio por Reserva</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {topClients.map((client, index) => (
+                    <tr key={index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td className="p-2 font-medium">{client.name}</td>
+                      <td className="text-center p-2">{client.reservations}</td>
+                      <td className="text-right p-2">{formatCurrency(client.revenue)}</td>
+                      <td className="text-right p-2">
+                        {formatCurrency(client.reservations > 0 ? client.revenue / client.reservations : 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+              No hay datos de clientes disponibles
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -546,6 +566,7 @@ const Reports = () => {
     weeklyRevenue: [],
     occupancyTrend: [],
     roomTypeStats: [],
+    monthlyRevenueTotal: 0,
   });
   const [clientsData, setClientsData] = useState({
     topClients: [],
@@ -566,13 +587,25 @@ const Reports = () => {
       const endDate = format(new Date(), 'yyyy-MM-dd');
       const startDate = format(new Date(new Date().setDate(new Date().getDate() - 28)), 'yyyy-MM-dd');
       
-      // Obtener datos de tipos de habitación del mes actual
-      const monthStart = format(new Date(new Date().setDate(1)), 'yyyy-MM-dd');
+      // Obtener datos del mes actual completo para el KPI de ingresos
+      const today = new Date();
+      const monthStart = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
+      const monthEnd = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
       
-      const [weeklyRev, dailyOcc, roomTypes] = await Promise.all([
+      // Calcular últimos 7 días terminando AYER (no hoy)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const sevenDaysAgo = new Date(yesterday);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // 6 días atrás desde ayer = 7 días total
+      
+      const weekStart = format(sevenDaysAgo, 'yyyy-MM-dd');
+      const weekEnd = format(yesterday, 'yyyy-MM-dd');
+      
+      const [weeklyRev, dailyOcc, roomTypes, monthlyRev] = await Promise.all([
         getWeeklyRevenue(startDate, endDate),
-        getDailyOccupancy(startDate, endDate),
-        getRoomTypeStats(monthStart, endDate),
+        getDailyOccupancy(weekStart, weekEnd), // Últimos 7 días terminando ayer
+        getRoomTypeStats(monthStart, monthEnd),
+        getMonthlyRevenue(monthStart, monthEnd), // Ingresos del mes completo
       ]);
 
       // Procesar ingresos semanales
@@ -582,7 +615,7 @@ const Reports = () => {
       })) || [];
 
       // Procesar ocupación diaria (últimos 7 días)
-      const last7Days = dailyOcc?.data?.slice(-7).map((item) => {
+      const last7Days = dailyOcc?.data?.map((item) => {
         const date = new Date(item.period);
         const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         return {
@@ -597,10 +630,14 @@ const Reports = () => {
         value: item.reservationCount || item.value || 0,
       })) || [];
 
+      // Calcular total de ingresos del mes actual
+      const monthlyRevenueTotal = monthlyRev?.data?.reduce((sum, item) => sum + (item.totalRevenue || 0), 0) || 0;
+
       setDashboardData({
         weeklyRevenue: weeklyRevenueData,
         occupancyTrend: last7Days,
         roomTypeStats: roomTypeStatsData,
+        monthlyRevenueTotal: monthlyRevenueTotal, // Nuevo campo
       });
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
@@ -609,6 +646,7 @@ const Reports = () => {
         weeklyRevenue: [],
         occupancyTrend: [],
         roomTypeStats: [],
+        monthlyRevenueTotal: 0,
       });
     } finally {
       setLoadingDashboard(false);
@@ -617,18 +655,23 @@ const Reports = () => {
 
   const loadClientsData = async () => {
     try {
-      const endDate = format(new Date(), 'yyyy-MM-dd');
-      const startDate = format(new Date(new Date().setDate(new Date().getDate() - 90)), 'yyyy-MM-dd');
+      // Usar el día de AYER como fecha final para mantener consistencia
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const endDate = format(yesterday, 'yyyy-MM-dd');
+      const startDate = format(new Date(yesterday.getTime() - 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
       
       // Cargar top 5 clientes desde el endpoint real
       const topClientsResponse = await getTopClients(startDate, endDate, 5);
-      const topClientsRaw = topClientsResponse?.data || [];
+      const topClientsRaw = topClientsResponse?.data?.ranking || [];
       
       // Transformar formato del backend al formato esperado por el frontend
       const topClients = Array.isArray(topClientsRaw) ? topClientsRaw.map(client => ({
         name: client.fullName || 'Cliente sin nombre',
         reservations: client.reservationCount || 0,
         revenue: client.totalSpent || 0,
+        email: client.email || '',
+        userId: client.userId || 0,
       })) : [];
 
       // Cargar estadísticas de clientes desde el endpoint real
@@ -717,9 +760,10 @@ const Reports = () => {
 
     switch (rangeType) {
       case 'Diario':
-        // HOY (desde las 00:00 hasta las 23:59)
-        from = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+        // HOY SOLAMENTE (desde las 00:00 hasta las 23:59)
+        from = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+        to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+        console.log('🗓️ Reporte Diario - Solo HOY:', { from, to });
         break;
         
       case 'Semanal':
@@ -760,6 +804,13 @@ const Reports = () => {
         to = new Date(lastYear, 11, 31, 23, 59, 59); // 31 de diciembre
         break;
         
+      case 'Anual (Últimos 12 meses)':
+        // Últimos 12 meses desde hoy (ej: 18 oct 2024 - 18 oct 2025)
+        from = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate(), 0, 0, 0, 0);
+        to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+        console.log('📅 Reporte Anual (12 meses):', { from, to });
+        break;
+        
       default:
         from = dateRange.from;
         to = dateRange.to;
@@ -791,9 +842,10 @@ const Reports = () => {
           ]);
           break;
         case 'Semanal':
+          // Usar groupBy='day' para mostrar cada día de la semana
           [revenue, occupancy] = await Promise.all([
-            getWeeklyRevenue(startDate, endDate),
-            getWeeklyOccupancy(startDate, endDate),
+            getDailyRevenue(startDate, endDate),
+            getDailyOccupancy(startDate, endDate),
           ]);
           break;
         case 'Mensual':
@@ -812,6 +864,13 @@ const Reports = () => {
           [revenue, occupancy] = await Promise.all([
             getYearlyRevenue(startDate, endDate),
             getYearlyOccupancy(startDate, endDate),
+          ]);
+          break;
+        case 'Anual (Últimos 12 meses)':
+          // Últimos 12 meses: agrupar por mes
+          [revenue, occupancy] = await Promise.all([
+            getMonthlyRevenue(startDate, endDate),
+            getMonthlyOccupancy(startDate, endDate),
           ]);
           break;
         default:
@@ -940,41 +999,55 @@ const Reports = () => {
                 <DollarSign className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{formatCurrency(4488000)}</div>
-                <p className="text-xs text-muted-foreground mt-1">+12.5% vs mes anterior</p>
+                <div className="text-2xl font-bold text-green-600">
+                  {loadingDashboard ? 'Cargando...' : formatCurrency(
+                    dashboardData.monthlyRevenueTotal || 0
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Mes actual completo</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ocupación Actual</CardTitle>
+                <CardTitle className="text-sm font-medium">Ocupación Promedio</CardTitle>
                 <Home className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">87.3%</div>
-                <p className="text-xs text-muted-foreground mt-1">-3.2% vs mes anterior</p>
+                <div className="text-2xl font-bold text-blue-600">
+                  {loadingDashboard ? 'Cargando...' : `${
+                    dashboardData.occupancyTrend.length > 0 
+                      ? (dashboardData.occupancyTrend.reduce((sum, day) => sum + day.ocupacion, 0) / dashboardData.occupancyTrend.length).toFixed(1)
+                      : 0
+                  }%`}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Últimos 7 días</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Huéspedes</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Clientes</CardTitle>
                 <Users className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">156</div>
-                <p className="text-xs text-muted-foreground mt-1">+8.7% vs mes anterior</p>
+                <div className="text-2xl font-bold text-purple-600">
+                  {clientsData.stats?.totalClients || 0}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Últimos 90 días</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Reservas Activas</CardTitle>
+                <CardTitle className="text-sm font-medium">Tipos de Habitación</CardTitle>
                 <FileText className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">41</div>
-                <p className="text-xs text-muted-foreground mt-1">+5.1% vs mes anterior</p>
+                <div className="text-2xl font-bold text-orange-600">
+                  {dashboardData.roomTypeStats.length}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Tipos activos</p>
               </CardContent>
             </Card>
           </div>
@@ -1048,30 +1121,12 @@ const Reports = () => {
                       </PopoverContent>
                     </Popover>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Rangos Rápidos</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setQuickRange(7)}>
-                        7 días
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setQuickRange(30)}>
-                        30 días
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setQuickRange(90)}>
-                        90 días
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setQuickRange(365)}>
-                        1 año
-                      </Button>
-                    </div>
-                  </div>
                 </div>
 
                 <div>
                   <Label className="mb-3 block">Tipo de Reporte</Label>
-                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
-                    {['Diario', 'Semanal', 'Mensual', 'Trimestral', 'Anual'].map((type) => (
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
+                    {['Diario', 'Semanal', 'Mensual', 'Trimestral', 'Anual', 'Anual (Últimos 12 meses)'].map((type) => (
                       <Button
                         key={type}
                         onClick={() => handleGenerateReport(type)}
@@ -1079,7 +1134,7 @@ const Reports = () => {
                         className="h-auto flex-col gap-2 py-4"
                       >
                         <FileText className="h-5 w-5" />
-                        <span>Reporte {type}</span>
+                        <span className="text-xs text-center">{type === 'Anual (Últimos 12 meses)' ? 'Anual (12 meses)' : `Reporte ${type}`}</span>
                       </Button>
                     ))}
                   </div>
@@ -1183,7 +1238,12 @@ const Reports = () => {
                           <BarChart data={dashboardData.weeklyRevenue}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                             <XAxis dataKey="semana" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                            <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
+                            <YAxis 
+                              tick={{ fontSize: 12 }} 
+                              stroke="#9ca3af"
+                              domain={[0, (dataMax) => Math.ceil(dataMax * 1.1)]}
+                              tickFormatter={(value) => value >= 1000000 ? `${(value/1000000).toFixed(1)}M` : value >= 1000 ? `${(value/1000).toFixed(0)}K` : value}
+                            />
                             <Tooltip 
                               formatter={(value) => formatCurrency(value)}
                               contentStyle={{ 
@@ -1253,7 +1313,12 @@ const Reports = () => {
                         <LineChart data={dashboardData.occupancyTrend}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis dataKey="dia" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                          <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
+                          <YAxis 
+                            tick={{ fontSize: 12 }} 
+                            stroke="#9ca3af"
+                            domain={[0, 100]}
+                            tickFormatter={(value) => `${value}%`}
+                          />
                           <Tooltip 
                             formatter={(value) => `${value}%`}
                             contentStyle={{ 

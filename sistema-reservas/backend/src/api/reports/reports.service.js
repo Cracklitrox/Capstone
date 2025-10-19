@@ -6,6 +6,19 @@ const prisma = new PrismaClient();
 // ============================================
 
 /**
+ * Normaliza fechas de inicio y fin para incluir todo el día
+ */
+function normalizeDateRange(startDate, endDate) {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+  
+  return { start, end };
+}
+
+/**
  * Calcula la diferencia en días entre dos fechas
  */
 function getDaysBetween(startDate, endDate) {
@@ -118,18 +131,23 @@ function groupByPeriod(data, dateField, groupBy) {
  * Calcula los KPIs principales del hotel
  */
 async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
+  // Normalizar fechas para incluir todo el día
   const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
   const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
 
   // Total de habitaciones en el hotel
   const totalRooms = await prisma.rooms.count({
     where: { is_active: true }
   });
 
-  // Reservas en el período actual
+  // Reservas en el período actual - Solo reservas confirmadas, en progreso o completadas
   const reservations = await prisma.reservations.findMany({
     where: {
       deleted_at: null,
+      status: { in: ['confirmed', 'in_progress', 'completed'] },
       OR: [
         {
           check_in_date: { gte: start, lte: end }
@@ -309,8 +327,12 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
  * Obtiene datos de ocupación agrupados por período
  */
 async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, floor = null) {
+  // Normalizar fechas para incluir todo el día
   const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
   const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
 
   // Construir filtros para habitaciones
   const roomFilters = {
@@ -353,7 +375,7 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       ],
       reservations: {
         deleted_at: null,
-        status: { in: ['confirmed', 'in_progress', 'completed'] }
+        status: 'completed' // SOLO reservas completadas
       }
     },
     include: {
@@ -382,18 +404,24 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       }
     });
 
-    // Calcular días en este período
+    // Calcular días en este período - CORREGIDO
     let periodDays;
     if (groupBy === 'day') {
       periodDays = 1;
     } else if (groupBy === 'week') {
       periodDays = 7;
     } else if (groupBy === 'month') {
+      // Corregido: calcular días correctamente para el mes
       const [year, month] = period.split('-');
-      periodDays = new Date(year, month, 0).getDate();
+      // new Date(year, month, 0) da el último día del mes anterior
+      // new Date(year, month, 1) es el primer día del mes
+      const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
+      periodDays = daysInMonth;
     } else if (groupBy === 'year') {
       const year = parseInt(period);
       periodDays = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0) ? 366 : 365;
+    } else {
+      periodDays = 1; // fallback
     }
 
     const totalAvailableNights = totalRooms * periodDays;
@@ -421,14 +449,33 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
  * Obtiene datos de ingresos agrupados por período
  */
 async function getRevenueData(startDate, endDate, groupBy, includeServices = true) {
+  // Normalizar fechas para incluir todo el día
   const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
   const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
 
-  // Obtener reservas con pagos en el período
+  // Obtener reservas con pagos en el período - CORREGIDO: considerar cualquier reserva que se superponga
+  // Solo incluir reservas COMPLETADAS (no confirmed ni in_progress)
   const reservations = await prisma.reservations.findMany({
     where: {
       deleted_at: null,
-      check_in_date: { gte: start, lte: end }
+      status: 'completed', // SOLO reservas completadas
+      OR: [
+        {
+          check_in_date: { gte: start, lte: end }
+        },
+        {
+          check_out_date: { gte: start, lte: end }
+        },
+        {
+          AND: [
+            { check_in_date: { lte: start } },
+            { check_out_date: { gte: end } }
+          ]
+        }
+      ]
     },
     include: {
       reservation_rooms: {
@@ -446,7 +493,7 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
     }
   });
 
-  // Agrupar por período
+  // Agrupar por período - usar check_in_date como referencia
   const grouped = groupByPeriod(reservations, 'check_in_date', groupBy);
 
   // Calcular métricas para cada grupo
@@ -458,14 +505,21 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
     let totalRoomNights = 0;
 
     periodData.forEach(res => {
-      // Ingresos de habitaciones
-      const roomSubtotal = res.reservation_rooms.reduce((sum, rr) => sum + rr.subtotal, 0);
-      roomRevenue += roomSubtotal;
-
-      // Calcular noches
+      // Ingresos de habitaciones - considerar solo las noches dentro del período
       res.reservation_rooms.forEach(rr => {
-        const nights = getDaysBetween(rr.start_date, rr.end_date);
-        totalRoomNights += nights;
+        const rrStart = new Date(rr.start_date);
+        const rrEnd = new Date(rr.end_date);
+        const checkIn = new Date(Math.max(rrStart, start));
+        const checkOut = new Date(Math.min(rrEnd, end));
+        
+        if (checkOut > checkIn) {
+          const nights = getDaysBetween(checkIn, checkOut);
+          totalRoomNights += nights;
+          // Calcular proporción del subtotal que corresponde a este período
+          const totalNights = getDaysBetween(rrStart, rrEnd);
+          const proportionalRevenue = (rr.subtotal / totalNights) * nights;
+          roomRevenue += proportionalRevenue;
+        }
       });
 
       // Ingresos de servicios
@@ -504,14 +558,14 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
  * Obtiene resumen de clientes con filtros
  */
 async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const { start, end } = normalizeDateRange(startDate, endDate);
 
-  // Obtener todos los clientes que tuvieron reservas en el período
+  // Obtener todos los clientes que tuvieron reservas COMPLETED en el período
   const clientReservations = await prisma.reservations.groupBy({
     by: ['main_guest_id'],
     where: {
       deleted_at: null,
+      status: 'completed', // SOLO reservas completadas
       check_in_date: { gte: start, lte: end }
     },
     _count: {
@@ -534,11 +588,12 @@ async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
         }
       });
 
-      // Obtener reservas del cliente en el período
+      // Obtener reservas COMPLETED del cliente en el período
       const reservations = await prisma.reservations.findMany({
         where: {
           main_guest_id: cr.main_guest_id,
           deleted_at: null,
+          status: 'completed', // SOLO reservas completadas
           check_in_date: { gte: start, lte: end }
         },
         include: {
@@ -658,18 +713,23 @@ async function getClientDetail(clientId, startDate = null, endDate = null) {
   if (!user) return null;
 
   // Construir filtros de fecha si se proporcionan
-  const dateFilter = (startDate && endDate) ? {
-    check_in_date: {
-      gte: new Date(startDate),
-      lte: new Date(endDate)
-    }
-  } : {};
+  let dateFilter = {};
+  if (startDate && endDate) {
+    const { start, end } = normalizeDateRange(startDate, endDate);
+    dateFilter = {
+      check_in_date: {
+        gte: start,
+        lte: end
+      }
+    };
+  }
 
   // Obtener todas las reservas del cliente
   const reservations = await prisma.reservations.findMany({
     where: {
       main_guest_id: clientId,
       deleted_at: null,
+      status: { in: ['confirmed', 'in_progress', 'completed'] },
       ...dateFilter
     },
     include: {
@@ -798,12 +858,12 @@ async function getClientDetail(clientId, startDate = null, endDate = null) {
  * Obtiene línea de tiempo de ingresos por tipo de cliente
  */
 async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId = null) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const { start, end } = normalizeDateRange(startDate, endDate);
 
   // Filtro base
   const whereClause = {
     deleted_at: null,
+    status: { in: ['confirmed', 'in_progress', 'completed'] },
     check_in_date: { gte: start, lte: end },
     ...(clientId && { main_guest_id: clientId })
   };
@@ -902,14 +962,25 @@ async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId =
  * Obtiene estadísticas generales de clientes (total, nuevos, recurrentes)
  */
 async function getClientStats(startDate, endDate) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const { start, end } = normalizeDateRange(startDate, endDate);
 
-  // Obtener todos los clientes únicos que hicieron reservas en el período
+  // Obtener el TOTAL de clientes registrados en el sistema (todos los usuarios con role='guest')
+  const allClients = await prisma.users.findMany({
+    where: {
+      deleted_at: null,
+      role: 'guest'
+    },
+    select: { id: true, created_at: true }
+  });
+
+  const totalClientsCount = allClients.length;
+
+  // Obtener clientes que hicieron reservas COMPLETED en el período (para estadísticas)
   const clientsInPeriod = await prisma.reservations.groupBy({
     by: ['main_guest_id'],
     where: {
       deleted_at: null,
+      status: 'completed', // Solo reservas completadas
       check_in_date: { gte: start, lte: end }
     },
     _count: {
@@ -917,29 +988,16 @@ async function getClientStats(startDate, endDate) {
     }
   });
 
-  const totalClientsCount = clientsInPeriod.length;
-
-  // Identificar clientes nuevos (primera reserva en este período)
+  // Identificar clientes nuevos (registrados en este período)
   let newClientsCount = 0;
   let recurringClientsCount = 0;
 
-  for (const client of clientsInPeriod) {
-    const firstReservation = await prisma.reservations.findFirst({
-      where: {
-        main_guest_id: client.main_guest_id,
-        deleted_at: null
-      },
-      orderBy: { created_at: 'asc' },
-      select: { created_at: true }
-    });
-
-    if (firstReservation) {
-      const firstDate = new Date(firstReservation.created_at);
-      if (firstDate >= start && firstDate <= end) {
-        newClientsCount++;
-      } else {
-        recurringClientsCount++;
-      }
+  for (const client of allClients) {
+    const registrationDate = new Date(client.created_at);
+    if (registrationDate >= start && registrationDate <= end) {
+      newClientsCount++;
+    } else {
+      recurringClientsCount++;
     }
   }
 
@@ -1001,8 +1059,7 @@ async function getTopClients(startDate, endDate, metric, limit) {
  * Obtiene ranking de mejores habitaciones
  */
 async function getTopRooms(startDate, endDate, metric) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const { start, end } = normalizeDateRange(startDate, endDate);
 
   // Obtener todas las reservation_rooms en el período
   const reservationRooms = await prisma.reservation_rooms.findMany({
@@ -1097,8 +1154,7 @@ async function getTopRooms(startDate, endDate, metric) {
  * Obtiene ranking de tipos de habitación
  */
 async function getTopRoomTypes(startDate, endDate, metric) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const { start, end } = normalizeDateRange(startDate, endDate);
 
   // Obtener todos los tipos de habitación
   const roomTypes = await prisma.room_types.findMany({
@@ -1179,8 +1235,7 @@ async function getTopRoomTypes(startDate, endDate, metric) {
  * Obtiene ranking de servicios
  */
 async function getTopServices(startDate, endDate) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const { start, end } = normalizeDateRange(startDate, endDate);
 
   // Obtener todos los servicios utilizados en el período
   const reservationServices = await prisma.reservation_services.findMany({
