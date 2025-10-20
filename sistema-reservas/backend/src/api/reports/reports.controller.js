@@ -69,7 +69,7 @@ async function getOccupancy(req, res) {
     }
 
     // Validar groupBy
-    const validGroupBy = ['day', 'week', 'month', 'year'];
+    const validGroupBy = ['hour', 'day', 'week', 'month', 'year'];
     if (!validGroupBy.includes(groupBy)) {
       return res.status(400).json({
         success: false,
@@ -136,7 +136,7 @@ async function getRevenue(req, res) {
     }
 
     // Validar groupBy
-    const validGroupBy = ['day', 'week', 'month', 'year'];
+    const validGroupBy = ['hour', 'day', 'week', 'month', 'year'];
     if (!validGroupBy.includes(groupBy)) {
       return res.status(400).json({
         success: false,
@@ -725,6 +725,214 @@ async function getClientStats(req, res) {
   }
 }
 
+/**
+ * Controlador para obtener el total de paid_amount
+ * @route GET /api/v1/reports/total-paid
+ */
+async function getTotalPaid(req, res) {
+  try {
+    const data = await reportsService.getTotalPaidAmount();
+
+    return res.status(200).json({
+      success: true,
+      data,
+      message: 'Total de pagos obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener total de pagos:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener total de pagos: ${error.message}`,
+      originModule: 'reports.controller - getTotalPaid',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el total de pagos',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener reporte personalizado de un cliente
+ * @route GET /api/v1/reports/client/:clientId/custom
+ */
+async function getClientCustomReport(req, res) {
+  try {
+    const { clientId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los parámetros startDate y endDate son requeridos'
+      });
+    }
+
+    const report = await reportsService.getClientCustomReport(clientId, startDate, endDate);
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Reporte de cliente obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener reporte de cliente:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener reporte de cliente: ${error.message}`,
+      originModule: 'reports.controller - getClientCustomReport',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el reporte del cliente',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener reporte personalizado de una habitación
+ * @route GET /api/v1/reports/room/:roomId/custom
+ */
+async function getRoomCustomReport(req, res) {
+  try {
+    const { roomId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los parámetros startDate y endDate son requeridos'
+      });
+    }
+
+    const report = await reportsService.getRoomCustomReport(roomId, startDate, endDate);
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Reporte de habitación obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener reporte de habitación:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener reporte de habitación: ${error.message}`,
+      originModule: 'reports.controller - getRoomCustomReport',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el reporte de la habitación',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener reporte personalizado de tipo de habitación
+ * @route GET /api/v1/reports/room-type/:roomTypeId/custom
+ */
+async function getRoomTypeCustomReport(req, res) {
+  try {
+    const { roomTypeId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los parámetros startDate y endDate son requeridos'
+      });
+    }
+
+    const report = await reportsService.getRoomTypeCustomReport(roomTypeId, startDate, endDate);
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Reporte de tipo de habitación obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener reporte de tipo de habitación:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener reporte de tipo: ${error.message}`,
+      originModule: 'reports.controller - getRoomTypeCustomReport',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el reporte del tipo de habitación',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener ranking de clientes por ingresos
+ * @route GET /api/v1/reports/clients/top-revenue
+ */
+async function getTopClientsRevenue(req, res) {
+  try {
+    const { startDate, endDate, limit = '50' } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los parámetros startDate y endDate son requeridos'
+      });
+    }
+
+    const report = await reportsService.getTopClientsRevenue(
+      startDate, 
+      endDate, 
+      parseInt(limit)
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Ranking de clientes obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener ranking de clientes:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener ranking de clientes: ${error.message}`,
+      originModule: 'reports.controller - getTopClientsRevenue',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el ranking de clientes',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
 module.exports = {
   getKPIs,
   getOccupancy,
@@ -738,5 +946,11 @@ module.exports = {
   getTopRoomTypes,
   getTopServices,
   comparePeriods,
-  compareClients
+  compareClients,
+  getTotalPaid,
+  getClientCustomReport,
+  getRoomCustomReport,
+  getRoomTypeCustomReport,
+  getTopClientsRevenue,
 };
+

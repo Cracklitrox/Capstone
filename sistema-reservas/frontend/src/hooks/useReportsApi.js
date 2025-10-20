@@ -49,7 +49,16 @@ export const useReportsApi = () => {
     }
   }, []);
 
-  // Reportes Diarios
+  // Reportes por Hora (para reportes diarios)
+  const getHourlyRevenue = useCallback((startDate, endDate) => {
+    return fetchReport('revenue', 'hour', startDate, endDate);
+  }, [fetchReport]);
+
+  const getHourlyOccupancy = useCallback((startDate, endDate) => {
+    return fetchReport('occupancy', 'hour', startDate, endDate);
+  }, [fetchReport]);
+
+  // Reportes Diarios (por día)
   const getDailyRevenue = useCallback((startDate, endDate) => {
     return fetchReport('revenue', 'day', startDate, endDate);
   }, [fetchReport]);
@@ -166,10 +175,118 @@ export const useReportsApi = () => {
     }
   }, []);
 
+  // Obtener total de paid_amount
+  const getTotalPaidAmount = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const url = `${API_URL}/reports/total-paid`;
+      const response = await axios.get(url, getAuthHeaders());
+      setLoading(false);
+      return { data: response.data.data || {} };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message || 'Error al obtener total de pagos';
+      setError(errorMessage);
+      setLoading(false);
+      throw new Error(errorMessage);
+    }
+  }, []);
+
+  // ============================================
+  // REPORTES PERSONALIZADOS
+  // ============================================
+
+  // Reporte personalizado de cliente
+  const getClientCustomReport = useCallback(async (clientId, startDate, endDate) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', startDate);
+      params.append('endDate', endDate);
+      
+      const url = `${API_URL}/reports/client/${clientId}/custom?${params.toString()}`;
+      const response = await axios.get(url, getAuthHeaders());
+      setLoading(false);
+      return { data: response.data.data || {} };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message || 'Error al obtener reporte de cliente';
+      setError(errorMessage);
+      setLoading(false);
+      throw new Error(errorMessage);
+    }
+  }, []);
+
+  // Reporte personalizado de habitación
+  const getRoomCustomReport = useCallback(async (roomId, startDate, endDate) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', startDate);
+      params.append('endDate', endDate);
+      
+      const url = `${API_URL}/reports/room/${roomId}/custom?${params.toString()}`;
+      const response = await axios.get(url, getAuthHeaders());
+      setLoading(false);
+      return { data: response.data.data || {} };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message || 'Error al obtener reporte de habitación';
+      setError(errorMessage);
+      setLoading(false);
+      throw new Error(errorMessage);
+    }
+  }, []);
+
+  // Reporte personalizado de tipo de habitación
+  const getRoomTypeCustomReport = useCallback(async (roomTypeId, startDate, endDate) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', startDate);
+      params.append('endDate', endDate);
+      
+      const url = `${API_URL}/reports/room-type/${roomTypeId}/custom?${params.toString()}`;
+      const response = await axios.get(url, getAuthHeaders());
+      setLoading(false);
+      return { data: response.data.data || {} };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message || 'Error al obtener reporte de tipo';
+      setError(errorMessage);
+      setLoading(false);
+      throw new Error(errorMessage);
+    }
+  }, []);
+
+  // Top clientes por ingresos
+  const getTopClientsRevenue = useCallback(async (startDate, endDate, limit = 50) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', startDate);
+      params.append('endDate', endDate);
+      params.append('limit', limit.toString());
+      
+      const url = `${API_URL}/reports/clients/top-revenue?${params.toString()}`;
+      const response = await axios.get(url, getAuthHeaders());
+      setLoading(false);
+      return { data: response.data.data || {} };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message || 'Error al obtener ranking de clientes';
+      setError(errorMessage);
+      setLoading(false);
+      throw new Error(errorMessage);
+    }
+  }, []);
+
   return {
     loading,
     error,
     // Reportes Diarios
+    getHourlyRevenue,
+    getHourlyOccupancy,
     getDailyRevenue,
     getDailyOccupancy,
     getDailyCheckIns,
@@ -190,5 +307,13 @@ export const useReportsApi = () => {
     getClientStats,
     // Reportes de Habitaciones
     getRoomTypeStats,
+    getTotalPaidAmount,
+    // Reportes Personalizados
+    getClientCustomReport,
+    getRoomCustomReport,
+    getRoomTypeCustomReport,
+    getTopClientsRevenue,
+    // Total Pagado
+    getTotalPaidAmount,
   };
 };

@@ -201,4 +201,71 @@ router.get(
   reportsController.compareClients
 );
 
+/**
+ * @route GET /api/v1/reports/total-paid
+ * @desc Obtiene el total de paid_amount de todas las reservas completadas
+ * @access Todos los roles autenticados
+ */
+router.get(
+  '/total-paid',
+  authenticate,
+  reportsController.getTotalPaid
+);
+
+// ============================================
+// REPORTES PERSONALIZADOS
+// ============================================
+
+/**
+ * @route GET /api/v1/reports/client/:clientId/custom
+ * @desc Obtiene reporte detallado personalizado de un cliente específico
+ * @query startDate, endDate
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/client/:clientId/custom',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getClientCustomReport
+);
+
+/**
+ * @route GET /api/v1/reports/room/:roomId/custom
+ * @desc Obtiene reporte detallado personalizado de una habitación
+ * @query startDate, endDate
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/room/:roomId/custom',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getRoomCustomReport
+);
+
+/**
+ * @route GET /api/v1/reports/room-type/:roomTypeId/custom
+ * @desc Obtiene reporte detallado personalizado de un tipo de habitación
+ * @query startDate, endDate
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/room-type/:roomTypeId/custom',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getRoomTypeCustomReport
+);
+
+/**
+ * @route GET /api/v1/reports/clients/top-revenue
+ * @desc Obtiene ranking completo de clientes por ingresos generados
+ * @query startDate, endDate, limit
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/clients/top-revenue',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getTopClientsRevenue
+);
+
 module.exports = router;

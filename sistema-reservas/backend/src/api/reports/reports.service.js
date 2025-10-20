@@ -96,6 +96,11 @@ function groupByPeriod(data, dateField, groupBy) {
     let key;
 
     switch (groupBy) {
+      case 'hour':
+        // Formato: 2025-10-18T14 (año-mes-día-hora)
+        const hourKey = date.toISOString().substring(0, 13);
+        key = hourKey;
+        break;
       case 'day':
         key = date.toISOString().split('T')[0];
         break;
@@ -383,7 +388,57 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
     }
   });
 
-  // Agrupar datos por período
+  // Si es agrupación por día, calcular ocupación día por día correctamente
+  if (groupBy === 'day' || groupBy === 'hour') {
+    const result = [];
+    const currentDate = new Date(start);
+    
+    while (currentDate <= end) {
+      const dayStart = new Date(currentDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(currentDate);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      // Contar habitaciones únicas ocupadas en este día específico
+      const occupiedRooms = new Set();
+      const reservationsOnThisDay = [];
+      
+      reservationRooms.forEach(rr => {
+        const rrStart = new Date(rr.start_date);
+        const rrEnd = new Date(rr.end_date);
+        
+        // Una habitación está ocupada si el día está entre start_date (inclusive) y end_date (exclusive)
+        // Ejemplo: reserva 14/10 - 19/10 ocupa habitación los días 14, 15, 16, 17, 18 (NO el 19, es checkout)
+        if (dayStart >= rrStart && dayStart < rrEnd) {
+          occupiedRooms.add(rr.room_id);
+          reservationsOnThisDay.push(rr);
+        }
+      });
+      
+      const occupiedRoomCount = occupiedRooms.size;
+      const occupancyRate = totalRooms > 0 ? (occupiedRoomCount / totalRooms) * 100 : 0;
+      const uniqueReservations = new Set(reservationsOnThisDay.map(rr => rr.reservation_id));
+      
+      const period = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      result.push({
+        period,
+        periodLabel: formatPeriodLabel(period, groupBy),
+        occupancyRate: parseFloat(occupancyRate.toFixed(2)),
+        occupancyPercentage: parseFloat(occupancyRate.toFixed(2)), // Alias para compatibilidad
+        totalRooms,
+        occupiedRoomNights: occupiedRoomCount, // Para este día específico
+        availableRoomNights: totalRooms - occupiedRoomCount,
+        reservationCount: uniqueReservations.size
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return result;
+  }
+
+  // Para otras agrupaciones (semana, mes, año), usar lógica de noches totales
   const grouped = groupByPeriod(reservationRooms, 'start_date', groupBy);
 
   // Calcular métricas para cada grupo
@@ -404,24 +459,19 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       }
     });
 
-    // Calcular días en este período - CORREGIDO
+    // Calcular días en este período
     let periodDays;
-    if (groupBy === 'day') {
-      periodDays = 1;
-    } else if (groupBy === 'week') {
+    if (groupBy === 'week') {
       periodDays = 7;
     } else if (groupBy === 'month') {
-      // Corregido: calcular días correctamente para el mes
       const [year, month] = period.split('-');
-      // new Date(year, month, 0) da el último día del mes anterior
-      // new Date(year, month, 1) es el primer día del mes
       const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
       periodDays = daysInMonth;
     } else if (groupBy === 'year') {
       const year = parseInt(period);
       periodDays = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0) ? 366 : 365;
     } else {
-      periodDays = 1; // fallback
+      periodDays = 1;
     }
 
     const totalAvailableNights = totalRooms * periodDays;
@@ -435,6 +485,7 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       period,
       periodLabel: formatPeriodLabel(period, groupBy),
       occupancyRate: parseFloat(occupancyRate.toFixed(2)),
+      occupancyPercentage: parseFloat(occupancyRate.toFixed(2)), // Alias para compatibilidad
       totalRooms,
       occupiedRoomNights,
       availableRoomNights: totalAvailableNights - occupiedRoomNights,
@@ -546,6 +597,39 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
       totalRoomNights
     };
   });
+
+  // Si es agrupación mensual y el rango es de un año completo, generar todos los 12 meses
+  if (groupBy === 'month') {
+    const startYear = start.getFullYear();
+    const endYear = end.getFullYear();
+    const startMonth = start.getMonth();
+    const endMonth = end.getMonth();
+    
+    // Si es el mismo año y abarca todo el año (Ene-Dic), generar 12 meses
+    if (startYear === endYear && startMonth === 0 && endMonth === 11) {
+      const fullYearData = [];
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      
+      for (let month = 0; month < 12; month++) {
+        const monthKey = `${startYear}-${(month + 1).toString().padStart(2, '0')}`;
+        const existingData = result.find(r => r.period === monthKey);
+        
+        fullYearData.push({
+          period: monthKey,
+          periodLabel: monthNames[month],
+          totalRevenue: existingData?.totalRevenue || 0,
+          roomRevenue: existingData?.roomRevenue || 0,
+          servicesRevenue: existingData?.servicesRevenue || 0,
+          reservationCount: existingData?.reservationCount || 0,
+          averageReservationValue: existingData?.averageReservationValue || 0,
+          adr: existingData?.adr || 0,
+          totalRoomNights: existingData?.totalRoomNights || 0
+        });
+      }
+      return fullYearData;
+    }
+  }
 
   return result;
 }
@@ -964,11 +1048,13 @@ async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId =
 async function getClientStats(startDate, endDate) {
   const { start, end } = normalizeDateRange(startDate, endDate);
 
-  // Obtener el TOTAL de clientes registrados en el sistema (todos los usuarios con role='guest')
+  // Obtener el TOTAL de clientes registrados en el sistema (usuarios con guest_details)
   const allClients = await prisma.users.findMany({
     where: {
       deleted_at: null,
-      role: 'guest'
+      guest_details: {
+        isNot: null // Solo usuarios que tienen guest_details (son huéspedes)
+      }
     },
     select: { id: true, created_at: true }
   });
@@ -1369,6 +1455,418 @@ async function compareClients(clientIds, startDate, endDate) {
   return comparisons.filter(c => c !== null);
 }
 
+/**
+ * Obtiene el total de paid_amount de todas las reservas completadas
+ */
+async function getTotalPaidAmount() {
+  const result = await prisma.reservations.aggregate({
+    where: {
+      status: 'completed',
+      deleted_at: null
+    },
+    _sum: {
+      paid_amount: true
+    },
+    _count: {
+      id: true
+    }
+  });
+
+  return {
+    totalPaidAmount: result._sum.paid_amount || 0,
+    totalCompletedReservations: result._count.id || 0
+  };
+}
+
+/**
+ * Obtiene reporte detallado de un cliente específico
+ */
+async function getClientCustomReport(clientId, startDate, endDate) {
+  const { start, end } = normalizeDateRange(startDate, endDate);
+
+  // Obtener todas las reservas del cliente en el período
+  const reservations = await prisma.reservations.findMany({
+    where: {
+      main_guest_id: parseInt(clientId),
+      deleted_at: null,
+      status: 'completed',
+      check_in_date: { gte: start, lte: end }
+    },
+    include: {
+      reservation_rooms: {
+        where: { deleted_at: null },
+        include: {
+          rooms: {
+            include: {
+              room_types: true
+            }
+          }
+        }
+      },
+      reservation_services: {
+        where: { deleted_at: null }
+      },
+      payments: {
+        where: {
+          status: 'confirmed',
+          deleted_at: null
+        }
+      }
+    },
+    orderBy: { check_in_date: 'desc' }
+  });
+
+  // Calcular métricas del cliente
+  let totalRevenue = 0;
+  let totalRoomRevenue = 0;
+  let totalServicesRevenue = 0;
+  let totalNights = 0;
+
+  const reservationDetails = reservations.map(res => {
+    let roomRevenue = res.reservation_rooms.reduce((sum, rr) => sum + rr.subtotal, 0);
+    let servicesRevenue = res.reservation_services.reduce((sum, rs) => sum + rs.subtotal, 0);
+    let nights = getDaysBetween(new Date(res.check_in_date), new Date(res.check_out_date));
+
+    totalRevenue += (roomRevenue + servicesRevenue);
+    totalRoomRevenue += roomRevenue;
+    totalServicesRevenue += servicesRevenue;
+    totalNights += nights;
+
+    return {
+      reservationId: res.id,
+      checkInDate: res.check_in_date,
+      checkOutDate: res.check_out_date,
+      nights,
+      roomRevenue,
+      servicesRevenue,
+      totalRevenue: roomRevenue + servicesRevenue,
+      paidAmount: res.paid_amount,
+      status: res.status,
+      rooms: res.reservation_rooms.map(rr => ({
+        roomNumber: rr.rooms.room_number,
+        roomType: rr.rooms.room_types.name,
+        floor: rr.rooms.floor
+      }))
+    };
+  });
+
+  // Obtener información del cliente
+  const client = await prisma.users.findUnique({
+    where: { id: parseInt(clientId) },
+    select: {
+      id: true,
+      first_name: true,
+      paternal_last_name: true,
+      maternal_last_name: true,
+      email: true,
+      phone_number: true,
+      created_at: true
+    }
+  });
+
+  if (!client) {
+    throw new Error('Cliente no encontrado');
+  }
+
+  return {
+    client: {
+      id: client.id,
+      fullName: `${client.first_name} ${client.paternal_last_name} ${client.maternal_last_name || ''}`.trim(),
+      email: client.email,
+      phone: client.phone_number,
+      memberSince: client.created_at
+    },
+    summary: {
+      totalReservations: reservations.length,
+      totalRevenue,
+      totalRoomRevenue,
+      totalServicesRevenue,
+      totalNights,
+      averageReservationValue: reservations.length > 0 ? totalRevenue / reservations.length : 0,
+      averageStayDuration: reservations.length > 0 ? totalNights / reservations.length : 0
+    },
+    reservations: reservationDetails
+  };
+}
+
+/**
+ * Obtiene reporte detallado de una habitación específica
+ */
+async function getRoomCustomReport(roomId, startDate, endDate) {
+  const { start, end } = normalizeDateRange(startDate, endDate);
+
+  // Obtener información de la habitación
+  const room = await prisma.rooms.findUnique({
+    where: { id: parseInt(roomId) },
+    include: {
+      room_types: true
+    }
+  });
+
+  if (!room) {
+    throw new Error('Habitación no encontrada');
+  }
+
+  // Obtener todas las reservas de esta habitación en el período
+  const reservationRooms = await prisma.reservation_rooms.findMany({
+    where: {
+      room_id: parseInt(roomId),
+      deleted_at: null,
+      reservations: {
+        status: 'completed',
+        deleted_at: null
+      },
+      OR: [
+        { start_date: { gte: start, lte: end } },
+        { end_date: { gte: start, lte: end } },
+        { AND: [{ start_date: { lte: start } }, { end_date: { gte: end } }] }
+      ]
+    },
+    include: {
+      reservations: {
+        include: {
+          users_reservations_main_guest_idTousers: {
+            select: {
+              id: true,
+              first_name: true,
+              paternal_last_name: true,
+              maternal_last_name: true,
+              email: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: { start_date: 'desc' }
+  });
+
+  // Calcular métricas
+  let totalRevenue = 0;
+  let totalNights = 0;
+
+  const reservationDetails = reservationRooms.map(rr => {
+    const nights = getDaysBetween(new Date(rr.start_date), new Date(rr.end_date));
+    totalRevenue += rr.subtotal;
+    totalNights += nights;
+
+    const guest = rr.reservations.users_reservations_main_guest_idTousers;
+    return {
+      reservationId: rr.reservation_id,
+      guestName: `${guest.first_name} ${guest.paternal_last_name} ${guest.maternal_last_name || ''}`.trim(),
+      guestEmail: guest.email,
+      startDate: rr.start_date,
+      endDate: rr.end_date,
+      nights,
+      revenue: rr.subtotal,
+      pricePerNight: rr.price_per_night
+    };
+  });
+
+  // Calcular ocupación en el período
+  const totalDays = getDaysBetween(start, end) + 1;
+  const occupiedDays = totalNights;
+  const occupancyRate = totalDays > 0 ? (occupiedDays / totalDays) * 100 : 0;
+
+  return {
+    room: {
+      id: room.id,
+      roomNumber: room.room_number,
+      floor: room.floor,
+      roomType: room.room_types.name,
+      capacity: room.room_types.capacity,
+      basePrice: room.room_types.base_price
+    },
+    summary: {
+      totalReservations: reservationRooms.length,
+      totalRevenue,
+      totalNights,
+      occupancyRate: parseFloat(occupancyRate.toFixed(2)),
+      averageNightlyRate: totalNights > 0 ? totalRevenue / totalNights : 0,
+      periodDays: totalDays
+    },
+    reservations: reservationDetails
+  };
+}
+
+/**
+ * Obtiene reporte de habitaciones por tipo
+ */
+async function getRoomTypeCustomReport(roomTypeId, startDate, endDate) {
+  const { start, end } = normalizeDateRange(startDate, endDate);
+
+  // Obtener información del tipo de habitación
+  const roomType = await prisma.room_types.findUnique({
+    where: { id: parseInt(roomTypeId) },
+    include: {
+      rooms: {
+        where: { is_active: true }
+      }
+    }
+  });
+
+  if (!roomType) {
+    throw new Error('Tipo de habitación no encontrado');
+  }
+
+  const roomIds = roomType.rooms.map(r => r.id);
+
+  // Obtener todas las reservas de este tipo en el período
+  const reservationRooms = await prisma.reservation_rooms.findMany({
+    where: {
+      room_id: { in: roomIds },
+      deleted_at: null,
+      reservations: {
+        status: 'completed',
+        deleted_at: null
+      },
+      OR: [
+        { start_date: { gte: start, lte: end } },
+        { end_date: { gte: start, lte: end } },
+        { AND: [{ start_date: { lte: start } }, { end_date: { gte: end } }] }
+      ]
+    },
+    include: {
+      rooms: true,
+      reservations: true
+    }
+  });
+
+  // Calcular métricas por habitación
+  const roomsData = {};
+  let totalRevenue = 0;
+  let totalNights = 0;
+
+  reservationRooms.forEach(rr => {
+    const roomId = rr.room_id;
+    if (!roomsData[roomId]) {
+      roomsData[roomId] = {
+        roomNumber: rr.rooms.room_number,
+        floor: rr.rooms.floor,
+        revenue: 0,
+        nights: 0,
+        reservations: 0
+      };
+    }
+
+    const nights = getDaysBetween(new Date(rr.start_date), new Date(rr.end_date));
+    roomsData[roomId].revenue += rr.subtotal;
+    roomsData[roomId].nights += nights;
+    roomsData[roomId].reservations++;
+
+    totalRevenue += rr.subtotal;
+    totalNights += nights;
+  });
+
+  // Calcular ocupación general del tipo
+  const totalDays = getDaysBetween(start, end) + 1;
+  const totalRooms = roomType.rooms.length;
+  const totalAvailableNights = totalDays * totalRooms;
+  const occupancyRate = totalAvailableNights > 0 ? (totalNights / totalAvailableNights) * 100 : 0;
+
+  return {
+    roomType: {
+      id: roomType.id,
+      name: roomType.name,
+      capacity: roomType.capacity,
+      basePrice: roomType.base_price,
+      totalRooms: totalRooms
+    },
+    summary: {
+      totalReservations: reservationRooms.length,
+      totalRevenue,
+      totalNights,
+      occupancyRate: parseFloat(occupancyRate.toFixed(2)),
+      averageNightlyRate: totalNights > 0 ? totalRevenue / totalNights : 0,
+      revPAR: totalAvailableNights > 0 ? totalRevenue / totalAvailableNights : 0
+    },
+    roomsBreakdown: Object.entries(roomsData).map(([roomId, data]) => ({
+      roomId: parseInt(roomId),
+      ...data,
+      averageNightlyRate: data.nights > 0 ? data.revenue / data.nights : 0
+    }))
+  };
+}
+
+/**
+ * Obtiene ranking completo de clientes por ingresos
+ */
+async function getTopClientsRevenue(startDate, endDate, limit = 50) {
+  const { start, end } = normalizeDateRange(startDate, endDate);
+
+  // Obtener todas las reservas completadas en el período
+  const reservations = await prisma.reservations.findMany({
+    where: {
+      deleted_at: null,
+      status: 'completed',
+      check_in_date: { gte: start, lte: end }
+    },
+    include: {
+      reservation_rooms: {
+        where: { deleted_at: null }
+      },
+      reservation_services: {
+        where: { deleted_at: null }
+      },
+      users_reservations_main_guest_idTousers: {
+        select: {
+          id: true,
+          first_name: true,
+          paternal_last_name: true,
+          maternal_last_name: true,
+          email: true,
+          phone_number: true
+        }
+      }
+    }
+  });
+
+  // Agrupar por cliente y calcular ingresos
+  const clientsMap = {};
+
+  reservations.forEach(res => {
+    const clientId = res.main_guest_id;
+    if (!clientsMap[clientId]) {
+      const guest = res.users_reservations_main_guest_idTousers;
+      clientsMap[clientId] = {
+        clientId,
+        fullName: `${guest.first_name} ${guest.paternal_last_name} ${guest.maternal_last_name || ''}`.trim(),
+        email: guest.email,
+        phone: guest.phone_number,
+        totalRevenue: 0,
+        totalReservations: 0,
+        totalNights: 0
+      };
+    }
+
+    const roomRevenue = res.reservation_rooms.reduce((sum, rr) => sum + rr.subtotal, 0);
+    const servicesRevenue = res.reservation_services.reduce((sum, rs) => sum + rs.subtotal, 0);
+    const nights = getDaysBetween(new Date(res.check_in_date), new Date(res.check_out_date));
+
+    clientsMap[clientId].totalRevenue += (roomRevenue + servicesRevenue);
+    clientsMap[clientId].totalReservations++;
+    clientsMap[clientId].totalNights += nights;
+  });
+
+  // Convertir a array y ordenar por ingresos descendente
+  const ranking = Object.values(clientsMap)
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .slice(0, limit)
+    .map((client, index) => ({
+      rank: index + 1,
+      ...client,
+      averageReservationValue: client.totalReservations > 0 
+        ? client.totalRevenue / client.totalReservations 
+        : 0
+    }));
+
+  return {
+    totalClients: Object.keys(clientsMap).length,
+    topClients: ranking,
+    periodStart: start,
+    periodEnd: end
+  };
+}
+
 module.exports = {
   calculateKPIs,
   getOccupancyData,
@@ -1382,5 +1880,10 @@ module.exports = {
   getTopRoomTypes,
   getTopServices,
   comparePeriods,
-  compareClients
+  compareClients,
+  getTotalPaidAmount,
+  getClientCustomReport,
+  getRoomCustomReport,
+  getRoomTypeCustomReport,
+  getTopClientsRevenue
 };
