@@ -25,7 +25,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import {
   LineChart,
@@ -134,6 +134,7 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
       pdf.save(fileName);
     } catch (error) {
       console.error('Error al generar PDF:', error);
+      alert('Error al generar el PDF. Por favor, intenta nuevamente.');
     } finally {
       setIsGenerating(false);
     }
@@ -561,7 +562,7 @@ const CustomReportsSection = () => {
     const loadData = async () => {
       try {
         // Cargar clientes que tienen reservas
-        const clientsResponse = await fetch('http://localhost:3001/api/v1/guests?limit=100', {
+        const clientsResponse = await fetch('http://localhost:3001/api/v1/guests?limit=200', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
@@ -572,6 +573,7 @@ const CustomReportsSection = () => {
           const allGuests = clientsData.data || [];
           // Filtrar solo clientes con reservas
           const clientsWithReservations = allGuests.filter(g => g.totalReservations > 0);
+          console.log('Clientes con reservas:', clientsWithReservations.length);
           setClients(clientsWithReservations.map(c => ({
             id: c.id,
             name: c.fullName,
@@ -579,35 +581,56 @@ const CustomReportsSection = () => {
           })));
         }
 
-        // Cargar habitaciones activas
-        const roomsResponse = await fetch('http://localhost:3001/api/v1/rooms?isActive=true', {
+        // Cargar habitaciones activas desde el endpoint de admin que incluye relaciones
+        const roomsResponse = await fetch('http://localhost:3001/api/v1/admin/rooms', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
           }
         });
+        console.log('📡 Respuesta habitaciones:', roomsResponse.status, roomsResponse.statusText);
         if (roomsResponse.ok) {
           const roomsData = await roomsResponse.json();
-          setRooms((roomsData.data || []).map(r => ({
-            id: r.id,
-            roomNumber: r.room_number,
-            type: r.room_types?.name || 'N/A'
-          })));
+          console.log('📦 Datos habitaciones raw:', roomsData);
+          // El backend puede devolver el array directamente o en { data: [...] }
+          const rawData = Array.isArray(roomsData) ? roomsData : (roomsData.data || []);
+          // Filtrar solo habitaciones activas y mapear los datos
+          const roomsList = rawData
+            .filter(r => r.is_active !== false)
+            .map(r => ({
+              id: r.id,
+              roomNumber: r.room_number || 'S/N',
+              type: r.room_types?.name || 'Sin tipo'
+            }));
+          console.log('✅ Habitaciones procesadas:', roomsList.length, roomsList);
+          setRooms(roomsList);
+        } else {
+          const errorText = await roomsResponse.text();
+          console.error('❌ Error al cargar habitaciones:', roomsResponse.status, errorText);
         }
 
         // Cargar tipos de habitación activos
-        const typesResponse = await fetch('http://localhost:3001/api/v1/room-types?isActive=true', {
+        const typesResponse = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types?isActive=true', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
           }
         });
+        console.log('📡 Respuesta tipos de habitación:', typesResponse.status, typesResponse.statusText);
         if (typesResponse.ok) {
           const typesData = await typesResponse.json();
-          setRoomTypes((typesData.data || []).map(rt => ({
+          console.log('📦 Datos tipos habitación raw:', typesData);
+          // El backend puede devolver el array directamente o en { data: [...] }
+          const rawData = Array.isArray(typesData) ? typesData : (typesData.data || []);
+          const typesList = rawData.map(rt => ({
             id: rt.id,
             name: rt.name
-          })));
+          }));
+          console.log('✅ Tipos de habitación procesados:', typesList.length, typesList);
+          setRoomTypes(typesList);
+        } else {
+          const errorText = await typesResponse.text();
+          console.error('❌ Error al cargar tipos de habitación:', typesResponse.status, errorText);
         }
       } catch (error) {
         console.error('Error cargando datos:', error);
@@ -736,7 +759,8 @@ const CustomReportsSection = () => {
           formatCurrency(r.totalRevenue)
         ]);
 
-        pdf.autoTable({
+        // Usar la importación de autoTable
+        autoTable(pdf, {
           startY: yPosition,
           head: [['Check-in', 'Check-out', 'Noches', 'Total']],
           body: tableData,
@@ -784,7 +808,7 @@ const CustomReportsSection = () => {
         formatCurrency(c.totalRevenue)
       ]);
 
-      pdf.autoTable({
+      autoTable(pdf, {
         startY: yPosition,
         head: [['#', 'Cliente', 'Reservas', 'Ingresos']],
         body: tableData,
@@ -794,8 +818,20 @@ const CustomReportsSection = () => {
       });
     }
 
-    // Descargar PDF
-    pdf.save(`reporte-${reportType}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    // Descargar PDF con nombre personalizado
+    let fileName = 'reporte';
+    if (reportType === 'client' && reportData.data?.client) {
+      fileName = `Reporte_Cliente_${reportData.data.client.fullName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    } else if (reportType === 'room' && reportData.data?.room) {
+      fileName = `Reporte_Habitacion_${reportData.data.room.roomNumber}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    } else if (reportType === 'roomType' && reportData.data?.roomType) {
+      fileName = `Reporte_Tipo_Habitacion_${reportData.data.roomType.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    } else if (reportType === 'topClients') {
+      fileName = `Reporte_Top_Clientes_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    } else {
+      fileName = `reporte-${reportType}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    }
+    pdf.save(fileName);
   };
 
   const formatCurrency = (value) => {
@@ -881,19 +917,37 @@ const CustomReportsSection = () => {
                 <select
                   value={selectedEntity}
                   onChange={(e) => setSelectedEntity(e.target.value)}
-                  className="w-full p-2 border rounded-md bg-background"
+                  className="w-full p-3 border rounded-md bg-background text-foreground"
                 >
                   <option value="">-- Seleccione --</option>
-                  {reportType === 'client' && clients.map(c => (
+                  {reportType === 'client' && clients.length > 0 && clients.map(c => (
                     <option key={c.id} value={c.id}>{c.name} - {c.email}</option>
                   ))}
-                  {reportType === 'room' && rooms.map(r => (
+                  {reportType === 'client' && clients.length === 0 && (
+                    <option disabled>No hay clientes disponibles</option>
+                  )}
+                  {reportType === 'room' && rooms.length > 0 && rooms.map(r => (
                     <option key={r.id} value={r.id}>Habitación {r.roomNumber} ({r.type})</option>
                   ))}
-                  {reportType === 'roomType' && roomTypes.map(rt => (
+                  {reportType === 'room' && rooms.length === 0 && (
+                    <option disabled>No hay habitaciones disponibles</option>
+                  )}
+                  {reportType === 'roomType' && roomTypes.length > 0 && roomTypes.map(rt => (
                     <option key={rt.id} value={rt.id}>{rt.name}</option>
                   ))}
+                  {reportType === 'roomType' && roomTypes.length === 0 && (
+                    <option disabled>No hay tipos de habitación disponibles</option>
+                  )}
                 </select>
+                {reportType === 'client' && clients.length === 0 && (
+                  <p className="text-xs text-yellow-600 mt-1">⚠️ No se encontraron clientes. Verifica los permisos.</p>
+                )}
+                {reportType === 'room' && rooms.length === 0 && (
+                  <p className="text-xs text-yellow-600 mt-1">⚠️ No se encontraron habitaciones. Verifica los permisos.</p>
+                )}
+                {reportType === 'roomType' && roomTypes.length === 0 && (
+                  <p className="text-xs text-yellow-600 mt-1">⚠️ No se encontraron tipos de habitación. Verifica los permisos.</p>
+                )}
               </div>
             )}
 
@@ -961,7 +1015,7 @@ const CustomReportsSection = () => {
               )}
             </Button>
 
-            {reportData && (
+            {reportData && (reportData.data || reportData.topClients) && (
               <Button 
                 onClick={handleDownloadPDF}
                 variant="outline"
@@ -1074,6 +1128,42 @@ const CustomReportsSection = () => {
                     <CardContent className="pt-6">
                       <div className="text-2xl font-bold text-blue-600">{reportData.data.summary.occupancyRate.toFixed(1)}%</div>
                       <p className="text-xs text-muted-foreground">Ocupación</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold">{formatCurrency(reportData.data.summary.averageNightlyRate)}</div>
+                      <p className="text-xs text-muted-foreground">Tarifa Promedio</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {reportType === 'roomType' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Tipo de Habitación: {reportData.data.roomType.name}</h3>
+                  <p className="text-sm text-muted-foreground">Total de habitaciones de este tipo: {reportData.data.roomType.totalRooms}</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold">{reportData.data.summary.totalReservations}</div>
+                      <p className="text-xs text-muted-foreground">Total Reservas</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(reportData.data.summary.totalRevenue)}</div>
+                      <p className="text-xs text-muted-foreground">Ingresos Totales</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold text-blue-600">{reportData.data.summary.occupancyRate.toFixed(1)}%</div>
+                      <p className="text-xs text-muted-foreground">Tasa de Ocupación</p>
                     </CardContent>
                   </Card>
                   <Card>
