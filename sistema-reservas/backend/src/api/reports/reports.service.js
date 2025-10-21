@@ -58,9 +58,35 @@ function formatPeriodLabel(date, groupBy) {
       return `${d.getDate()} ${months[d.getMonth()]}`;
     }
     case 'week': {
-      // Para semanas, el formato es "2025-W41"
-      const weekNum = date.split('-W')[1];
-      return `Semana ${weekNum}`;
+      // Para semanas, calculamos el rango de fechas de la semana
+      if (date.includes('-W')) {
+        const [yearStr, weekStr] = date.split('-W');
+        const year = parseInt(yearStr);
+        const week = parseInt(weekStr);
+        
+        // Calcular el inicio de la semana (lunes)
+        const jan4 = new Date(year, 0, 4);
+        const daysSinceMonday = (jan4.getDay() + 6) % 7;
+        const firstMonday = new Date(year, 0, 4 - daysSinceMonday);
+        const startOfWeek = new Date(firstMonday);
+        startOfWeek.setDate(firstMonday.getDate() + (week - 1) * 7);
+        
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        
+        const startDay = startOfWeek.getDate();
+        const startMonth = months[startOfWeek.getMonth()];
+        const endDay = endOfWeek.getDate();
+        const endMonth = months[endOfWeek.getMonth()];
+        
+        // Si están en el mismo mes, mostrar rango corto
+        if (startOfWeek.getMonth() === endOfWeek.getMonth()) {
+          return `${startDay}-${endDay} ${startMonth}`;
+        } else {
+          return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
+        }
+      }
+      return date;
     }
     case 'month': {
       // Para meses, el formato es "2025-10"
@@ -497,6 +523,74 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
 }
 
 /**
+ * Genera todos los períodos del rango, incluso si no tienen datos
+ */
+function generateAllPeriods(start, end, groupBy) {
+  const periods = [];
+  const current = new Date(start);
+  
+  switch (groupBy) {
+    case 'hour': {
+      // Generar todas las horas del día
+      while (current <= end) {
+        const hourKey = current.toISOString().substring(0, 13);
+        periods.push(hourKey);
+        current.setHours(current.getHours() + 1);
+      }
+      break;
+    }
+    case 'day': {
+      // Generar todos los días del rango
+      while (current <= end) {
+        periods.push(current.toISOString().split('T')[0]);
+        current.setDate(current.getDate() + 1);
+      }
+      break;
+    }
+    case 'week': {
+      // Generar todas las semanas del rango
+      const startWeek = getWeekNumber(current);
+      const endWeek = getWeekNumber(end);
+      const startYear = current.getFullYear();
+      const endYear = end.getFullYear();
+      
+      let year = startYear;
+      let week = startWeek;
+      
+      while (year < endYear || (year === endYear && week <= endWeek)) {
+        periods.push(`${year}-W${week.toString().padStart(2, '0')}`);
+        week++;
+        // Si llegamos a la semana 53 (o 52 dependiendo del año), pasar al siguiente año
+        const weeksInYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 53 : 52;
+        if (week > weeksInYear) {
+          year++;
+          week = 1;
+        }
+      }
+      break;
+    }
+    case 'month': {
+      // Generar todos los meses del rango
+      while (current <= end) {
+        periods.push(`${current.getFullYear()}-${(current.getMonth() + 1).toString().padStart(2, '0')}`);
+        current.setMonth(current.getMonth() + 1);
+      }
+      break;
+    }
+    case 'year': {
+      // Generar todos los años del rango
+      while (current <= end) {
+        periods.push(current.getFullYear().toString());
+        current.setFullYear(current.getFullYear() + 1);
+      }
+      break;
+    }
+  }
+  
+  return periods;
+}
+
+/**
  * Obtiene datos de ingresos agrupados por período
  */
 async function getRevenueData(startDate, endDate, groupBy, includeServices = true) {
@@ -544,34 +638,63 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
     }
   });
 
+  // Generar TODOS los períodos del rango
+  const allPeriods = generateAllPeriods(start, end, groupBy);
+  
   // Agrupar por período - usar check_in_date como referencia
   const grouped = groupByPeriod(reservations, 'check_in_date', groupBy);
 
-  // Calcular métricas para cada grupo
-  const result = Object.keys(grouped).sort().map(period => {
-    const periodData = grouped[period];
+  // Calcular métricas para cada período (incluso los vacíos)
+  const result = allPeriods.map(period => {
+    const periodData = grouped[period] || [];
+    
+    // Si no hay datos para este período, retornar valores en 0
+    if (periodData.length === 0) {
+      return {
+        period,
+        periodLabel: formatPeriodLabel(period, groupBy),
+        totalRevenue: 0,
+        roomRevenue: 0,
+        servicesRevenue: 0,
+        reservationCount: 0,
+        averageReservationValue: 0,
+        adr: 0,
+        totalRoomNights: 0
+      };
+    }
 
     let roomRevenue = 0;
     let servicesRevenue = 0;
     let totalRoomNights = 0;
 
     periodData.forEach(res => {
-      // Ingresos de habitaciones - considerar solo las noches dentro del período
-      res.reservation_rooms.forEach(rr => {
-        const rrStart = new Date(rr.start_date);
-        const rrEnd = new Date(rr.end_date);
-        const checkIn = new Date(Math.max(rrStart, start));
-        const checkOut = new Date(Math.min(rrEnd, end));
-        
-        if (checkOut > checkIn) {
-          const nights = getDaysBetween(checkIn, checkOut);
+      // Para reportes diarios/horarios, contar el ingreso completo
+      // Para reportes semanales/mensuales, la reserva solo se cuenta en el período de check-in
+      if (groupBy === 'hour' || groupBy === 'day') {
+        // Ingresos de habitaciones - considerar solo las noches dentro del período
+        res.reservation_rooms.forEach(rr => {
+          const rrStart = new Date(rr.start_date);
+          const rrEnd = new Date(rr.end_date);
+          const checkIn = new Date(Math.max(rrStart, start));
+          const checkOut = new Date(Math.min(rrEnd, end));
+          
+          if (checkOut > checkIn) {
+            const nights = getDaysBetween(checkIn, checkOut);
+            totalRoomNights += nights;
+            // Calcular proporción del subtotal que corresponde a este período
+            const totalNights = getDaysBetween(rrStart, rrEnd);
+            const proportionalRevenue = (rr.subtotal / totalNights) * nights;
+            roomRevenue += proportionalRevenue;
+          }
+        });
+      } else {
+        // Para semanas/meses, contar el ingreso completo en el período de check-in
+        res.reservation_rooms.forEach(rr => {
+          roomRevenue += rr.subtotal;
+          const nights = getDaysBetween(new Date(rr.start_date), new Date(rr.end_date));
           totalRoomNights += nights;
-          // Calcular proporción del subtotal que corresponde a este período
-          const totalNights = getDaysBetween(rrStart, rrEnd);
-          const proportionalRevenue = (rr.subtotal / totalNights) * nights;
-          roomRevenue += proportionalRevenue;
-        }
-      });
+        });
+      }
 
       // Ingresos de servicios
       if (includeServices && res.reservation_services) {

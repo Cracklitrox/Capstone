@@ -45,11 +45,11 @@ import {
   Cell,
 } from 'recharts';
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1', '#a855f7'];
 
 // Modal de previsualización con gráficos
-const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
-  const [selectedCharts, setSelectedCharts] = useState({
+const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedChartsFromParent }) => {
+  const [selectedCharts, setSelectedCharts] = useState(selectedChartsFromParent || {
     bar: true,
     line: true,
     pie: true,
@@ -57,6 +57,13 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const previewRef = useRef(null);
+
+  // Sincronizar con el estado del padre cuando cambie
+  useEffect(() => {
+    if (selectedChartsFromParent) {
+      setSelectedCharts(selectedChartsFromParent);
+    }
+  }, [selectedChartsFromParent]);
 
   if (!isOpen) return null;
 
@@ -83,12 +90,23 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
     checkIns: data?.checkIns?.data?.[index]?.count || 0,
   })) || [];
 
+  // Si es reporte Diario y no hay datos, generar 24 horas vacías
+  let finalChartData = chartData;
+  if (reportType === 'Diario' && chartData.length === 0) {
+    finalChartData = Array.from({ length: 24 }, (_, i) => ({
+      name: `${i.toString().padStart(2, '0')}:00`,
+      ingresos: 0,
+      ocupacion: 0,
+      checkIns: 0,
+    }));
+  }
+
   console.log('📊 Modal - Data recibida:', {
     reportType,
-    chartDataLength: chartData.length,
+    chartDataLength: finalChartData.length,
     revenueTotal: data?.revenue?.total,
     occupancyAverage: data?.occupancy?.average,
-    firstDataPoint: chartData[0]
+    firstDataPoint: finalChartData[0]
   });
 
   const pieData = [
@@ -215,11 +233,11 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
               </div>
 
               <div className="space-y-6">
-                {selectedCharts.bar && chartData.length > 0 && (
+                {selectedCharts.bar && finalChartData.length > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold mb-3 text-slate-700">Ingresos por Período</h3>
                     <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={chartData}>
+                      <BarChart data={finalChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis 
                           dataKey="name" 
@@ -241,11 +259,11 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
                   </div>
                 )}
 
-                {selectedCharts.line && chartData.length > 0 && (
+                {selectedCharts.line && finalChartData.length > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold mb-3 text-slate-700">Tendencia de Ocupación y Check-ins</h3>
                     <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={chartData}>
+                      <LineChart data={finalChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis 
                           dataKey="name" 
@@ -310,11 +328,11 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType }) => {
                   </div>
                 )}
 
-                {selectedCharts.area && chartData.length > 0 && (
+                {selectedCharts.area && finalChartData.length > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold mb-3 text-slate-700">Tendencia de Ingresos</h3>
                     <ResponsiveContainer width="100%" height={250}>
-                      <AreaChart data={chartData}>
+                      <AreaChart data={finalChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis 
                           dataKey="name" 
@@ -791,6 +809,53 @@ const CustomReportsSection = () => {
       pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
       yPosition += 5;
       pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
+    } else if (reportType === 'roomType' && reportData.data) {
+      const { roomType, summary, roomsBreakdown } = reportData.data;
+      
+      pdf.text(`Tipo de Habitación: ${roomType.name}`, 20, yPosition);
+      yPosition += 7;
+      pdf.setFontSize(10);
+      pdf.text(`Total de habitaciones de este tipo: ${roomType.totalRooms}`, 20, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.text('Resumen:', 20, yPosition);
+      yPosition += 7;
+      pdf.setFontSize(10);
+      pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+      yPosition += 5;
+      pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+      yPosition += 5;
+      pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
+      yPosition += 5;
+      pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
+      yPosition += 5;
+      pdf.text(`RevPAR: ${formatCurrency(summary.revPAR)}`, 25, yPosition);
+      yPosition += 10;
+
+      // Tabla de habitaciones
+      if (roomsBreakdown && roomsBreakdown.length > 0) {
+        pdf.setFontSize(12);
+        pdf.text('Desglose por Habitación:', 20, yPosition);
+        yPosition += 7;
+
+        const tableData = roomsBreakdown.map(r => [
+          r.roomNumber,
+          `Piso ${r.floor}`,
+          r.reservations.toString(),
+          r.nights.toString(),
+          formatCurrency(r.revenue)
+        ]);
+
+        autoTable(pdf, {
+          startY: yPosition,
+          head: [['Habitación', 'Piso', 'Reservas', 'Noches', 'Ingresos']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: { fillColor: [139, 92, 246] },
+          margin: { left: 20, right: 20 },
+        });
+      }
     } else if (reportType === 'topClients' && reportData.data) {
       const { topClients, totalClients } = reportData.data;
       
@@ -919,7 +984,7 @@ const CustomReportsSection = () => {
                   onChange={(e) => setSelectedEntity(e.target.value)}
                   className="w-full p-3 border rounded-md bg-background text-foreground"
                 >
-                  <option value="">-- Seleccione --</option>
+                  <option value="">Seleccione una Opción</option>
                   {reportType === 'client' && clients.length > 0 && clients.map(c => (
                     <option key={c.id} value={c.id}>{c.name} - {c.email}</option>
                   ))}
@@ -1300,11 +1365,48 @@ const Reports = () => {
         getTotalPaidAmount(),
       ]);
 
-      // Procesar ingresos semanales
-      const weeklyRevenueData = weeklyRev?.data?.map((item, index) => ({
-        semana: `Sem ${index + 1}`,
-        ingresos: item.totalRevenue || 0,
-      })) || [];
+      // Procesar ingresos semanales con formato "Sem 1: DD/MM - DD/MM"
+      const weeklyRevenueData = weeklyRev?.data?.map((item, index) => {
+        // El backend devuelve el período en formato "2025-W41"
+        const periodString = item.period || '';
+        const periodLabel = item.periodLabel || `Sem ${index + 1}`;
+        
+        // Intentar extraer fechas del rango si están disponibles
+        let label = periodLabel;
+        
+        // Si el backend proporciona startDate y endDate en el futuro, usar eso
+        // Por ahora, usar el periodLabel del backend
+        if (periodString.includes('W')) {
+          // Extraer el número de semana del formato "2025-W41"
+          const weekNumber = periodString.split('-W')[1];
+          label = `Sem ${weekNumber}`;
+          
+          // Calcular fechas de inicio y fin de la semana
+          const year = parseInt(periodString.split('-W')[0]);
+          const week = parseInt(weekNumber);
+          
+          // Calcular el primer día de la semana (Lunes)
+          const firstDayOfYear = new Date(year, 0, 1);
+          const daysOffset = (week - 1) * 7;
+          const weekStart = new Date(firstDayOfYear);
+          weekStart.setDate(firstDayOfYear.getDate() + daysOffset - firstDayOfYear.getDay() + 1);
+          
+          // Calcular el último día de la semana (Domingo)
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          
+          // Formatear las fechas
+          const startFormatted = format(weekStart, 'dd/MM/yyyy');
+          const endFormatted = format(weekEnd, 'dd/MM/yyyy');
+          
+          label = `Sem ${weekNumber}: ${startFormatted} - ${endFormatted}`;
+        }
+        
+        return {
+          semana: label,
+          ingresos: item.totalRevenue || 0,
+        };
+      }) || [];
 
       // Procesar ocupación diaria (últimos 8 días incluyendo hoy)
       // Generar TODOS los días desde sevenDaysAgo hasta today, incluso si no hay datos
@@ -1323,7 +1425,7 @@ const Reports = () => {
         
         allDays.push({
           dia: `${dayName} ${dayNumber}`,  // Formato: "Lun 14"
-          ocupacion: dayData ? Math.round(dayData.occupancyRate || dayData.occupancyPercentage || 0) : 0,
+          ocupacion: dayData ? (dayData.occupiedRoomNights || 0) : 0,
         });
       }
       
@@ -1510,9 +1612,10 @@ const Reports = () => {
           break;
           
         case 'Anual':
-          // Año actual completo (1 enero a 31 diciembre)
-          from = new Date(today.getFullYear(), 0, 1, 0, 0, 0);
-          to = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
+          // Año PASADO completo (1 enero a 31 diciembre del año anterior)
+          const lastYear = today.getFullYear() - 1;
+          from = new Date(lastYear, 0, 1, 0, 0, 0);
+          to = new Date(lastYear, 11, 31, 23, 59, 59);
           break;
           
         default:
@@ -1538,26 +1641,26 @@ const Reports = () => {
           break;
           
         case 'Mensual':
-          // Últimos 30 días (desde hace 30 días hasta ayer)
+          // Últimos 30 días (desde hace 29 días más ayer = 30 días totales)
           const thirtyDaysAgo = new Date(yesterday);
-          thirtyDaysAgo.setDate(yesterday.getDate() - 29);
+          thirtyDaysAgo.setDate(yesterday.getDate() - 29); // Correctamente ya resta 29 para tener 30 días
           from = new Date(thirtyDaysAgo.getFullYear(), thirtyDaysAgo.getMonth(), thirtyDaysAgo.getDate(), 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
           
         case 'Trimestral':
-          // Últimos 90 días (desde hace 90 días hasta ayer)
+          // Últimos 90 días (desde hace 89 días más ayer = 90 días totales)
           const ninetyDaysAgo = new Date(yesterday);
-          ninetyDaysAgo.setDate(yesterday.getDate() - 89);
+          ninetyDaysAgo.setDate(yesterday.getDate() - 89); // Correctamente ya resta 89 para tener 90 días
           from = new Date(ninetyDaysAgo.getFullYear(), ninetyDaysAgo.getMonth(), ninetyDaysAgo.getDate(), 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
           
         case 'Anual':
-          // Últimos 365 días (desde hace 365 días hasta ayer)
-          const oneYearAgo = new Date(yesterday);
-          oneYearAgo.setDate(yesterday.getDate() - 364);
-          from = new Date(oneYearAgo.getFullYear(), oneYearAgo.getMonth(), oneYearAgo.getDate(), 0, 0, 0);
+          // Últimos 365 días (desde hace 364 días más ayer = 365 días totales)
+          const threeHundredSixtyFiveDaysAgo = new Date(yesterday);
+          threeHundredSixtyFiveDaysAgo.setDate(yesterday.getDate() - 364); // Resta 364 para tener 365 días totales
+          from = new Date(threeHundredSixtyFiveDaysAgo.getFullYear(), threeHundredSixtyFiveDaysAgo.getMonth(), threeHundredSixtyFiveDaysAgo.getDate(), 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
           
@@ -1785,7 +1888,7 @@ const Reports = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ocupación Promedio</CardTitle>
+                <CardTitle className="text-sm font-medium">Habitaciones Ocupadas (Promedio)</CardTitle>
                 <Home className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
@@ -1796,7 +1899,7 @@ const Reports = () => {
                       : 0
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Últimos 7 días + hoy</p>
+                <p className="text-xs text-muted-foreground mt-1">Últimos 7 días + hoy (promedio diario)</p>
               </CardContent>
             </Card>
 
@@ -1937,14 +2040,14 @@ const Reports = () => {
                                     {type === 'Semanal' && 'Semana calendario (Lunes a Domingo)'}
                                     {type === 'Mensual' && 'Mes pasado completo (Día 1 al último día)'}
                                     {type === 'Trimestral' && 'Trimestre actual (3 meses)'}
-                                    {type === 'Anual' && 'Año calendario (Enero a Diciembre)'}
+                                    {type === 'Anual' && 'Año pasado (Enero a Diciembre)'}
                                   </div>
                                   <div className="text-xs text-muted-foreground">
                                     {type === 'Diario' && `Hoy: ${format(new Date(), 'dd/MM/yyyy')}`}
                                     {type === 'Semanal' && `Lun ${format(new Date(new Date().setDate(new Date().getDate() - (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1))), 'dd/MM')} - Dom ${format(new Date(new Date().setDate(new Date().getDate() - (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1) + 6)), 'dd/MM')}`}
                                     {type === 'Mensual' && `${format(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1), 'dd/MM')} - ${format(new Date(new Date().getFullYear(), new Date().getMonth(), 0), 'dd/MM/yyyy')}`}
-                                    {type === 'Trimestral' && `Q${Math.floor(new Date().getMonth() / 3) + 1} ${new Date().getFullYear()}`}
-                                    {type === 'Anual' && `01/01/${new Date().getFullYear()} - 31/12/${new Date().getFullYear()}`}
+                                    {type === 'Trimestral' && `Trimestre ${Math.floor(new Date().getMonth() / 3) + 1} (${['Ene-Mar', 'Abr-Jun', 'Jul-Sep', 'Oct-Dic'][Math.floor(new Date().getMonth() / 3)]}) ${new Date().getFullYear()}`}
+                                    {type === 'Anual' && `01/01/${new Date().getFullYear() - 1} - 31/12/${new Date().getFullYear() - 1}`}
                                   </div>
                                 </div>
                               </label>
@@ -2134,12 +2237,13 @@ const Reports = () => {
                               ))}
                             </Pie>
                             <Tooltip 
-                              formatter={(value) => `${value}%`}
+                              formatter={(value) => `${value} reservas`}
                               contentStyle={{ 
-                                backgroundColor: '#1f2937', 
-                                border: '1px solid #374151',
-                                borderRadius: '6px',
-                                color: '#fff'
+                                backgroundColor: '#ffffff', 
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                color: '#1f2937',
+                                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                               }}
                             />
                             <Legend 
@@ -2158,7 +2262,7 @@ const Reports = () => {
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-semibold mb-3">Tendencia de Ocupación (Últimos 7 días + hoy)</h3>
+                    <h3 className="text-sm font-semibold mb-3">Habitaciones Ocupadas (Últimos 7 días + hoy)</h3>
                     {dashboardData.occupancyTrend.length > 0 ? (
                       <div className="w-full overflow-x-auto">
                         <div className="min-w-[600px]">
@@ -2169,11 +2273,10 @@ const Reports = () => {
                           <YAxis 
                             tick={{ fontSize: 12 }} 
                             stroke="#9ca3af"
-                            domain={[0, 100]}
-                            tickFormatter={(value) => `${value}%`}
+                            domain={[0, (dataMax) => Math.ceil(dataMax * 1.2)]}
                           />
                           <Tooltip 
-                            formatter={(value) => `${value}%`}
+                            formatter={(value) => `${value} habitaciones`}
                             contentStyle={{ 
                               backgroundColor: '#1f2937', 
                               border: '1px solid #374151',
@@ -2221,6 +2324,7 @@ const Reports = () => {
         data={reportData}
         dateRange={dateRange}
         reportType={selectedReportType}
+        selectedChartsFromParent={selectedCharts}
       />
     </div>
   );
