@@ -9,20 +9,42 @@ const roomValidator = require('../validators/room.validator');
 const menuFlow = require('./menu.flow');
 
 /**
- * Estados del flujo de reserva
+ * Estados del flujo de reserva (mismo orden que la interfaz)
+ * Paso 1: Fechas y Huéspedes
+ * Paso 2: Habitaciones
+ * Paso 3: Datos del Huésped Principal
+ * Paso 4: Servicios Adicionales (opcional)
+ * Paso 5: Huéspedes Adicionales (opcional)
+ * Paso 6: Confirmación
  */
 const STATES = {
   INITIAL: 'INITIAL',
+  // Paso 1: Búsqueda (Fechas y Huéspedes)
+  AWAITING_CHECK_IN: 'AWAITING_CHECK_IN',
+  AWAITING_CHECK_OUT: 'AWAITING_CHECK_OUT',
+  AWAITING_ADULTS: 'AWAITING_ADULTS',
+  AWAITING_CHILDREN: 'AWAITING_CHILDREN',
+  // Paso 2: Selección de Habitaciones
+  AWAITING_ROOM_TYPE: 'AWAITING_ROOM_TYPE',
+  // Paso 3: Datos del Huésped Principal
   AWAITING_NAME: 'AWAITING_NAME',
   AWAITING_RUT: 'AWAITING_RUT',
   AWAITING_EMAIL: 'AWAITING_EMAIL',
   AWAITING_PHONE: 'AWAITING_PHONE',
-  AWAITING_CHECK_IN: 'AWAITING_CHECK_IN',
-  AWAITING_CHECK_OUT: 'AWAITING_CHECK_OUT',
-  AWAITING_ROOM_TYPE: 'AWAITING_ROOM_TYPE',
-  AWAITING_ADULTS: 'AWAITING_ADULTS',
-  AWAITING_CHILDREN: 'AWAITING_CHILDREN',
   AWAITING_SPECIAL_REQUESTS: 'AWAITING_SPECIAL_REQUESTS',
+  // Paso 4: Servicios Adicionales (opcional)
+  AWAITING_SERVICES: 'AWAITING_SERVICES',
+  AWAITING_LAUNDRY: 'AWAITING_LAUNDRY',
+  AWAITING_BREAKFAST: 'AWAITING_BREAKFAST',
+  AWAITING_BREAKFAST_PREFERENCE: 'AWAITING_BREAKFAST_PREFERENCE',
+  // Paso 5: Huéspedes Adicionales (opcional)
+  AWAITING_ADDITIONAL_GUESTS_CHOICE: 'AWAITING_ADDITIONAL_GUESTS_CHOICE',
+  AWAITING_ADDITIONAL_GUEST_NAME: 'AWAITING_ADDITIONAL_GUEST_NAME',
+  AWAITING_ADDITIONAL_GUEST_RUT: 'AWAITING_ADDITIONAL_GUEST_RUT',
+  AWAITING_ADDITIONAL_GUEST_EMAIL: 'AWAITING_ADDITIONAL_GUEST_EMAIL',
+  AWAITING_ADDITIONAL_GUEST_PHONE: 'AWAITING_ADDITIONAL_GUEST_PHONE',
+  AWAITING_MORE_GUESTS: 'AWAITING_MORE_GUESTS',
+  // Paso 6: Confirmación
   AWAITING_CONFIRMATION: 'AWAITING_CONFIRMATION'
 };
 
@@ -47,11 +69,29 @@ async function processMessage(session, messageText, phoneNumber) {
       return menuFlow.getCancelMessage();
     }
 
-    // Procesar según estado
+    // Procesar según estado (orden ajustado a la interfaz)
     switch (session.state) {
       case STATES.INITIAL:
         return await handleInitialState(session, messageText, phoneNumber);
       
+      // Paso 1: Fechas y Huéspedes
+      case STATES.AWAITING_CHECK_IN:
+        return await handleCheckInState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_CHECK_OUT:
+        return await handleCheckOutState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADULTS:
+        return await handleAdultsState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_CHILDREN:
+        return await handleChildrenState(session, messageText, phoneNumber);
+      
+      // Paso 2: Selección de Habitaciones
+      case STATES.AWAITING_ROOM_TYPE:
+        return await handleRoomTypeState(session, messageText, phoneNumber);
+      
+      // Paso 3: Datos del Huésped Principal
       case STATES.AWAITING_NAME:
         return await handleNameState(session, messageText, phoneNumber);
       
@@ -64,24 +104,42 @@ async function processMessage(session, messageText, phoneNumber) {
       case STATES.AWAITING_PHONE:
         return await handlePhoneState(session, messageText, phoneNumber);
       
-      case STATES.AWAITING_CHECK_IN:
-        return await handleCheckInState(session, messageText, phoneNumber);
-      
-      case STATES.AWAITING_CHECK_OUT:
-        return await handleCheckOutState(session, messageText, phoneNumber);
-      
-      case STATES.AWAITING_ROOM_TYPE:
-        return await handleRoomTypeState(session, messageText, phoneNumber);
-      
-      case STATES.AWAITING_ADULTS:
-        return await handleAdultsState(session, messageText, phoneNumber);
-      
-      case STATES.AWAITING_CHILDREN:
-        return await handleChildrenState(session, messageText, phoneNumber);
-      
       case STATES.AWAITING_SPECIAL_REQUESTS:
         return await handleSpecialRequestsState(session, messageText, phoneNumber);
       
+      // Paso 4: Servicios Adicionales (opcional)
+      case STATES.AWAITING_SERVICES:
+        return await handleServicesState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_LAUNDRY:
+        return await handleLaundryState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_BREAKFAST:
+        return await handleBreakfastState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_BREAKFAST_PREFERENCE:
+        return await handleBreakfastPreferenceState(session, messageText, phoneNumber);
+      
+      // Paso 5: Huéspedes Adicionales (opcional)
+      case STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE:
+        return await handleAdditionalGuestsChoiceState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_NAME:
+        return await handleAdditionalGuestNameState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_RUT:
+        return await handleAdditionalGuestRutState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_EMAIL:
+        return await handleAdditionalGuestEmailState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_PHONE:
+        return await handleAdditionalGuestPhoneState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_MORE_GUESTS:
+        return await handleMoreGuestsState(session, messageText, phoneNumber);
+      
+      // Paso 6: Confirmación
       case STATES.AWAITING_CONFIRMATION:
         return await handleConfirmationState(session, messageText, phoneNumber);
       
@@ -114,15 +172,17 @@ async function handleInitialState(session, messageText, phoneNumber) {
 
   if (menuOption.option === 'reservation') {
     whatsappService.updateSession(phoneNumber, { 
-      state: STATES.AWAITING_NAME 
+      state: STATES.AWAITING_CHECK_IN 
     });
     
     return `🎉 *¡Genial! Iniciemos tu reserva*
 
-Para comenzar, necesito algunos datos.
+📅 *Paso 1: Fechas y Huéspedes*
 
-📝 *Paso 1 de 9*
-¿Cuál es tu *nombre completo*?`;
+¿Cuál es tu fecha de *check-in* (entrada)?
+
+Formato: DD/MM/YYYY
+Ejemplo: 25/10/2025`;
   }
 
   return menuFlow.getWelcomeMessage();
@@ -146,8 +206,7 @@ async function handleNameState(session, messageText, phoneNumber) {
 
   return `✅ Perfecto, ${validation.name}
 
-📝 *Paso 2 de 9*
-¿Cuál es tu *RUT*?
+📝 ¿Cuál es tu *RUT*?
 
 Formato: 11.111.111-1`;
 }
@@ -170,8 +229,7 @@ async function handleRutState(session, messageText, phoneNumber) {
 
   return `✅ RUT registrado: ${validation.rut}
 
-📝 *Paso 3 de 9*
-¿Cuál es tu *correo electrónico*?`;
+📝 ¿Cuál es tu *correo electrónico*?`;
 }
 
 /**
@@ -192,8 +250,7 @@ async function handleEmailState(session, messageText, phoneNumber) {
 
   return `✅ Email registrado
 
-📝 *Paso 4 de 9*
-¿Cuál es tu *número de teléfono* de contacto?
+📝 ¿Cuál es tu *número de teléfono* de contacto?
 
 Formato: +56912345678`;
 }
@@ -210,17 +267,22 @@ async function handlePhoneState(session, messageText, phoneNumber) {
 
   session.data.phone = validation.phone;
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_CHECK_IN,
+    state: STATES.AWAITING_SPECIAL_REQUESTS,
     data: session.data
   });
 
   return `✅ Teléfono registrado
 
-📝 *Paso 5 de 9*
-¿Cuál es la fecha de *entrada* (check-in)?
+📝 *Paso Final (Opcional)*
+¿Tienes alguna *solicitud especial*?
 
-Formato: DD/MM/AAAA
-Ejemplo: 25/12/2025`;
+Ejemplos:
+- Vista al mar
+- Piso alto/bajo
+- Cama adicional
+- Alergias alimentarias
+
+Escribe tu solicitud o *NO* si no tienes ninguna.`;
 }
 
 /**
@@ -243,8 +305,7 @@ async function handleCheckInState(session, messageText, phoneNumber) {
 
   return `✅ Fecha de entrada: ${validation.formatted}
 
-📝 *Paso 6 de 9*
-¿Cuál es la fecha de *salida* (check-out)?
+📝 ¿Cuál es la fecha de *salida* (check-out)?
 
 Formato: DD/MM/AAAA`;
 }
@@ -265,14 +326,67 @@ async function handleCheckOutState(session, messageText, phoneNumber) {
   session.data.nights = validation.nights;
   
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_ROOM_TYPE,
+    state: STATES.AWAITING_ADULTS,
     data: session.data
   });
 
   return `✅ Fecha de salida: ${validation.formatted}
 🌙 Total: ${validation.nights} noche(s)
 
-📝 *Paso 7 de 9*
+👥 ¿Cuántos *adultos* se hospedarán?
+
+Ingresa un número (1-10)
+Nota: Niños de 5 años o más se consideran adultos.`;
+}
+
+/**
+ * Capturar número de adultos
+ */
+async function handleAdultsState(session, messageText, phoneNumber) {
+  const adults = parseInt(messageText.trim());
+  
+  if (isNaN(adults) || adults < 1 || adults > 10) {
+    return '❌ Por favor, indica un número válido entre 1 y 10.';
+  }
+
+  session.data.adults = adults;
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_CHILDREN,
+    data: session.data
+  });
+
+  return `✅ Adultos: ${adults}
+
+👶 ¿Cuántos *niños menores de 4 años*?
+
+Ingresa un número (0-5)
+⚠️ Los niños menores de 4 años NO pagan.`;
+}
+
+/**
+ * Capturar número de niños menores de 4
+ */
+async function handleChildrenState(session, messageText, phoneNumber) {
+  const children = parseInt(messageText.trim());
+  
+  if (isNaN(children) || children < 0 || children > 5) {
+    return '❌ Por favor, indica un número válido entre 0 y 5.';
+  }
+
+  session.data.childrenUnder4 = children;
+  session.data.totalGuests = session.data.adults + children;
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ROOM_TYPE,
+    data: session.data
+  });
+
+  return `✅ Niños menores de 4 años: ${children}
+👥 Total de huéspedes: ${session.data.totalGuests}
+
+🏨 *Paso 2: Selección de Habitación*
+
 ${await roomValidator.getRoomTypesMenu()}`;
 }
 
@@ -301,85 +415,23 @@ async function handleRoomTypeState(session, messageText, phoneNumber) {
   session.data.roomTypeName = validation.roomTypeName;
   session.data.roomInfo = validation.roomInfo;
   
+  // Validar que la habitación tenga capacidad para los huéspedes
+  const maxCapacity = validation.roomInfo.capacity;
+  if (session.data.totalGuests > maxCapacity) {
+    return `❌ La habitación *${validation.roomTypeName}* tiene capacidad máxima de *${maxCapacity}* persona(s).\n\nHas indicado *${session.data.totalGuests}* huéspedes.\n\nPor favor, selecciona otro tipo de habitación:\n\n${await roomValidator.getRoomTypesMenu()}`;
+  }
+  
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_ADULTS,
+    state: STATES.AWAITING_NAME,
     data: session.data
   });
 
   return `✅ Habitación seleccionada: *${validation.roomTypeName}*
-📋 ${validation.roomInfo.description || ''}
+📋 Capacidad: ${maxCapacity} persona(s)
 
-📝 *Paso 8 de 9*
-¿Cuántos *adultos* se hospedarán?
+📝 *Paso 3: Datos del Huésped Principal*
 
-(Número entre 1 y 4)`;
-}
-
-/**
- * Capturar cantidad de adultos
- */
-async function handleAdultsState(session, messageText, phoneNumber) {
-  const validation = guestValidator.validateGuestCount(messageText, 'adults');
-  
-  if (!validation.valid) {
-    return validation.message;
-  }
-
-  session.data.adults = validation.count;
-  
-  whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_CHILDREN,
-    data: session.data
-  });
-
-  return `✅ Adultos: ${validation.count}
-
-📝 *Paso 9 de 9*
-¿Cuántos *niños* se hospedarán?
-
-(Número entre 0 y 3, o escribe *0* si no hay niños)`;
-}
-
-/**
- * Capturar cantidad de niños
- */
-async function handleChildrenState(session, messageText, phoneNumber) {
-  const validation = guestValidator.validateGuestCount(messageText, 'children');
-  
-  if (!validation.valid) {
-    return validation.message;
-  }
-
-  session.data.children = validation.count;
-
-  // Validar capacidad de la habitación
-  const capacityValidation = await roomValidator.validateRoomCapacity(
-    session.data.roomTypeId,
-    session.data.adults,
-    session.data.children
-  );
-
-  if (!capacityValidation.valid) {
-    // Volver al estado de adultos para que reingrese
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADULTS
-    });
-    return capacityValidation.message;
-  }
-  
-  whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_SPECIAL_REQUESTS,
-    data: session.data
-  });
-
-  return `✅ Niños: ${validation.count}
-
-📝 *Último paso (opcional)*
-¿Tienes alguna *solicitud especial*?
-
-Ejemplo: Vista al mar, piso alto, cama extra, etc.
-
-Si no tienes solicitudes, escribe *NO* o *NINGUNA*.`;
+¿Cuál es tu *nombre completo*?`;
 }
 
 /**
@@ -401,11 +453,22 @@ async function handleSpecialRequestsState(session, messageText, phoneNumber) {
   }
   
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_CONFIRMATION,
+    state: STATES.AWAITING_SERVICES,
     data: session.data
   });
 
-  return getConfirmationMessage(session.data);
+  return `✅ Solicitudes registradas
+
+🛎️ *Paso 4: Servicios Adicionales (Opcional)*
+
+¿Deseas agregar servicios adicionales a tu reserva?
+
+1️⃣ *Lavandería*
+2️⃣ *Desayuno*
+3️⃣ *Ambos servicios*
+4️⃣ *NO*, continuar sin servicios
+
+Responde con el *número* o *NO* para omitir.`;
 }
 
 /**
@@ -445,9 +508,35 @@ function getConfirmationMessage(data) {
     ? `\n   ${data.specialRequests}` 
     : '\n   Ninguna';
 
+  // Servicios adicionales
+  let servicesText = '\n   Ninguno';
+  if (data.services && (data.services.laundry || data.services.breakfast)) {
+    const servicesList = [];
+    if (data.services.laundry) {
+      servicesList.push(`Lavandería (${data.services.laundryQuantity} prendas)`);
+    }
+    if (data.services.breakfast) {
+      const prefs = data.services.breakfastPreferences?.join(', ') || 'Estándar';
+      servicesList.push(`Desayuno (${data.services.breakfastQuantity} personas)\n     Preferencias: ${prefs}`);
+    }
+    servicesText = '\n   ' + servicesList.join('\n   ');
+  }
+
+  // Huéspedes adicionales
+  let additionalGuestsText = '\n   Ninguno';
+  if (data.additionalGuests && data.additionalGuests.length > 0) {
+    const guestsList = data.additionalGuests.map((guest, index) => {
+      return `${index + 2}. ${guest.name}\n     RUT: ${guest.rut}\n     Email: ${guest.email}\n     Teléfono: ${guest.phone}`;
+    });
+    additionalGuestsText = '\n   ' + guestsList.join('\n   ');
+  }
+  
+  const adultsText = data.adults ? `${data.adults} adulto(s)` : '';
+  const childrenText = data.childrenUnder4 > 0 ? `, ${data.childrenUnder4} niño(s) <4 años` : '';
+
   return `📋 *Resumen de tu reserva*
 
-👤 *Datos personales:*
+👤 *Huésped Principal:*
    • Nombre: ${data.name}
    • RUT: ${data.rut}
    • Email: ${data.email}
@@ -458,8 +547,11 @@ function getConfirmationMessage(data) {
    • Salida: ${data.checkOutDateFormatted}
    • Noches: ${data.nights}
    • Habitación: ${data.roomTypeName || data.roomInfo?.name || 'N/A'}
-   • Adultos: ${data.adults}
-   • Niños: ${data.children}
+   • Huéspedes: ${adultsText}${childrenText}
+
+🛎️ *Servicios adicionales:*${servicesText}
+
+👥 *Huéspedes adicionales:*${additionalGuestsText}
 
 📝 *Solicitudes especiales:*${specialRequests}
 
@@ -469,6 +561,514 @@ function getConfirmationMessage(data) {
 
 1️⃣ *SÍ* - Enviar solicitud
 2️⃣ *NO* - Cancelar y reiniciar`;
+}
+
+/**
+ * Paso 4: Servicios Adicionales
+ */
+
+/**
+ * Capturar selección de servicios
+ */
+async function handleServicesState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Inicializar array de servicios si no existe
+  if (!session.data.services) {
+    session.data.services = {
+      laundry: false,
+      breakfast: false,
+      breakfastPreference: ''
+    };
+  }
+  
+  if (normalized === 'no' || normalized === '4' || normalized === 'ninguno') {
+    // No agregar servicios, ir directo a huéspedes adicionales
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+      data: session.data
+    });
+    
+    const totalGuests = session.data.totalGuests || 1;
+    const additionalGuestsNeeded = totalGuests - 1;
+    
+    if (additionalGuestsNeeded > 0) {
+      return `📝 *Paso 5: Huéspedes Adicionales (Opcional)*
+
+Tienes *${totalGuests}* huéspede(s) en total.
+Ya registraste al huésped principal.
+
+¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es)?
+
+Responde *SÍ* o *NO*`;
+    } else {
+      // Solo hay 1 huésped, ir directo a confirmación
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_CONFIRMATION,
+        data: session.data
+      });
+      return getConfirmationMessage(session.data);
+    }
+  }
+  
+  if (normalized === '1' || normalized.includes('lavand')) {
+    // Solo lavandería
+    session.data.services.laundry = true;
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_LAUNDRY,
+      data: session.data
+    });
+    return `✅ Servicio de *Lavandería* seleccionado
+
+¿Cuántas prendas necesitas lavar?
+
+Ingresa un número (ejemplo: 5)`;
+  }
+  
+  if (normalized === '2' || normalized.includes('desayun')) {
+    // Solo desayuno
+    session.data.services.breakfast = true;
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_BREAKFAST,
+      data: session.data
+    });
+    return `✅ Servicio de *Desayuno* seleccionado
+
+¿Cuántos desayunos necesitas por día?
+
+Ingresa un número (ejemplo: 2)`;
+  }
+  
+  if (normalized === '3' || normalized.includes('ambos')) {
+    // Ambos servicios
+    session.data.services.laundry = true;
+    session.data.services.breakfast = true;
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_LAUNDRY,
+      data: session.data
+    });
+    return `✅ Servicios *Lavandería* y *Desayuno* seleccionados
+
+Primero, ¿cuántas prendas necesitas lavar?
+
+Ingresa un número (ejemplo: 5)`;
+  }
+  
+  return `❌ Opción no válida
+
+Por favor selecciona:
+1️⃣ Lavandería
+2️⃣ Desayuno
+3️⃣ Ambos servicios
+4️⃣ NO, continuar sin servicios`;
+}
+
+/**
+ * Capturar cantidad de lavandería
+ */
+async function handleLaundryState(session, messageText, phoneNumber) {
+  const quantity = parseInt(messageText.trim());
+  
+  if (isNaN(quantity) || quantity < 1 || quantity > 50) {
+    return `❌ Por favor ingresa un número válido entre 1 y 50`;
+  }
+  
+  session.data.services.laundryQuantity = quantity;
+  
+  // Si también seleccionó desayuno, preguntar por desayuno
+  if (session.data.services.breakfast) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_BREAKFAST,
+      data: session.data
+    });
+    return `✅ Lavandería: ${quantity} prenda(s)
+
+Ahora, ¿cuántos desayunos necesitas por día?
+
+Ingresa un número (ejemplo: 2)`;
+  }
+  
+  // Si no hay desayuno, ir a huéspedes adicionales
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+    data: session.data
+  });
+  
+  const totalGuests = session.data.totalGuests || 1;
+  const additionalGuestsNeeded = totalGuests - 1;
+  
+  if (additionalGuestsNeeded > 0) {
+    return `✅ Servicios registrados
+
+📝 *Paso 5: Huéspedes Adicionales (Opcional)*
+
+Tienes *${totalGuests}* huéspede(s) en total.
+Ya registraste al huésped principal.
+
+¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es)?
+
+Responde *SÍ* o *NO*`;
+  } else {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    return getConfirmationMessage(session.data);
+  }
+}
+
+/**
+ * Capturar cantidad de desayunos
+ */
+async function handleBreakfastState(session, messageText, phoneNumber) {
+  const quantity = parseInt(messageText.trim());
+  
+  if (isNaN(quantity) || quantity < 1 || quantity > 20) {
+    return `❌ Por favor ingresa un número válido entre 1 y 20`;
+  }
+  
+  session.data.services.breakfastQuantity = quantity;
+  
+  // Inicializar array de preferencias
+  if (!session.data.services.breakfastPreferences) {
+    session.data.services.breakfastPreferences = [];
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_BREAKFAST_PREFERENCE,
+    data: session.data
+  });
+  
+  return `✅ Desayuno: ${quantity} persona(s)
+
+🥐 *Preferencias de Desayuno (Opcional)*
+
+Puedes seleccionar varios ingredientes para tu desayuno buffet:
+
+*Bebidas:*
+1. Café
+2. Té
+3. Jugos naturales
+4. Leche
+
+*Panadería:*
+5. Pan integral
+6. Croissants
+7. Tostadas
+
+*Proteínas:*
+8. Huevos revueltos
+9. Jamón
+10. Queso
+
+*Frutas y Cereales:*
+11. Frutas frescas
+12. Yogurt
+13. Cereales
+
+*Opciones especiales:*
+14. Sin gluten
+15. Vegetariano
+16. Sin lactosa
+
+Responde con los *números* separados por comas.
+Ejemplo: *1,3,5,11* o *NINGUNO* para continuar.`;
+}
+
+/**
+ * Capturar preferencias de desayuno (selección múltiple)
+ */
+async function handleBreakfastPreferenceState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  const breakfastOptions = {
+    1: 'Café',
+    2: 'Té', 
+    3: 'Jugos naturales',
+    4: 'Leche',
+    5: 'Pan integral',
+    6: 'Croissants',
+    7: 'Tostadas',
+    8: 'Huevos revueltos',
+    9: 'Jamón',
+    10: 'Queso',
+    11: 'Frutas frescas',
+    12: 'Yogurt',
+    13: 'Cereales',
+    14: 'Sin gluten',
+    15: 'Vegetariano',
+    16: 'Sin lactosa'
+  };
+  
+  if (normalized === 'ninguno' || normalized === 'no' || normalized === 'ninguna') {
+    session.data.services.breakfastPreferences = ['Estándar'];
+  } else {
+    // Procesar números separados por comas
+    const selections = normalized.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    
+    if (selections.length === 0) {
+      return `❌ Por favor ingresa números válidos separados por comas (ej: 1,3,5) o *NINGUNO*`;
+    }
+    
+    // Validar que todos los números estén en el rango
+    const invalidSelections = selections.filter(n => n < 1 || n > 16);
+    if (invalidSelections.length > 0) {
+      return `❌ Algunos números no son válidos. Usa números del 1 al 16.`;
+    }
+    
+    // Convertir números a nombres
+    session.data.services.breakfastPreferences = selections.map(n => breakfastOptions[n]);
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+    data: session.data
+  });
+  
+  const totalGuests = session.data.totalGuests || 1;
+  const additionalGuestsNeeded = totalGuests - 1;
+  
+  const preferencesText = session.data.services.breakfastPreferences.join(', ');
+  
+  if (additionalGuestsNeeded > 0) {
+    return `✅ Preferencias registradas: ${preferencesText}
+
+📝 *Paso 5: Huéspedes Adicionales*
+
+Tienes *${totalGuests}* huéspede(s) en total.
+Ya registraste al huésped principal.
+
+⚠️ *IMPORTANTE*: Debes registrar los datos completos de los otros *${additionalGuestsNeeded}* huésped(es).
+
+Responde *CONTINUAR* para comenzar.`;
+  } else {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    return getConfirmationMessage(session.data);
+  }
+}
+
+/**
+ * Paso 5: Huéspedes Adicionales (OBLIGATORIO)
+ */
+
+/**
+ * Confirmar inicio de captura de huéspedes adicionales
+ */
+async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  const totalGuests = session.data.totalGuests || 1;
+  const additionalGuestsNeeded = totalGuests - 1;
+  
+  // Si solo hay 1 huésped, ir directo a confirmación
+  if (additionalGuestsNeeded === 0) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    return getConfirmationMessage(session.data);
+  }
+  
+  if (normalized === 'continuar' || normalized === 'si' || normalized === 'sí') {
+    // Inicializar array de huéspedes adicionales
+    if (!session.data.additionalGuests) {
+      session.data.additionalGuests = [];
+    }
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
+      data: session.data
+    });
+    
+    const guestNumber = session.data.additionalGuests.length + 2; // +1 por el principal, +1 por el actual
+    
+    return `📝 *Huésped ${guestNumber} de ${totalGuests}*
+
+¿Cuál es el *nombre completo* de este huésped?`;
+  }
+  
+  return `❌ Por favor responde *CONTINUAR* para registrar los huéspedes adicionales.`;
+}
+
+/**
+ * Capturar nombre de huésped adicional
+ */
+async function handleAdditionalGuestNameState(session, messageText, phoneNumber) {
+  const validation = guestValidator.validateName(messageText);
+  
+  if (!validation.valid) {
+    return validation.message;
+  }
+  
+  // Guardar temporalmente el nombre
+  session.data.tempAdditionalGuest = {
+    name: validation.name
+  };
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
+    data: session.data
+  });
+  
+  return `✅ Nombre registrado: ${validation.name}
+
+¿Cuál es su *RUT*?
+
+Formato: 11.111.111-1`;
+}
+
+/**
+ * Capturar RUT de huésped adicional (con validación de duplicados)
+ */
+async function handleAdditionalGuestRutState(session, messageText, phoneNumber) {
+  const validation = guestValidator.validateRut(messageText);
+  
+  if (!validation.valid) {
+    return validation.message;
+  }
+  
+  // Validar que no sea el mismo RUT del huésped principal
+  if (validation.rut === session.data.rut) {
+    return `❌ Este RUT pertenece al huésped principal.
+
+Por favor ingresa un RUT diferente.`;
+  }
+  
+  // Validar que no haya duplicados en huéspedes adicionales
+  const isDuplicate = session.data.additionalGuests?.some(
+    guest => guest.rut === validation.rut
+  );
+  
+  if (isDuplicate) {
+    return `❌ Este RUT ya fue registrado para otro huésped.
+
+Por favor ingresa un RUT diferente.`;
+  }
+  
+  session.data.tempAdditionalGuest.rut = validation.rut;
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_EMAIL,
+    data: session.data
+  });
+  
+  return `✅ RUT registrado: ${validation.rut}
+
+¿Cuál es su *correo electrónico*?
+
+Escribe el email (ejemplo: juan@email.com)`;
+}
+
+/**
+ * Capturar email de huésped adicional (OBLIGATORIO)
+ */
+async function handleAdditionalGuestEmailState(session, messageText, phoneNumber) {
+  const validation = guestValidator.validateEmail(messageText);
+  
+  if (!validation.valid) {
+    return validation.message;
+  }
+  
+  session.data.tempAdditionalGuest.email = validation.email;
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_PHONE,
+    data: session.data
+  });
+  
+  return `✅ Email registrado: ${validation.email}
+
+¿Cuál es su *número de teléfono*?
+
+Formato: +56912345678`;
+}
+
+/**
+ * Capturar teléfono de huésped adicional (OBLIGATORIO)
+ */
+async function handleAdditionalGuestPhoneState(session, messageText, phoneNumber) {
+  const validation = guestValidator.validatePhone(messageText);
+  
+  if (!validation.valid) {
+    return validation.message;
+  }
+  
+  session.data.tempAdditionalGuest.phone = validation.phone;
+  
+  // Agregar huésped a la lista
+  session.data.additionalGuests.push({ ...session.data.tempAdditionalGuest });
+  delete session.data.tempAdditionalGuest;
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_MORE_GUESTS,
+    data: session.data
+  });
+  
+  const currentGuestsCount = session.data.additionalGuests.length + 1; // +1 por el principal
+  const totalGuests = session.data.totalGuests || 1;
+  const remaining = totalGuests - currentGuestsCount;
+  
+  if (remaining > 0) {
+    return `✅ Huésped ${currentGuestsCount} registrado
+
+📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
+⚠️ Faltan *${remaining}* huésped(es) por registrar
+
+Responde *CONTINUAR* para agregar el siguiente huésped.`;
+  } else {
+    // Ya se completaron todos los huéspedes
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    
+    return `✅ ¡Todos los huéspedes registrados! (${currentGuestsCount}/${totalGuests})
+
+${getConfirmationMessage(session.data)}`;
+  }
+}
+
+/**
+ * Continuar agregando huéspedes (OBLIGATORIO hasta completar)
+ */
+async function handleMoreGuestsState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  const currentGuestsCount = session.data.additionalGuests.length + 1;
+  const totalGuests = session.data.totalGuests || 1;
+  const remaining = totalGuests - currentGuestsCount;
+  
+  if (remaining === 0) {
+    // Ya están todos registrados
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    
+    return getConfirmationMessage(session.data);
+  }
+  
+  if (normalized === 'continuar' || normalized === 'si' || normalized === 'sí') {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
+      data: session.data
+    });
+    
+    const guestNumber = currentGuestsCount + 1;
+    
+    return `📝 *Huésped ${guestNumber} de ${totalGuests}*
+
+¿Cuál es el *nombre completo* de este huésped?`;
+  }
+  
+  return `❌ Debes completar el registro de todos los huéspedes.
+
+Faltan *${remaining}* huésped(es).
+
+Responde *CONTINUAR* para agregar el siguiente.`;
 }
 
 module.exports = {

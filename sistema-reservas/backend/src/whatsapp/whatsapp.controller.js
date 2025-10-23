@@ -46,13 +46,27 @@ class WhatsAppController {
 
     } catch (error) {
       console.error('❌ Error en handleMessage:', error);
+      console.error('Stack:', error.stack);
+      
+      // Limpiar sesión en caso de error para evitar loops
+      const phoneNumber = from.replace('@s.whatsapp.net', '');
+      try {
+        await whatsappService.clearSession(phoneNumber);
+      } catch (clearError) {
+        console.error('Error al limpiar sesión:', clearError);
+      }
       
       // Enviar mensaje de error al usuario
       const errorMessage = 
         '❌ Lo siento, ha ocurrido un error.\n\n' +
-        'Por favor, intenta nuevamente o escribe *MENU* para reiniciar.';
+        'La conversación ha sido reiniciada.\n\n' +
+        'Escribe *MENU* para ver las opciones disponibles.';
       
-      await whatsappService.sendMessage(from, errorMessage);
+      try {
+        await whatsappService.sendMessage(from, errorMessage);
+      } catch (sendError) {
+        console.error('Error al enviar mensaje de error:', sendError);
+      }
     }
   }
 

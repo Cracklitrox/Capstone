@@ -117,11 +117,26 @@ class WhatsAppService {
             reservation_data: {
               check_in: data.checkInDate || '',
               check_out: data.checkOutDate || '',
-              room_type: data.roomType || '',
+              room_type_id: data.roomTypeId || null,
+              room_type_name: data.roomTypeName || '',
               adults: data.adults || 1,
-              children: data.children || 0,
+              children_under_4: data.childrenUnder4 || 0,
+              total_guests: data.totalGuests || 1,
               special_requests: data.specialRequests || ''
             },
+            services: {
+              laundry: data.services?.laundry || false,
+              laundry_quantity: data.services?.laundryQuantity || 0,
+              breakfast: data.services?.breakfast || false,
+              breakfast_quantity: data.services?.breakfastQuantity || 0,
+              breakfast_preferences: data.services?.breakfastPreferences || []
+            },
+            additional_guests: (data.additionalGuests || []).map(guest => ({
+              name: guest.name,
+              rut: guest.rut,
+              email: guest.email || '',
+              phone: guest.phone || ''
+            })),
             timestamp: new Date().toISOString()
           })
         }
