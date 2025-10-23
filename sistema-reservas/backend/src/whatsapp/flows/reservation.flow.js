@@ -26,6 +26,7 @@ const STATES = {
   AWAITING_CHILDREN: 'AWAITING_CHILDREN',
   // Paso 2: Selección de Habitaciones
   AWAITING_ROOM_TYPE: 'AWAITING_ROOM_TYPE',
+  AWAITING_SPECIFIC_ROOM: 'AWAITING_SPECIFIC_ROOM',
   // Paso 3: Datos del Huésped Principal
   AWAITING_NAME: 'AWAITING_NAME',
   AWAITING_RUT: 'AWAITING_RUT',
@@ -49,6 +50,33 @@ const STATES = {
 };
 
 /**
+ * Mapa de navegación hacia atrás
+ */
+const PREVIOUS_STATE = {
+  [STATES.AWAITING_CHECK_OUT]: STATES.AWAITING_CHECK_IN,
+  [STATES.AWAITING_ADULTS]: STATES.AWAITING_CHECK_OUT,
+  [STATES.AWAITING_CHILDREN]: STATES.AWAITING_ADULTS,
+  [STATES.AWAITING_ROOM_TYPE]: STATES.AWAITING_CHILDREN,
+  [STATES.AWAITING_SPECIFIC_ROOM]: STATES.AWAITING_ROOM_TYPE,
+  [STATES.AWAITING_NAME]: STATES.AWAITING_SPECIFIC_ROOM,
+  [STATES.AWAITING_RUT]: STATES.AWAITING_NAME,
+  [STATES.AWAITING_EMAIL]: STATES.AWAITING_RUT,
+  [STATES.AWAITING_PHONE]: STATES.AWAITING_EMAIL,
+  [STATES.AWAITING_SPECIAL_REQUESTS]: STATES.AWAITING_PHONE,
+  [STATES.AWAITING_SERVICES]: STATES.AWAITING_SPECIAL_REQUESTS,
+  [STATES.AWAITING_LAUNDRY]: STATES.AWAITING_SERVICES,
+  [STATES.AWAITING_BREAKFAST]: STATES.AWAITING_SERVICES,
+  [STATES.AWAITING_BREAKFAST_PREFERENCE]: STATES.AWAITING_BREAKFAST,
+  [STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE]: STATES.AWAITING_SERVICES,
+  [STATES.AWAITING_ADDITIONAL_GUEST_NAME]: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+  [STATES.AWAITING_ADDITIONAL_GUEST_RUT]: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
+  [STATES.AWAITING_ADDITIONAL_GUEST_EMAIL]: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
+  [STATES.AWAITING_ADDITIONAL_GUEST_PHONE]: STATES.AWAITING_ADDITIONAL_GUEST_EMAIL,
+  [STATES.AWAITING_MORE_GUESTS]: STATES.AWAITING_ADDITIONAL_GUEST_PHONE,
+  [STATES.AWAITING_CONFIRMATION]: STATES.AWAITING_MORE_GUESTS
+};
+
+/**
  * Procesar mensaje según el estado actual
  */
 async function processMessage(session, messageText, phoneNumber) {
@@ -67,6 +95,12 @@ async function processMessage(session, messageText, phoneNumber) {
         data: {}
       });
       return menuFlow.getCancelMessage();
+    }
+    
+    // Comando VOLVER/ATRAS
+    const normalized = messageText.toLowerCase().trim();
+    if ((normalized === 'volver' || normalized === 'atras' || normalized === 'atrás') && session.state !== STATES.INITIAL) {
+      return await handleGoBack(session, phoneNumber);
     }
 
     // Procesar según estado (orden ajustado a la interfaz)
@@ -90,6 +124,9 @@ async function processMessage(session, messageText, phoneNumber) {
       // Paso 2: Selección de Habitaciones
       case STATES.AWAITING_ROOM_TYPE:
         return await handleRoomTypeState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_SPECIFIC_ROOM:
+        return await handleSpecificRoomState(session, messageText, phoneNumber);
       
       // Paso 3: Datos del Huésped Principal
       case STATES.AWAITING_NAME:
@@ -153,6 +190,60 @@ async function processMessage(session, messageText, phoneNumber) {
 }
 
 /**
+ * Manejar comando VOLVER/ATRAS
+ */
+async function handleGoBack(session, phoneNumber) {
+  const previousState = PREVIOUS_STATE[session.state];
+  
+  if (!previousState) {
+    return `ℹ️ No puedes volver desde este punto.
+
+Escribe *MENU* para volver al inicio o *CANCELAR* para reiniciar.`;
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: previousState,
+    data: session.data
+  });
+  
+  return `⬅️ Volviendo al paso anterior...
+
+${await getStatePrompt(previousState, session.data)}`;
+}
+
+/**
+ * Obtener mensaje del estado para navegación hacia atrás
+ */
+async function getStatePrompt(state, data) {
+  switch (state) {
+    case STATES.AWAITING_CHECK_IN:
+      return `📅 *Paso 1: Fechas y Huéspedes*\n\n¿Cuál es la fecha de *entrada* (check-in)?\n\nFormato: DD/MM/AAAA\nEjemplo: 25/12/2025`;
+    case STATES.AWAITING_CHECK_OUT:
+      return `📅 ¿Cuál es la fecha de *salida* (check-out)?\n\nFormato: DD/MM/AAAA`;
+    case STATES.AWAITING_ADULTS:
+      return `👥 ¿Cuántos *adultos* se hospedarán?\n\nIngresa un número (1-10)\nNota: Niños de 5 años o más se consideran adultos.`;
+    case STATES.AWAITING_CHILDREN:
+      return `👶 ¿Cuántos *niños menores de 4 años*?\n\nIngresa un número (0-5)\n⚠️ Los niños menores de 4 años NO pagan.`;
+    case STATES.AWAITING_ROOM_TYPE:
+      return `🏨 *Paso 2: Selección de Habitación*\n\n${await roomValidator.getRoomTypesMenu()}`;
+    case STATES.AWAITING_NAME:
+      return `📝 *Paso 3: Datos del Huésped Principal*\n\n¿Cuál es tu *nombre completo*?`;
+    case STATES.AWAITING_RUT:
+      return `📝 ¿Cuál es tu *RUT*?\n\nFormato: 11.111.111-1`;
+    case STATES.AWAITING_EMAIL:
+      return `📧 ¿Cuál es tu *correo electrónico*?`;
+    case STATES.AWAITING_PHONE:
+      return `📱 ¿Cuál es tu *número de teléfono* de contacto?\n\nFormato: +56912345678`;
+    case STATES.AWAITING_SPECIAL_REQUESTS:
+      return `💬 ¿Tienes alguna *solicitud especial*?\n\nEjemplos: Vista al mar, Piso alto/bajo, Cama adicional\n\nEscribe tu solicitud o *NO* si no tienes ninguna.`;
+    case STATES.AWAITING_SERVICES:
+      return `🛎️ *Paso 4: Servicios Adicionales (Opcional)*\n\n¿Deseas agregar servicios adicionales?\n\n1️⃣ Lavandería\n2️⃣ Desayuno\n3️⃣ Ambos servicios\n4️⃣ NO, continuar sin servicios`;
+    default:
+      return `Continuemos con tu reserva...`;
+  }
+}
+
+/**
  * Estado inicial - Menú principal
  */
 async function handleInitialState(session, messageText, phoneNumber) {
@@ -182,7 +273,9 @@ async function handleInitialState(session, messageText, phoneNumber) {
 ¿Cuál es tu fecha de *check-in* (entrada)?
 
 Formato: DD/MM/YYYY
-Ejemplo: 25/10/2025`;
+Ejemplo: 25/10/2025
+
+💡 *Tip:* Escribe *VOLVER* en cualquier momento para regresar al paso anterior.`;
   }
 
   return menuFlow.getWelcomeMessage();
@@ -382,16 +475,35 @@ async function handleChildrenState(session, messageText, phoneNumber) {
     data: session.data
   });
 
+  // Verificar disponibilidad de tipos de habitación para las fechas
+  const availableTypes = await roomValidator.getAvailableRoomTypes(
+    session.data.checkInDate,
+    session.data.checkOutDate
+  );
+  
+  if (availableTypes.length === 0) {
+    return `❌ Lo sentimos, no hay habitaciones disponibles para las fechas seleccionadas (${session.data.checkInDateFormatted} - ${session.data.checkOutDateFormatted}).
+
+Por favor, escribe *VOLVER* para cambiar las fechas.`;
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ROOM_TYPE,
+    data: session.data
+  });
+
   return `✅ Niños menores de 4 años: ${children}
 👥 Total de huéspedes: ${session.data.totalGuests}
 
-🏨 *Paso 2: Selección de Habitación*
+🏨 *Paso 2: Selección de Tipo de Habitación*
 
-${await roomValidator.getRoomTypesMenu()}`;
+${await roomValidator.getAvailableRoomTypesMenu(session.data.checkInDate, session.data.checkOutDate, session.data.totalGuests)}
+
+Selecciona el número del tipo de habitación que deseas.`;
 }
 
 /**
- * Capturar tipo de habitación
+ * Capturar tipo de habitación (solo mostrar tipos disponibles)
  */
 async function handleRoomTypeState(session, messageText, phoneNumber) {
   const validation = await roomValidator.validateRoomType(messageText);
@@ -399,35 +511,75 @@ async function handleRoomTypeState(session, messageText, phoneNumber) {
   if (!validation.valid) {
     return validation.message;
   }
+  
+  // Validar capacidad antes de buscar habitaciones
+  const maxCapacity = validation.roomInfo.base_capacity || validation.roomInfo.capacity;
+  if (session.data.totalGuests > maxCapacity) {
+    return `❌ El tipo de habitación *${validation.roomTypeName}* tiene capacidad máxima de *${maxCapacity}* persona(s).
 
-  // Verificar disponibilidad
-  const availability = await roomValidator.checkAvailability(
-    validation.roomTypeId,
-    session.data.checkInDate,
-    session.data.checkOutDate
-  );
+Has indicado *${session.data.totalGuests}* huéspedes.
 
-  if (!availability.available) {
-    return availability.message;
+Por favor, selecciona otro tipo de habitación o escribe *VOLVER* para cambiar el número de huéspedes.`;
   }
 
   session.data.roomTypeId = validation.roomTypeId;
   session.data.roomTypeName = validation.roomTypeName;
   session.data.roomInfo = validation.roomInfo;
   
-  // Validar que la habitación tenga capacidad para los huéspedes
-  const maxCapacity = validation.roomInfo.capacity;
-  if (session.data.totalGuests > maxCapacity) {
-    return `❌ La habitación *${validation.roomTypeName}* tiene capacidad máxima de *${maxCapacity}* persona(s).\n\nHas indicado *${session.data.totalGuests}* huéspedes.\n\nPor favor, selecciona otro tipo de habitación:\n\n${await roomValidator.getRoomTypesMenu()}`;
+  // Obtener habitaciones específicas disponibles de ese tipo
+  const availableRooms = await roomValidator.getAvailableRoomsByType(
+    validation.roomTypeId,
+    session.data.checkInDate,
+    session.data.checkOutDate
+  );
+
+  if (availableRooms.length === 0) {
+    return `❌ Lo sentimos, no hay habitaciones *${validation.roomTypeName}* disponibles para las fechas seleccionadas.
+
+Por favor, selecciona otro tipo de habitación:
+
+${await roomValidator.getAvailableRoomTypesMenu(session.data.checkInDate, session.data.checkOutDate, session.data.totalGuests)}`;
   }
+
+  // Guardar habitaciones disponibles en sesión
+  session.data.availableRooms = availableRooms;
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_SPECIFIC_ROOM,
+    data: session.data
+  });
+
+  return `✅ Tipo seleccionado: *${validation.roomTypeName}*
+📋 Capacidad: ${maxCapacity} persona(s)
+
+🛏️ *Habitaciones disponibles:*
+
+${availableRooms.map((room, index) => `${index + 1}. *${room.room_number}* - ${room.floor ? `Piso ${room.floor}` : 'Planta baja'}`).join('\n')}
+
+Selecciona el número de la habitación que prefieres.`;
+}
+
+/**
+ * Capturar habitación específica
+ */
+async function handleSpecificRoomState(session, messageText, phoneNumber) {
+  const selection = parseInt(messageText.trim());
+  
+  if (isNaN(selection) || selection < 1 || selection > session.data.availableRooms.length) {
+    return `❌ Por favor, selecciona un número válido entre 1 y ${session.data.availableRooms.length}.`;
+  }
+
+  const selectedRoom = session.data.availableRooms[selection - 1];
+  session.data.roomId = selectedRoom.room_id;
+  session.data.roomNumber = selectedRoom.room_number;
   
   whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_NAME,
     data: session.data
   });
 
-  return `✅ Habitación seleccionada: *${validation.roomTypeName}*
-📋 Capacidad: ${maxCapacity} persona(s)
+  return `✅ Habitación seleccionada: *${session.data.roomTypeName}* - Habitación ${session.data.roomNumber}
+📋 Capacidad: ${session.data.roomInfo.base_capacity || session.data.roomInfo.capacity} persona(s)
 
 📝 *Paso 3: Datos del Huésped Principal*
 

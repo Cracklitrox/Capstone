@@ -185,9 +185,95 @@ async function validateRoomCapacity(roomTypeId, adults, children) {
   }
 }
 
+/**
+ * Obtener tipos de habitación con disponibilidad para fechas específicas
+ */
+async function getAvailableRoomTypes(checkIn, checkOut) {
+  try {
+    const roomTypes = await whatsappService.getRoomTypes();
+    const availableTypes = [];
+    
+    for (const type of roomTypes) {
+      const availability = await checkAvailability(type.id, checkIn, checkOut);
+      if (availability.available) {
+        availableTypes.push(type);
+      }
+    }
+    
+    return availableTypes;
+  } catch (error) {
+    console.error('Error al obtener tipos disponibles:', error);
+    return [];
+  }
+}
+
+/**
+ * Obtener menú de tipos de habitación disponibles para fechas y capacidad
+ */
+async function getAvailableRoomTypesMenu(checkIn, checkOut, totalGuests) {
+  try {
+    const availableTypes = await getAvailableRoomTypes(checkIn, checkOut);
+    
+    if (availableTypes.length === 0) {
+      return '❌ No hay tipos de habitación disponibles para estas fechas.';
+    }
+    
+    // Filtrar por capacidad
+    const suitableTypes = availableTypes.filter(type => type.base_capacity >= totalGuests);
+    
+    if (suitableTypes.length === 0) {
+      return `❌ No hay habitaciones con capacidad para ${totalGuests} huésped(es) en estas fechas.
+
+Por favor, escribe *VOLVER* para cambiar las fechas o el número de huéspedes.`;
+    }
+
+    let menu = '🏨 *Tipos de habitación disponibles:*\n\n';
+    
+    suitableTypes.forEach((type, index) => {
+      const number = index + 1;
+      menu += `${number}️⃣ *${type.name}*\n`;
+      menu += `   💰 Precio: $${type.price?.toLocaleString() || 'Consultar'}\n`;
+      menu += `   👥 Capacidad: ${type.base_capacity} persona(s)\n`;
+      if (type.bed_configuration) {
+        menu += `   🛏️ Camas: ${type.bed_configuration}\n`;
+      }
+      if (type.description) {
+        menu += `   📝 ${type.description}\n`;
+      }
+      menu += '\n';
+    });
+
+    return menu;
+  } catch (error) {
+    console.error('Error al generar menú disponible:', error);
+    return '❌ Error al cargar habitaciones disponibles.';
+  }
+}
+
+/**
+ * Obtener habitaciones específicas disponibles de un tipo
+ */
+async function getAvailableRoomsByType(roomTypeId, checkIn, checkOut) {
+  try {
+    const rooms = await whatsappService.getAvailableRoomsByType(
+      roomTypeId,
+      checkIn,
+      checkOut
+    );
+    
+    return rooms || [];
+  } catch (error) {
+    console.error('Error al obtener habitaciones por tipo:', error);
+    return [];
+  }
+}
+
 module.exports = {
   validateRoomType,
   checkAvailability,
   getRoomTypesMenu,
-  validateRoomCapacity
+  validateRoomCapacity,
+  getAvailableRoomTypes,
+  getAvailableRoomTypesMenu,
+  getAvailableRoomsByType
 };
