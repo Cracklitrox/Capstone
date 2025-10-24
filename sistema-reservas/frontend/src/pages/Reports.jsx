@@ -7,11 +7,11 @@ import { Calendar } from '@/components/ui/Calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { 
-  FileText, 
-  DollarSign, 
-  Users, 
-  Home, 
+import {
+  FileText,
+  DollarSign,
+  Users,
+  Home,
   CalendarIcon,
   TrendingUp,
   TrendingDown,
@@ -56,11 +56,11 @@ const exportToCSV = (data, filename) => {
       alert('No hay datos para exportar');
       return;
     }
-    
+
     const headers = Object.keys(data[0]);
     const csvContent = [
       headers.join(','),
-      ...data.map(row => 
+      ...data.map(row =>
         headers.map(header => {
           const value = row[header];
           // Escapar valores que contienen comas
@@ -71,7 +71,7 @@ const exportToCSV = (data, filename) => {
         }).join(',')
       )
     ].join('\n');
-    
+
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -113,7 +113,7 @@ const DownloadButton = ({ onDownloadPDF, onDownloadExcel, className = "" }) => {
         <Download className="h-4 w-4" />
         Descargar
       </Button>
-      
+
       {showMenu && (
         <div className="absolute right-0 mt-2 w-48 bg-background border border-border rounded-md shadow-lg z-10">
           <button
@@ -146,9 +146,7 @@ const DownloadButton = ({ onDownloadPDF, onDownloadExcel, className = "" }) => {
 const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedChartsFromParent }) => {
   const [selectedCharts, setSelectedCharts] = useState(selectedChartsFromParent || {
     bar: true,
-    line: true,
     pie: true,
-    area: false,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const previewRef = useRef(null);
@@ -171,11 +169,7 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
   };
 
   const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return format(new Date(date), "d 'de' MMM yyyy", { locale: es });
   };
 
   const chartData = data?.revenue?.data?.map((item, index) => ({
@@ -209,45 +203,119 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
     { name: 'Servicios', value: data?.revenue?.data?.reduce((sum, item) => sum + (item.servicesRevenue || 0), 0) || 0 },
   ].filter(item => item.value > 0);
 
-  const handleDownloadPDF = async () => {
+  const handleDownload = async (type = 'pdf') => {
     if (!previewRef.current) return;
     setIsGenerating(true);
     try {
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
+      if (type === 'pdf') {
+        // Capturar el contenido completo
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+        
+        // Capturar el contenido completo incluyendo los gráficos
+        const content = previewRef.current;
+        const canvas = await html2canvas(content, {
+          scale: 2,
+          logging: false,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+        });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
+        let yPosition = 20;
 
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+        // Título y encabezado
+        pdf.setFontSize(20);
+        pdf.setTextColor(66, 133, 244);
+        pdf.text(`Reporte ${reportType}`, 105, yPosition, { align: 'center' });
+        yPosition += 10;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+        pdf.setFontSize(12);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text(`Período: ${formatDate(dateRange.from)} - ${formatDate(dateRange.to)}`, 105, yPosition, { align: 'center' });
+        yPosition += 15;
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        // Resumen de datos
+        pdf.setFontSize(14);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text('Resumen', 20, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(10);
+        pdf.text(`Ingresos Totales: ${formatCurrency(data?.revenue?.total || 0)}`, 25, yPosition);
+        yPosition += 5;
+        pdf.text(`Ocupación de Habitaciones: ${data?.occupancy?.data?.reduce((sum, d) => sum + (d.occupiedNights || 0), 0)} habitaciones (${data?.occupancy?.average?.toFixed(2) || 0}% del total)`, 25, yPosition);
+        yPosition += 5;
+        pdf.text(`Habitaciones Disponibles: ${data?.occupancy?.data?.reduce((sum, d) => sum + (d.availableNights || 0), 0)}`, 25, yPosition);
+        yPosition += 15;
+
+        // Capturar y añadir cada gráfico
+        for (let section of sections) {
+          const canvas = await html2canvas(section, {
+            scale: 2,
+            logging: false,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+          });
+
+          const imgData = canvas.toDataURL('image/png');
+          const imgWidth = 170;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+          if (yPosition + imgHeight > 270) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+
+          pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
+          yPosition += imgHeight + 10;
+        }
+
+        const fileName = `Reporte_${reportType}_${formatDate(dateRange.from)}_${formatDate(dateRange.to)}.pdf`;
+        pdf.save(fileName);
+      } else if (type === 'excel') {
+        // Preparar datos detallados para Excel
+        const exportData = finalChartData.map(item => {
+          const period = item.name;
+          const occupiedRooms = data?.occupancy?.data?.find(d => d.period === item.period)?.occupiedRoomNights || 0;
+          const availableRooms = data?.occupancy?.data?.find(d => d.period === item.period)?.availableRoomNights || 0;
+
+          return {
+            'Período': period,
+            'Ingresos Totales': item.ingresos,
+            'Ingresos por Habitaciones': item.roomRevenue || 0,
+            'Ingresos por Servicios': item.servicesRevenue || 0,
+            'Habitaciones Ocupadas': occupiedRooms,
+            'Habitaciones Disponibles': availableRooms,
+            'Ocupación (%)': ((occupiedRooms / availableRooms) * 100).toFixed(2),
+            'Check-ins': item.checkIns
+          };
+        });
+
+        // Agregar resumen al inicio del archivo
+        const summaryData = [{
+          'Período': 'RESUMEN DEL REPORTE',
+          'Ingresos Totales': data?.revenue?.total || 0,
+          'Habitaciones Ocupadas Totales': data?.occupancy?.data?.reduce((sum, d) => sum + (d.occupiedRoomNights || 0), 0) || 0,
+          'Habitaciones Disponibles Totales': data?.occupancy?.data?.reduce((sum, d) => sum + (d.availableRoomNights || 0), 0) || 0,
+          'Ocupación Promedio (%)': data?.occupancy?.average?.toFixed(2) || 0,
+          'Total Check-ins': data?.checkIns?.total || 0
+        }, {
+          'Período': '',
+        }, ...exportData];
+
+        if (summaryData.length > 0) {
+          const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`;
+          exportToCSV(summaryData, fileName);
+        } else {
+          alert('No hay datos para exportar');
+        }
       }
-
-      const fileName = `Reporte_${reportType}_${formatDate(dateRange.from)}_${formatDate(dateRange.to)}.pdf`;
-      pdf.save(fileName);
     } catch (error) {
-      console.error('Error al generar PDF:', error);
-      alert('Error al generar el PDF. Por favor, intenta nuevamente.');
+      console.error('Error al generar archivo:', error);
+      alert('Error al generar el archivo. Por favor, intenta nuevamente.');
     } finally {
       setIsGenerating(false);
     }
@@ -273,7 +341,7 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
             <div>
               <h3 className="text-sm font-semibold mb-3 text-white">Tipos de Gráficos</h3>
               <div className="space-y-2">
-                {Object.entries({ bar: 'Barras', line: 'Líneas', pie: 'Circular', area: 'Área' }).map(([key, label]) => (
+                {Object.entries({ bar: 'Barras', pie: 'Circular', excel: 'Excel' }).map(([key, label]) => (
                   <div key={key} className="flex items-center space-x-2">
                     <Checkbox
                       id={`chart-${key}`}
@@ -328,132 +396,71 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
               </div>
 
               <div className="space-y-6">
-                {selectedCharts.bar && finalChartData.length > 0 && (
+                {selectedCharts.bar && (
                   <div>
                     <h3 className="text-sm font-semibold mb-3 text-slate-700">Ingresos por Período</h3>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={finalChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-45} 
-                          textAnchor="end" 
-                          height={70}
-                          tick={{ fontSize: 11 }}
-                          stroke="#64748b"
-                        />
-                        <YAxis tick={{ fontSize: 11 }} stroke="#64748b" />
-                        <Tooltip 
-                          formatter={(value) => formatCurrency(value)}
-                          contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: '12px' }} />
-                        <Bar dataKey="ingresos" fill="#10b981" name="Ingresos" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {finalChartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={finalChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis
+                            dataKey="name"
+                            angle={-45}
+                            textAnchor="end"
+                            height={70}
+                            tick={{ fontSize: 11 }}
+                            stroke="#64748b"
+                          />
+                          <YAxis tick={{ fontSize: 11 }} stroke="#64748b" />
+                          <Tooltip
+                            formatter={(value) => formatCurrency(value)}
+                            contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
+                          <Bar dataKey="ingresos" fill="#10b981" name="Ingresos" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-[250px] bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                        <p className="text-gray-500">Sin datos disponibles</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {selectedCharts.line && finalChartData.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3 text-slate-700">Tendencia de Ocupación y Check-ins</h3>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={finalChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-45} 
-                          textAnchor="end" 
-                          height={70}
-                          tick={{ fontSize: 11 }}
-                          stroke="#64748b"
-                        />
-                        <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#64748b" />
-                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#64748b" />
-                        <Tooltip contentStyle={{ fontSize: '12px', borderRadius: '6px' }} />
-                        <Legend wrapperStyle={{ fontSize: '12px' }} />
-                        <Line 
-                          yAxisId="left" 
-                          type="monotone" 
-                          dataKey="checkIns" 
-                          stroke="#f59e0b" 
-                          name="Check-ins" 
-                          strokeWidth={2}
-                          dot={{ fill: '#f59e0b', r: 3 }}
-                        />
-                        <Line 
-                          yAxisId="right" 
-                          type="monotone" 
-                          dataKey="ocupacion" 
-                          stroke="#06b6d4" 
-                          name="Ocupación %" 
-                          strokeWidth={2}
-                          dot={{ fill: '#06b6d4', r: 3 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
 
-                {selectedCharts.pie && pieData.length > 0 && (
+
+                {selectedCharts.pie && (
                   <div>
                     <h3 className="text-sm font-semibold mb-3 text-slate-700">Distribución de Ingresos</h3>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
-                          outerRadius={90}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value) => formatCurrency(value)}
-                          contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {selectedCharts.area && finalChartData.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3 text-slate-700">Tendencia de Ingresos</h3>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <AreaChart data={finalChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-45} 
-                          textAnchor="end" 
-                          height={70}
-                          tick={{ fontSize: 11 }}
-                          stroke="#64748b"
-                        />
-                        <YAxis tick={{ fontSize: 11 }} stroke="#64748b" />
-                        <Tooltip 
-                          formatter={(value) => formatCurrency(value)}
-                          contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: '12px' }} />
-                        <Area 
-                          type="monotone" 
-                          dataKey="ingresos" 
-                          stackId="1" 
-                          stroke="#10b981" 
-                          fill="#10b981" 
-                          fillOpacity={0.6} 
-                          name="Ingresos" 
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                    {pieData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
+                            outerRadius={90}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value) => formatCurrency(value)}
+                            contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-[250px] bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                        <p className="text-gray-500">Sin datos disponibles</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -465,19 +472,25 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
           <Button variant="outline" onClick={onClose} className="text-white border-slate-600 hover:bg-slate-800">
             Cancelar
           </Button>
-          <Button onClick={handleDownloadPDF} disabled={isGenerating} className="bg-cyan-600 hover:bg-cyan-700">
-            {isGenerating ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Generando...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Descargar PDF
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => handleDownload('excel')} disabled={isGenerating} className="bg-emerald-600 hover:bg-emerald-700">
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel
+            </Button>
+            <Button onClick={() => handleDownload('pdf')} disabled={isGenerating} className="bg-cyan-600 hover:bg-cyan-700">
+              {isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 mr-2" />
+                  PDF
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -503,16 +516,6 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
     { title: 'Clientes Nuevos', value: clientStats?.newClients || 0, icon: UserPlus, color: 'text-green-600', bgColor: 'bg-green-100' },
   ];
 
-  // Datos de nuevos clientes por mes (últimos 6 meses)
-  const newClientsByMonth = [
-    { mes: 'Mayo', clientes: Math.floor(Math.random() * 30) + 20 },
-    { mes: 'Junio', clientes: Math.floor(Math.random() * 30) + 25 },
-    { mes: 'Julio', clientes: Math.floor(Math.random() * 30) + 30 },
-    { mes: 'Agosto', clientes: Math.floor(Math.random() * 30) + 35 },
-    { mes: 'Sept', clientes: Math.floor(Math.random() * 30) + 28 },
-    { mes: 'Oct', clientes: clientStats?.newClients || 32 },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
@@ -534,31 +537,7 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
         })}
       </div>
 
-      {/* Gráfico de Nuevos Clientes por Mes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Nuevos Clientes por Mes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={newClientsByMonth}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="mes" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Area 
-                type="monotone" 
-                dataKey="clientes" 
-                name="Nuevos Clientes" 
-                stroke="#10b981" 
-                fill="#10b981" 
-                fillOpacity={0.3}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -570,17 +549,17 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={topClients} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis 
-                    type="number" 
-                    tick={{ fontSize: 12 }} 
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 12 }}
                     stroke="#9ca3af"
-                    tickFormatter={(value) => value >= 1000000 ? `${(value/1000000).toFixed(1)}M` : value >= 1000 ? `${(value/1000).toFixed(0)}K` : value}
+                    tickFormatter={(value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value}
                   />
                   <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 11 }} stroke="#9ca3af" />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => formatCurrency(value)}
-                    contentStyle={{ 
-                      backgroundColor: '#1f2937', 
+                    contentStyle={{
+                      backgroundColor: '#1f2937',
                       border: '1px solid #374151',
                       borderRadius: '6px',
                       color: '#fff'
@@ -595,24 +574,6 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
                 No hay datos de clientes disponibles
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Clientes por País</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={clientCountryStats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="pais" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="cantidad" name="Clientes" fill="#3b82f6" />
-              </BarChart>
-            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
@@ -669,6 +630,7 @@ const CustomReportsSection = () => {
 
   const [reportType, setReportType] = useState('client'); // 'client', 'room', 'roomType', 'topClients'
   const [selectedEntity, setSelectedEntity] = useState('');
+  const [selectedFloor, setSelectedFloor] = useState(null);
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date(),
@@ -765,7 +727,7 @@ const CustomReportsSection = () => {
         setRoomTypes([]);
       }
     };
-    
+
     loadData();
   }, []);
 
@@ -776,6 +738,11 @@ const CustomReportsSection = () => {
 
     try {
       let data;
+      // Incluir el filtro de piso en los parámetros de la consulta
+      const params = {
+        ...(selectedFloor !== null ? { floor: selectedFloor } : {})
+      };
+      
       switch (reportType) {
         case 'client':
           if (!selectedEntity) {
@@ -783,7 +750,7 @@ const CustomReportsSection = () => {
             setIsLoading(false);
             return;
           }
-          data = await getClientCustomReport(selectedEntity, startDate, endDate);
+          data = await getClientCustomReport(selectedEntity, startDate, endDate, params);
           break;
         case 'room':
           if (!selectedEntity) {
@@ -791,7 +758,7 @@ const CustomReportsSection = () => {
             setIsLoading(false);
             return;
           }
-          data = await getRoomCustomReport(selectedEntity, startDate, endDate);
+          data = await getRoomCustomReport(selectedEntity, startDate, endDate, params);
           break;
         case 'roomType':
           if (!selectedEntity) {
@@ -799,10 +766,10 @@ const CustomReportsSection = () => {
             setIsLoading(false);
             return;
           }
-          data = await getRoomTypeCustomReport(selectedEntity, startDate, endDate);
+          data = await getRoomTypeCustomReport(selectedEntity, startDate, endDate, params);
           break;
         case 'topClients':
-          data = await getTopClientsRevenue(startDate, endDate, 50);
+          data = await getTopClientsRevenue(startDate, endDate, 50, params);
           break;
         default:
           break;
@@ -816,132 +783,198 @@ const CustomReportsSection = () => {
     }
   };
 
-  const handleDownloadPDF = async () => {
+  const handleDownload = async (type = 'pdf') => {
     if (!reportData) return;
 
-    // Crear documento PDF
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    let yPosition = 20;
+    if (type === 'pdf') {
+      // Crear documento PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 20;
 
-    // Título
-    pdf.setFontSize(20);
-    pdf.setTextColor(33, 150, 243);
-    pdf.text('Reporte Personalizado', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 10;
-
-    // Período
-    pdf.setFontSize(12);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(
-      `Período: ${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`,
-      pageWidth / 2,
-      yPosition,
-      { align: 'center' }
-    );
-    yPosition += 15;
-
-    // Contenido según tipo de reporte
-    pdf.setFontSize(14);
-    pdf.setTextColor(0, 0, 0);
-
-    if (reportType === 'client' && reportData.data) {
-      const { client, summary, reservations } = reportData.data;
-      
-      pdf.text(`Cliente: ${client.fullName}`, 20, yPosition);
-      yPosition += 7;
-      pdf.setFontSize(10);
-      pdf.text(`Email: ${client.email}`, 20, yPosition);
-      yPosition += 5;
-      pdf.text(`Teléfono: ${client.phone || 'N/A'}`, 20, yPosition);
+      // Título
+      pdf.setFontSize(20);
+      pdf.setTextColor(33, 150, 243);
+      pdf.text('Reporte Personalizado', pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 10;
 
+      // Período
       pdf.setFontSize(12);
-      pdf.text('Resumen:', 20, yPosition);
-      yPosition += 7;
-      pdf.setFontSize(10);
-      pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Noches Totales: ${summary.totalNights}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Promedio por Reserva: ${formatCurrency(summary.averageReservationValue)}`, 25, yPosition);
-      yPosition += 10;
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(
+        `Período: ${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`,
+        pageWidth / 2,
+        yPosition,
+        { align: 'center' }
+      );
+      yPosition += 15;
 
-      // Tabla de reservas
-      if (reservations && reservations.length > 0) {
-        pdf.setFontSize(12);
-        pdf.text('Historial de Reservas:', 20, yPosition);
-        yPosition += 7;
+      // Contenido según tipo de reporte
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+    } else if (type === 'excel') {
+      // Preparar datos para Excel
+      let exportData = [];
 
-        pdf.setFontSize(8);
-        const tableData = reservations.map(r => [
-          format(new Date(r.checkInDate), 'dd/MM/yyyy'),
-          format(new Date(r.checkOutDate), 'dd/MM/yyyy'),
-          r.nights.toString(),
-          formatCurrency(r.totalRevenue)
-        ]);
+      if (reportData.data) {
+        if (reportType === 'client') {
+          exportData = reportData.data.reservations?.map(r => ({
+            'Fecha Check-in': format(new Date(r.checkInDate), 'dd/MM/yyyy'),
+            'Fecha Check-out': format(new Date(r.checkOutDate), 'dd/MM/yyyy'),
+            'Noches': r.nights,
+            'Habitaciones': r.rooms.map(room => room.roomNumber).join(', '),
+            'Tipo': r.rooms.map(room => room.roomType).join(', '),
+            'Total': r.totalRevenue
+          })) || [];
+        } else if (reportType === 'room' || reportType === 'roomType') {
+          exportData = reportData.data.roomsBreakdown?.map(r => ({
+            'Habitación': r.roomNumber,
+            'Piso': r.floor,
+            'Reservas': r.reservations,
+            'Noches': r.nights,
+            'Ingresos': r.revenue,
+            'Ocupación %': r.occupancyRate?.toFixed(2) || '0'
+          })) || [];
+        }
 
-        // Usar la importación de autoTable
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Check-in', 'Check-out', 'Noches', 'Total']],
-          body: tableData,
-          theme: 'grid',
-          headStyles: { fillColor: [33, 150, 243] },
-          margin: { left: 20, right: 20 },
-        });
+        if (exportData.length > 0) {
+          const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`;
+          exportToCSV(exportData, fileName);
+        } else {
+          alert('No hay datos para exportar');
+        }
       }
-    } else if (reportType === 'room' && reportData.data) {
-      const { room, summary, reservations } = reportData.data;
-      
-      pdf.text(`Habitación: ${room.roomNumber}`, 20, yPosition);
-      yPosition += 7;
-      pdf.setFontSize(10);
-      pdf.text(`Tipo: ${room.roomType}`, 20, yPosition);
-      yPosition += 5;
-      pdf.text(`Piso: ${room.floor}`, 20, yPosition);
-      yPosition += 10;
+    }
 
-      pdf.setFontSize(12);
-      pdf.text('Resumen:', 20, yPosition);
-      yPosition += 7;
-      pdf.setFontSize(10);
-      pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
-    } else if (reportType === 'roomType' && reportData.data) {
-      const { roomType, summary, roomsBreakdown } = reportData.data;
-      
-      pdf.text(`Tipo de Habitación: ${roomType.name}`, 20, yPosition);
-      yPosition += 7;
-      pdf.setFontSize(10);
-      pdf.text(`Total de habitaciones de este tipo: ${roomType.totalRooms}`, 20, yPosition);
-      yPosition += 10;
+    if (type === 'pdf') {
+      // Procesamiento según tipo de reporte
+      if (reportType === 'client' && reportData.data) {
+        const { client, summary, reservations } = reportData.data;
 
-      pdf.setFontSize(12);
-      pdf.text('Resumen:', 20, yPosition);
-      yPosition += 7;
-      pdf.setFontSize(10);
-      pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
-      yPosition += 5;
-      pdf.text(`RevPAR: ${formatCurrency(summary.revPAR)}`, 25, yPosition);
-      yPosition += 10;
+        // Generar PDF específico para cliente
+        if (type === 'pdf') {
+          pdf.text(`Cliente: ${client.fullName}`, 20, yPosition);
+          yPosition += 7;
+          pdf.setFontSize(10);
+          pdf.text(`Email: ${client.email}`, 20, yPosition);
+          yPosition += 5;
+          pdf.text(`Teléfono: ${client.phone || 'N/A'}`, 20, yPosition);
+          yPosition += 10;
 
-      // Tabla de habitaciones
-      if (roomsBreakdown && roomsBreakdown.length > 0) {
+          pdf.setFontSize(12);
+          pdf.text('Resumen:', 20, yPosition);
+          yPosition += 7;
+          pdf.setFontSize(10);
+          pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Noches Totales: ${summary.totalNights}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Promedio por Reserva: ${formatCurrency(summary.averageReservationValue)}`, 25, yPosition);
+          yPosition += 10;
+
+          // Tabla de reservas
+          if (reservations && reservations.length > 0) {
+            pdf.setFontSize(12);
+            pdf.text('Historial de Reservas:', 20, yPosition);
+            yPosition += 7;
+
+            const tableData = reservations.map(r => [
+              format(new Date(r.checkInDate), 'dd/MM/yyyy'),
+              format(new Date(r.checkOutDate), 'dd/MM/yyyy'),
+              r.nights.toString(),
+              formatCurrency(r.totalRevenue)
+            ]);
+
+            // Usar la importación de autoTable
+            autoTable(pdf, {
+              startY: yPosition,
+              head: [['Check-in', 'Check-out', 'Noches', 'Total']],
+              body: tableData,
+              theme: 'grid',
+              headStyles: { fillColor: [33, 150, 243] },
+              margin: { left: 20, right: 20 },
+            });
+          }
+        }
+      } else if (reportType === 'room' && reportData.data) {
+        const { room, summary, reservations } = reportData.data;
+
+        // Generar PDF específico para habitación
+        if (type === 'pdf') {
+          pdf.text(`Habitación: ${room.roomNumber}`, 20, yPosition);
+          yPosition += 7;
+          pdf.setFontSize(10);
+          pdf.text(`Tipo: ${room.roomType}`, 20, yPosition);
+          yPosition += 5;
+          pdf.text(`Piso: ${room.floor}`, 20, yPosition);
+          yPosition += 10;
+
+          pdf.setFontSize(12);
+          pdf.text('Resumen:', 20, yPosition);
+          yPosition += 7;
+          pdf.setFontSize(10);
+          pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
+        }
+      } else if (reportType === 'roomType' && reportData.data) {
+        const { roomType, summary, roomsBreakdown } = reportData.data;
+
+        // Generar PDF específico para tipo de habitación
+        if (type === 'pdf') {
+          pdf.text(`Tipo de Habitación: ${roomType.name}`, 20, yPosition);
+          yPosition += 7;
+          pdf.setFontSize(10);
+          pdf.text(`Total de habitaciones de este tipo: ${roomType.totalRooms}`, 20, yPosition);
+          yPosition += 10;
+
+          pdf.setFontSize(12);
+          pdf.text('Resumen:', 20, yPosition);
+          yPosition += 7;
+          pdf.setFontSize(10);
+          pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
+          yPosition += 5;
+          pdf.text(`RevPAR: ${formatCurrency(summary.revPAR)}`, 25, yPosition);
+          yPosition += 10;
+
+          // Tabla de desglose por habitación
+          if (roomsBreakdown && roomsBreakdown.length > 0) {
+            pdf.setFontSize(12);
+            pdf.text('Desglose por Habitaciones:', 20, yPosition);
+            yPosition += 7;
+
+            const tableData = roomsBreakdown.map(r => [
+              r.roomNumber,
+              r.floor.toString(),
+              r.reservations.toString(),
+              r.nights.toString(),
+              formatCurrency(r.revenue),
+              `${r.occupancyRate?.toFixed(2) || '0'}%`
+            ]);
+
+            autoTable(pdf, {
+              startY: yPosition,
+              head: [['Habitación', 'Piso', 'Reservas', 'Noches', 'Ingresos', 'Ocupación']],
+              body: tableData,
+              theme: 'grid',
+              headStyles: { fillColor: [139, 92, 246] },
+              margin: { left: 20, right: 20 },
+            });
+          }
+        }
         pdf.setFontSize(12);
         pdf.text('Desglose por Habitación:', 20, yPosition);
         yPosition += 7;
@@ -965,7 +998,7 @@ const CustomReportsSection = () => {
       }
     } else if (reportType === 'topClients' && reportData.data) {
       const { topClients, totalClients } = reportData.data;
-      
+
       pdf.text(`Total de Clientes: ${totalClients}`, 20, yPosition);
       yPosition += 10;
 
@@ -1024,7 +1057,7 @@ const CustomReportsSection = () => {
         <CardContent className="space-y-6">
           {/* Selector de tipo de reporte */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card 
+            <Card
               className={`cursor-pointer transition-all ${reportType === 'client' ? 'ring-2 ring-blue-500' : 'hover:shadow-lg'}`}
               onClick={() => { setReportType('client'); setSelectedEntity(''); setReportData(null); }}
             >
@@ -1037,7 +1070,7 @@ const CustomReportsSection = () => {
               </CardContent>
             </Card>
 
-            <Card 
+            <Card
               className={`cursor-pointer transition-all ${reportType === 'room' ? 'ring-2 ring-green-500' : 'hover:shadow-lg'}`}
               onClick={() => { setReportType('room'); setSelectedEntity(''); setReportData(null); }}
             >
@@ -1050,7 +1083,7 @@ const CustomReportsSection = () => {
               </CardContent>
             </Card>
 
-            <Card 
+            <Card
               className={`cursor-pointer transition-all ${reportType === 'roomType' ? 'ring-2 ring-purple-500' : 'hover:shadow-lg'}`}
               onClick={() => { setReportType('roomType'); setSelectedEntity(''); setReportData(null); }}
             >
@@ -1063,7 +1096,7 @@ const CustomReportsSection = () => {
               </CardContent>
             </Card>
 
-            <Card 
+            <Card
               className={`cursor-pointer transition-all ${reportType === 'topClients' ? 'ring-2 ring-orange-500' : 'hover:shadow-lg'}`}
               onClick={() => { setReportType('topClients'); setSelectedEntity(''); setReportData(null); }}
             >
@@ -1079,6 +1112,38 @@ const CustomReportsSection = () => {
 
           {/* Formulario de selección */}
           <div className="grid gap-4 md:grid-cols-2">
+            {/* Filtro de Piso */}
+            <div className="space-y-2">
+              <Label>Filtrar por Piso</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedFloor === null ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedFloor(null)}
+                  className="h-8"
+                >
+                  Todos
+                </Button>
+                {[1, 2, 3, 4].map((floor) => (
+                  <Button
+                    key={floor}
+                    variant={selectedFloor === floor ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedFloor(floor)}
+                    className="h-8"
+                  >
+                    <Building2 className="mr-1 h-4 w-4" />
+                    Piso {floor}
+                  </Button>
+                ))}
+              </div>
+              {selectedFloor && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Filtrando por: Piso {selectedFloor}
+                </p>
+              )}
+            </div>
+
             {reportType !== 'topClients' && (
               <div className="space-y-2">
                 <Label>
@@ -1169,7 +1234,7 @@ const CustomReportsSection = () => {
 
           {/* Botones de acción */}
           <div className="flex gap-3">
-            <Button 
+            <Button
               onClick={handleGenerateReport}
               disabled={isLoading || (reportType !== 'topClients' && !selectedEntity)}
               className="flex-1"
@@ -1188,14 +1253,20 @@ const CustomReportsSection = () => {
             </Button>
 
             {reportData && (reportData.data || reportData.topClients) && (
-              <Button 
-                onClick={handleDownloadPDF}
-                variant="outline"
+              <DownloadButton
+                onDownloadPDF={() => handleDownload('pdf')}
+                onDownloadExcel={() => {
+                  const data = reportData.data ? (reportData.data?.reservations || reportData.data?.roomsBreakdown || []) : [];
+                  if (data.length > 0) {
+                    // Preparar los datos para Excel basado en el tipo de reporte
+                    const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`;
+                    exportToCSV(data, fileName);
+                  } else {
+                    alert('No hay datos para exportar');
+                  }
+                }}
                 className="flex-1"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Descargar PDF
-              </Button>
+              />
             )}
           </div>
         </CardContent>
@@ -1419,14 +1490,14 @@ const Reports = () => {
   const [selectedReportType, setSelectedReportType] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
   const [selectedFloor, setSelectedFloor] = useState(null);
+  const [selectedRoomType, setSelectedRoomType] = useState(null);
+  const [roomTypes, setRoomTypes] = useState([]);
   const [channelData, setChannelData] = useState([]);
   const [filterMode, setFilterMode] = useState('calendar'); // 'calendar' o 'rolling'
   const [expandedReportType, setExpandedReportType] = useState(null);
   const [selectedCharts, setSelectedCharts] = useState({
     bar: true,
-    line: false,
     pie: true,
-    area: false,
   });
   const [dashboardData, setDashboardData] = useState({
     weeklyRevenue: [],
@@ -1454,20 +1525,20 @@ const Reports = () => {
       // Obtener datos de las últimas 4 semanas
       const endDate = format(new Date(), 'yyyy-MM-dd');
       const startDate = format(new Date(new Date().setDate(new Date().getDate() - 28)), 'yyyy-MM-dd');
-      
+
       // Obtener datos del mes actual completo para el KPI de ingresos (día 1 al último día)
       const today = new Date();
       const monthStart = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
       const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       const monthEnd = format(lastDayOfMonth, 'yyyy-MM-dd');
-      
+
       // Calcular últimos 7 días + hoy = 8 días total para el gráfico
       const sevenDaysAgo = new Date(today);
       sevenDaysAgo.setDate(today.getDate() - 7); // Retroceder 7 días desde hoy
-      
+
       const weekStart = format(sevenDaysAgo, 'yyyy-MM-dd');
       const weekEnd = format(today, 'yyyy-MM-dd');
-      
+
       const [weeklyRev, dailyOcc, dailyRev, roomTypes, monthlyRev, totalPaid] = await Promise.all([
         getWeeklyRevenue(startDate, endDate),
         getDailyOccupancy(weekStart, weekEnd),
@@ -1477,43 +1548,58 @@ const Reports = () => {
         getTotalPaidAmount(),
       ]);
 
-      // Procesar ingresos semanales con formato "Sem 1: DD/MM - DD/MM"
+      // Procesar ingresos semanales
       const weeklyRevenueData = weeklyRev?.data?.map((item, index) => {
-        // El backend devuelve el período en formato "2025-W41"
         const periodString = item.period || '';
-        const periodLabel = item.periodLabel || `Sem ${index + 1}`;
+        let label;
         
-        // Intentar extraer fechas del rango si están disponibles
-        let label = periodLabel;
+        // Si es formato de semana (2025-W41)
+        if (periodString.match(/^\d{4}-W\d{1,2}$/)) {
+          const [year, week] = periodString.split('-W');
+          const weekNum = parseInt(week);
+          
+          // Calcular fechas de la semana
+          const startDate = new Date(year, 0, 1 + (weekNum - 1) * 7);
+          while (startDate.getDay() !== 1) startDate.setDate(startDate.getDate() - 1);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
+          
+          label = `Semana ${weekNum}\n${format(startDate, "d 'de' MMM", { locale: es })} - ${format(endDate, "d 'de' MMM", { locale: es })}`;
+        } else {
+          label = item.periodLabel || `Semana ${index + 1}`;
+        }
         
-        // Si el backend proporciona startDate y endDate en el futuro, usar eso
+        return {
+          semana: label,
+          ingresos: item.totalRevenue || 0,
+        };        // Si el backend proporciona startDate y endDate en el futuro, usar eso
         // Por ahora, usar el periodLabel del backend
         if (periodString.includes('W')) {
           // Extraer el número de semana del formato "2025-W41"
           const weekNumber = periodString.split('-W')[1];
           label = `Sem ${weekNumber}`;
-          
+
           // Calcular fechas de inicio y fin de la semana
           const year = parseInt(periodString.split('-W')[0]);
           const week = parseInt(weekNumber);
-          
+
           // Calcular el primer día de la semana (Lunes)
           const firstDayOfYear = new Date(year, 0, 1);
           const daysOffset = (week - 1) * 7;
           const weekStart = new Date(firstDayOfYear);
           weekStart.setDate(firstDayOfYear.getDate() + daysOffset - firstDayOfYear.getDay() + 1);
-          
+
           // Calcular el último día de la semana (Domingo)
           const weekEnd = new Date(weekStart);
           weekEnd.setDate(weekStart.getDate() + 6);
-          
+
           // Formatear las fechas
           const startFormatted = format(weekStart, 'dd/MM/yyyy');
           const endFormatted = format(weekEnd, 'dd/MM/yyyy');
-          
+
           label = `Sem ${weekNumber}: ${startFormatted} - ${endFormatted}`;
         }
-        
+
         return {
           semana: label,
           ingresos: item.totalRevenue || 0,
@@ -1524,23 +1610,23 @@ const Reports = () => {
       // Generar TODOS los días desde sevenDaysAgo hasta today, incluso si no hay datos
       const allDays = [];
       const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      
+
       for (let i = 0; i < 8; i++) {
         const currentDate = new Date(sevenDaysAgo);
         currentDate.setDate(sevenDaysAgo.getDate() + i);
         const dayName = dayNames[currentDate.getDay()];
         const dayNumber = currentDate.getDate();
         const periodKey = format(currentDate, 'yyyy-MM-dd');
-        
+
         // Buscar si hay datos para este día
         const dayData = dailyOcc?.data?.find(item => item.period === periodKey);
-        
+
         allDays.push({
           dia: `${dayName} ${dayNumber}`,  // Formato: "Lun 14"
           ocupacion: dayData ? (dayData.occupiedRoomNights || 0) : 0,
         });
       }
-      
+
       const last7Days = allDays;
 
       // Procesar distribución de tipos de habitación desde el endpoint real
@@ -1551,7 +1637,7 @@ const Reports = () => {
 
       // Calcular total de ingresos del mes actual
       const monthlyRevenueTotal = monthlyRev?.data?.reduce((sum, item) => sum + (item.totalRevenue || 0), 0) || 0;
-      
+
       // Obtener total de paid_amount
       const totalPaidAmount = totalPaid?.data?.totalPaidAmount || 0;
 
@@ -1587,15 +1673,16 @@ const Reports = () => {
 
   const loadClientsData = async () => {
     try {
+      console.log('Iniciando carga de datos de clientes...');
       // Usar HOY como fecha final para incluir clientes creados hoy
       const today = new Date();
       const endDate = format(today, 'yyyy-MM-dd');
       const startDate = format(new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
-      
+
       // Cargar top 5 clientes desde el endpoint real
       const topClientsResponse = await getTopClients(startDate, endDate, 5);
       const topClientsRaw = topClientsResponse?.data?.ranking || [];
-      
+
       // Transformar formato del backend al formato esperado por el frontend
       const topClients = Array.isArray(topClientsRaw) ? topClientsRaw.map(client => ({
         name: client.fullName || 'Cliente sin nombre',
@@ -1684,6 +1771,12 @@ const Reports = () => {
   const handleGenerateReport = async (rangeType, mode = filterMode) => {
     setIsLoading(true);
     setSelectedReportType(rangeType);
+    
+    // Incluir los filtros en los parámetros
+    const filters = {
+      ...(selectedFloor ? { floor: parseInt(selectedFloor) } : {}),
+      ...(selectedRoomType ? { roomTypeId: selectedRoomType } : {})
+    };
 
     // Calcular el rango de fechas según el tipo de reporte y modo
     const today = new Date();
@@ -1699,7 +1792,7 @@ const Reports = () => {
           from = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
           to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
           break;
-          
+
         case 'Semanal':
           // Semana actual (Lunes a Domingo)
           const currentDay = today.getDay(); // 0 = Domingo, 1 = Lunes, ...
@@ -1708,11 +1801,11 @@ const Reports = () => {
           thisMonday.setDate(today.getDate() - daysFromMonday);
           const thisSunday = new Date(thisMonday);
           thisSunday.setDate(thisMonday.getDate() + 6);
-          
+
           from = new Date(thisMonday.getFullYear(), thisMonday.getMonth(), thisMonday.getDate(), 0, 0, 0);
           to = new Date(thisSunday.getFullYear(), thisSunday.getMonth(), thisSunday.getDate(), 23, 59, 59);
           break;
-          
+
         case 'Mensual':
           // Mes PASADO completo (día 1 a último día del mes anterior)
           const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -1720,7 +1813,7 @@ const Reports = () => {
           const lastDayOfPrevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
           to = new Date(lastDayOfPrevMonth.getFullYear(), lastDayOfPrevMonth.getMonth(), lastDayOfPrevMonth.getDate(), 23, 59, 59);
           break;
-          
+
         case 'Trimestral':
           // Trimestre actual (Q1: Ene-Mar, Q2: Abr-Jun, Q3: Jul-Sep, Q4: Oct-Dic)
           const currentQuarter = Math.floor(today.getMonth() / 3);
@@ -1730,14 +1823,14 @@ const Reports = () => {
           const lastDayOfQuarter = new Date(today.getFullYear(), quarterEndMonth + 1, 0);
           to = new Date(lastDayOfQuarter.getFullYear(), lastDayOfQuarter.getMonth(), lastDayOfQuarter.getDate(), 23, 59, 59);
           break;
-          
+
         case 'Anual':
           // Año PASADO completo (1 enero a 31 diciembre del año anterior)
           const lastYear = today.getFullYear() - 1;
           from = new Date(lastYear, 0, 1, 0, 0, 0);
           to = new Date(lastYear, 11, 31, 23, 59, 59);
           break;
-          
+
         default:
           from = dateRange.from;
           to = dateRange.to;
@@ -1750,7 +1843,7 @@ const Reports = () => {
           from = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59, 999);
           break;
-          
+
         case 'Semanal':
           // Últimos 7 días (desde hace 6 días más ayer = 7 días total)
           // Por ejemplo si hoy es 19, ayer es 18, entonces desde 12 al 18 (7 días)
@@ -1759,7 +1852,7 @@ const Reports = () => {
           from = new Date(sevenDaysAgo.getFullYear(), sevenDaysAgo.getMonth(), sevenDaysAgo.getDate(), 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
-          
+
         case 'Mensual':
           // Últimos 30 días (desde hace 29 días más ayer = 30 días totales)
           const thirtyDaysAgo = new Date(yesterday);
@@ -1767,7 +1860,7 @@ const Reports = () => {
           from = new Date(thirtyDaysAgo.getFullYear(), thirtyDaysAgo.getMonth(), thirtyDaysAgo.getDate(), 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
-          
+
         case 'Trimestral':
           // Últimos 90 días (desde hace 89 días más ayer = 90 días totales)
           const ninetyDaysAgo = new Date(yesterday);
@@ -1775,7 +1868,7 @@ const Reports = () => {
           from = new Date(ninetyDaysAgo.getFullYear(), ninetyDaysAgo.getMonth(), ninetyDaysAgo.getDate(), 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
-          
+
         case 'Anual':
           // Últimos 365 días (desde hace 364 días más ayer = 365 días totales)
           const threeHundredSixtyFiveDaysAgo = new Date(yesterday);
@@ -1783,7 +1876,7 @@ const Reports = () => {
           from = new Date(threeHundredSixtyFiveDaysAgo.getFullYear(), threeHundredSixtyFiveDaysAgo.getMonth(), threeHundredSixtyFiveDaysAgo.getDate(), 0, 0, 0);
           to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
-          
+
         default:
           from = dateRange.from;
           to = dateRange.to;
@@ -1837,9 +1930,13 @@ const Reports = () => {
           ]);
           break;
         case 'Anual':
+          // Para el reporte anual, usamos el año actual
+          const currentYear = new Date().getFullYear();
+          const yearStart = `${currentYear}-01-01`;
+          const yearEnd = format(new Date(), 'yyyy-MM-dd');
           [revenue, occupancy] = await Promise.all([
-            getYearlyRevenue(startDate, endDate),
-            getYearlyOccupancy(startDate, endDate),
+            getYearlyRevenue(yearStart, yearEnd),
+            getYearlyOccupancy(yearStart, yearEnd),
           ]);
           break;
         case 'Anual (Últimos 12 meses)':
@@ -1863,13 +1960,13 @@ const Reports = () => {
       });
 
       const processed = processReportData(revenue, occupancy);
-      
+
       console.log('✅ Datos procesados:', {
         totalIngresos: processed.revenue.total,
         cantidadPeriodos: processed.revenue.data.length,
         primerosPeriodos: processed.revenue.data.slice(0, 3)
       });
-      
+
       setReportData(processed);
       setIsModalOpen(true);
     } catch (err) {
@@ -1888,7 +1985,7 @@ const Reports = () => {
 
   const handleGenerateCustomReport = async () => {
     if (!dateRange.from || !dateRange.to) return;
-    
+
     setIsLoading(true);
     setSelectedReportType('Personalizado');
 
@@ -1898,9 +1995,9 @@ const Reports = () => {
     try {
       // Calcular días entre fechas para determinar el mejor groupBy
       const days = Math.ceil((dateRange.to - dateRange.from) / (1000 * 60 * 60 * 24));
-      
+
       let revenue, occupancy;
-      
+
       // Seleccionar groupBy según la cantidad de días
       if (days <= 31) {
         // Menos de un mes: usar daily
@@ -1941,7 +2038,7 @@ const Reports = () => {
   // Función para determinar automáticamente el tipo de reporte según el rango de fechas
   const getIntelligentReportType = (fromDate, toDate) => {
     const days = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24));
-    
+
     if (days <= 1) {
       return 'Diario';
     } else if (days <= 7) {
@@ -1967,8 +2064,8 @@ const Reports = () => {
   const handleQuickPeriod = async (period) => {
     const today = new Date();
     let from, to = new Date(today);
-    
-    switch(period) {
+
+    switch (period) {
       case 'today':
         from = new Date(today);
         break;
@@ -1984,18 +2081,26 @@ const Reports = () => {
         from = new Date(today);
         from.setDate(today.getDate() - 29);
         break;
+      case '90days':
+        from = new Date(today);
+        from.setDate(today.getDate() - 89); // 90 días incluyendo hoy
+        break;
+      case '365days':
+        from = new Date(today);
+        from.setDate(today.getDate() - 364); // 365 días incluyendo hoy
+        break;
       default:
         from = new Date(today);
         from.setDate(today.getDate() - 29);
     }
-    
+
     setDateRange({ from, to });
     setSelectedPeriod(period);
-    
+
     // Auto-generar reporte con tipo inteligente
     const reportType = getIntelligentReportType(from, to);
     await handleGenerateReport(reportType, 'rolling');
-    
+
     // Recargar datos del dashboard con el nuevo rango
     await loadDashboardData();
   };
@@ -2006,16 +2111,16 @@ const Reports = () => {
       const pdf = new jsPDF();
       pdf.setFontSize(16);
       pdf.text(`Reporte: ${chartName}`, 20, 20);
-      
+
       pdf.setFontSize(10);
       pdf.text(`Fecha: ${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`, 20, 30);
-      
+
       // Añadir tabla con datos
       const tableData = data.map(item => [
         item.name || item.semana || item.dia || item.period || item.periodLabel,
         formatCurrency(item.ingresos || item.value || item.totalRevenue || 0)
       ]);
-      
+
       autoTable(pdf, {
         startY: 40,
         head: [['Período', 'Ingresos']],
@@ -2023,7 +2128,7 @@ const Reports = () => {
         theme: 'grid',
         headStyles: { fillColor: [16, 185, 129] },
       });
-      
+
       pdf.save(`${chartName}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     } catch (error) {
       console.error('Error al generar PDF:', error);
@@ -2039,7 +2144,7 @@ const Reports = () => {
         'Ingresos': item.ingresos || item.value || item.totalRevenue || 0,
         'Ocupación': item.ocupacion || item.percentage || 0,
       }));
-      
+
       exportToCSV(csvData, `${chartName}_${format(new Date(), 'yyyy-MM-dd')}`);
     } catch (error) {
       console.error('Error al generar CSV:', error);
@@ -2053,17 +2158,17 @@ const Reports = () => {
       const pdf = new jsPDF();
       pdf.setFontSize(16);
       pdf.text('Reservas por Canal de Origen', 20, 20);
-      
+
       pdf.setFontSize(10);
       pdf.text(`Fecha de generación: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 20, 30);
-      
+
       const total = channelData.reduce((sum, c) => sum + c.value, 0);
       const tableData = channelData.map(item => [
         item.name,
         item.value.toString(),
         `${((item.value / total) * 100).toFixed(1)}%`
       ]);
-      
+
       autoTable(pdf, {
         startY: 40,
         head: [['Canal', 'Cantidad', 'Porcentaje']],
@@ -2071,7 +2176,7 @@ const Reports = () => {
         theme: 'grid',
         headStyles: { fillColor: [59, 130, 246] },
       });
-      
+
       pdf.save(`Reservas_por_Canal_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     } catch (error) {
       console.error('Error al generar PDF:', error);
@@ -2088,7 +2193,7 @@ const Reports = () => {
         'Cantidad': item.value,
         'Porcentaje': `${((item.value / total) * 100).toFixed(1)}%`
       }));
-      
+
       exportToCSV(csvData, `Reservas_por_Canal_${format(new Date(), 'yyyy-MM-dd')}`);
     } catch (error) {
       console.error('Error al generar CSV:', error);
@@ -2096,17 +2201,72 @@ const Reports = () => {
     }
   };
 
+  // Cargar tipos de habitación
+  useEffect(() => {
+    const loadRoomTypes = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types?isActive=true', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setRoomTypes(data.data || []);
+        } else {
+          console.error('Error al cargar tipos de habitación');
+        }
+      } catch (error) {
+        console.error('Error al cargar tipos de habitación:', error);
+      }
+    };
+
+    loadRoomTypes();
+  }, []);
+
   // Cargar datos de canal (simulado - en producción vendría del backend)
   useEffect(() => {
-    // Simulación de datos de canal
-    const channels = [
-      { name: 'ChatBot/WhatsApp', value: 31, color: COLORS[0] },
-      { name: 'Web', value: 25, color: COLORS[1] },
-      { name: 'Presencial', value: 20, color: COLORS[2] },
-      { name: 'Telefónico', value: 15, color: COLORS[3] },
-      { name: 'Walk-in', value: 9, color: COLORS[4] },
-    ];
-    setChannelData(channels);
+    // En producción esto debería venir del backend
+    const loadChannelData = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/v1/analytics/channel-stats', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const channelsData = await response.json();
+          setChannelData(channelsData.data || []);
+        } else {
+          // Si hay error o no hay datos, usar datos de respaldo
+          const channels = [
+            { name: 'ChatBot/WhatsApp', value: 31, color: COLORS[0] },
+            { name: 'Web', value: 25, color: COLORS[1] },
+            { name: 'Presencial', value: 20, color: COLORS[2] },
+            { name: 'Telefónico', value: 15, color: COLORS[3] },
+            { name: 'Walk-in', value: 9, color: COLORS[4] },
+          ];
+          setChannelData(channels);
+        }
+      } catch (error) {
+        console.error('Error al cargar datos de canales:', error);
+        // Usar datos de respaldo en caso de error
+        const channels = [
+          { name: 'ChatBot/WhatsApp', value: 31, color: COLORS[0] },
+          { name: 'Web', value: 25, color: COLORS[1] },
+          { name: 'Presencial', value: 20, color: COLORS[2] },
+          { name: 'Telefónico', value: 15, color: COLORS[3] },
+          { name: 'Walk-in', value: 9, color: COLORS[4] },
+        ];
+        setChannelData(channels);
+      }
+    };
+
+    loadChannelData();
   }, []);
 
   return (
@@ -2268,25 +2428,6 @@ const Reports = () => {
                   >
                     Hoy
                   </Button>
-                  
-                  <Button
-                    variant={selectedPeriod === 'week' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      const today = new Date();
-                      const monday = new Date(today);
-                      const day = today.getDay();
-                      const diff = day === 0 ? -6 : 1 - day;
-                      monday.setDate(today.getDate() + diff);
-                      const sunday = new Date(monday);
-                      sunday.setDate(monday.getDate() + 6);
-                      setDateRange({ from: monday, to: sunday });
-                      setSelectedPeriod('week');
-                    }}
-                    className="h-8"
-                  >
-                    Semana
-                  </Button>
 
                   <Button
                     variant={selectedPeriod === '7days' ? 'default' : 'outline'}
@@ -2315,6 +2456,24 @@ const Reports = () => {
                     30 días
                   </Button>
 
+                  <Button
+                    variant={selectedPeriod === '90days' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleQuickPeriod('90days')}
+                    className="h-8"
+                  >
+                    Trimestre
+                  </Button>
+
+                  <Button
+                    variant={selectedPeriod === '365days' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleQuickPeriod('365days')}
+                    className="h-8"
+                  >
+                    Anual
+                  </Button>
+
                   <div className="border-l h-8 mx-2"></div>
 
                   {/* Calendarios de Fecha */}
@@ -2322,7 +2481,7 @@ const Reports = () => {
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8">
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateRange.from ? format(dateRange.from, 'dd MMM', { locale: es }) : 'Inicio'}
+                        {dateRange.from ? format(dateRange.from, "d 'de' MMM yyyy", { locale: es }) : 'Inicio'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -2351,7 +2510,7 @@ const Reports = () => {
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8">
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateRange.to ? format(dateRange.to, 'dd MMM', { locale: es }) : 'Fin'}
+                        {dateRange.to ? format(dateRange.to, "d 'de' MMM yyyy", { locale: es }) : 'Fin'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -2377,37 +2536,74 @@ const Reports = () => {
                   </Popover>
                 </div>
 
-                {/* Filtro de Pisos */}
-                <div className="space-y-2">
-                  <Label>Filtrar por Piso</Label>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={selectedFloor === null ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSelectedFloor(null)}
-                      className="min-w-[80px]"
-                    >
-                      Todos
-                    </Button>
-                    {[1, 2, 3, 4].map((floor) => (
+                {/* Filtros de Piso y Tipo de Habitación */}
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Filtro de Piso */}
+                  <div className="flex-1">
+                    <Label className="text-sm font-semibold mb-2">Filtrar por Piso</Label>
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <Button
-                        key={floor}
-                        variant={selectedFloor === floor ? 'default' : 'outline'}
+                        variant={selectedFloor === null ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setSelectedFloor(floor)}
-                        className="min-w-[80px]"
+                        onClick={() => setSelectedFloor(null)}
+                        className="h-8"
                       >
-                        <Building2 className="mr-1 h-3 w-3" />
-                        Piso {floor}
+                        Todos
                       </Button>
-                    ))}
+                      {[1, 2, 3, 4].map((floor) => (
+                        <Button
+                          key={floor}
+                          variant={selectedFloor === floor ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setSelectedFloor(floor)}
+                          className="h-8"
+                        >
+                          <Building2 className="mr-1 h-4 w-4" />
+                          Piso {floor}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  {selectedFloor && (
-                    <p className="text-xs text-muted-foreground">
-                      Mostrando solo habitaciones del piso {selectedFloor}
-                    </p>
-                  )}
+
+                  {/* Filtro de Tipo de Habitación */}
+                  <div className="flex-1">
+                    <Label className="text-sm font-semibold mb-2">Tipo de Habitación</Label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        variant={selectedRoomType === null ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedRoomType(null)}
+                        className="h-8"
+                      >
+                        Todos los Tipos
+                      </Button>
+                      {roomTypes.map((type) => (
+                        <Button
+                          key={type.id}
+                          variant={selectedRoomType === type.id ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setSelectedRoomType(type.id)}
+                          className="h-8"
+                        >
+                          <Home className="mr-1 h-4 w-4" />
+                          {type.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Estado de los filtros */}
+                {(selectedFloor || selectedRoomType) && (
+                  <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                    {selectedFloor && (
+                      <p>Mostrando solo habitaciones del piso {selectedFloor}</p>
+                    )}
+                    {selectedRoomType && (
+                      <p>Filtrando por tipo: {roomTypes.find(t => t.id === selectedRoomType)?.name}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -2434,16 +2630,16 @@ const Reports = () => {
                           <BarChart data={dashboardData.weeklyRevenue}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                             <XAxis dataKey="semana" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                            <YAxis 
-                              tick={{ fontSize: 12 }} 
+                            <YAxis
+                              tick={{ fontSize: 12 }}
                               stroke="#9ca3af"
                               domain={[0, (dataMax) => Math.ceil(dataMax * 1.1)]}
-                              tickFormatter={(value) => value >= 1000000 ? `${(value/1000000).toFixed(1)}M` : value >= 1000 ? `${(value/1000).toFixed(0)}K` : value}
+                              tickFormatter={(value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value}
                             />
-                            <Tooltip 
+                            <Tooltip
                               formatter={(value) => formatCurrency(value)}
-                              contentStyle={{ 
-                                backgroundColor: '#1f2937', 
+                              contentStyle={{
+                                backgroundColor: '#1f2937',
                                 border: '1px solid #374151',
                                 borderRadius: '6px',
                                 color: '#fff'
@@ -2453,8 +2649,8 @@ const Reports = () => {
                           </BarChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="flex items-center justify-center h-[250px] text-muted-foreground">
-                          No hay datos de ingresos disponibles
+                        <div className="flex items-center justify-center h-[250px] bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                          <p className="text-gray-500">Sin datos disponibles</p>
                         </div>
                       )}
                     </div>
@@ -2478,17 +2674,17 @@ const Reports = () => {
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
-                            <Tooltip 
+                            <Tooltip
                               formatter={(value) => `${value} reservas`}
-                              contentStyle={{ 
-                                backgroundColor: '#ffffff', 
+                              contentStyle={{
+                                backgroundColor: '#ffffff',
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '8px',
                                 color: '#1f2937',
                                 boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                               }}
                             />
-                            <Legend 
+                            <Legend
                               wrapperStyle={{ fontSize: '12px' }}
                               verticalAlign="bottom"
                               height={36}
@@ -2496,52 +2692,12 @@ const Reports = () => {
                           </PieChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                          No hay datos de tipos de habitación disponibles
+                        <div className="flex items-center justify-center h-[300px] bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                          <p className="text-gray-500">Sin datos disponibles</p>
                         </div>
                       )}
                     </div>
                   </div>
-
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3">Habitaciones Ocupadas (Últimos 7 días + hoy)</h3>
-                    {dashboardData.occupancyTrend.length > 0 ? (
-                      <div className="w-full overflow-x-auto">
-                        <div className="min-w-[600px]">
-                          <ResponsiveContainer width="100%" height={250}>
-                            <LineChart data={dashboardData.occupancyTrend}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                          <XAxis dataKey="dia" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                          <YAxis 
-                            tick={{ fontSize: 12 }} 
-                            stroke="#9ca3af"
-                            domain={[0, (dataMax) => Math.ceil(dataMax * 1.2)]}
-                          />
-                          <Tooltip 
-                            formatter={(value) => `${value} habitaciones`}
-                            contentStyle={{ 
-                              backgroundColor: '#1f2937', 
-                              border: '1px solid #374151',
-                              borderRadius: '6px',
-                              color: '#fff'
-                            }}
-                          />
-                          <Line 
-                            type="monotone" 
-                            dataKey="ocupacion" 
-                            stroke="#06b6d4" 
-                            dot={{ fill: '#06b6d4', r: 4 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-[250px] text-muted-foreground">
-                      No hay datos de ocupación disponibles
-                    </div>
-                  )}
-                </div>
                 </div>
               )}
             </CardContent>
@@ -2549,8 +2705,8 @@ const Reports = () => {
         </TabsContent>
 
         <TabsContent value="clients" className="mt-6">
-          <ClientsSection 
-            topClientsData={clientsData.topClients} 
+          <ClientsSection
+            topClientsData={clientsData.topClients}
             clientStats={clientsData.stats}
           />
         </TabsContent>
