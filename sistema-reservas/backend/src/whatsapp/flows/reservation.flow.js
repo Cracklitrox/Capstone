@@ -23,6 +23,7 @@ const STATES = {
   AWAITING_CHECK_IN: 'AWAITING_CHECK_IN',
   AWAITING_CHECK_OUT: 'AWAITING_CHECK_OUT',
   AWAITING_ADULTS: 'AWAITING_ADULTS',
+  AWAITING_HAS_CHILDREN: 'AWAITING_HAS_CHILDREN',
   AWAITING_CHILDREN: 'AWAITING_CHILDREN',
   // Paso 2: Selección de Habitaciones
   AWAITING_ROOM_TYPE: 'AWAITING_ROOM_TYPE',
@@ -55,8 +56,9 @@ const STATES = {
 const PREVIOUS_STATE = {
   [STATES.AWAITING_CHECK_OUT]: STATES.AWAITING_CHECK_IN,
   [STATES.AWAITING_ADULTS]: STATES.AWAITING_CHECK_OUT,
-  [STATES.AWAITING_CHILDREN]: STATES.AWAITING_ADULTS,
-  [STATES.AWAITING_ROOM_TYPE]: STATES.AWAITING_CHILDREN,
+  [STATES.AWAITING_HAS_CHILDREN]: STATES.AWAITING_ADULTS,
+  [STATES.AWAITING_CHILDREN]: STATES.AWAITING_HAS_CHILDREN,
+  [STATES.AWAITING_ROOM_TYPE]: STATES.AWAITING_HAS_CHILDREN,
   [STATES.AWAITING_SPECIFIC_ROOM]: STATES.AWAITING_ROOM_TYPE,
   [STATES.AWAITING_NAME]: STATES.AWAITING_SPECIFIC_ROOM,
   [STATES.AWAITING_RUT]: STATES.AWAITING_NAME,
@@ -117,6 +119,9 @@ async function processMessage(session, messageText, phoneNumber) {
       
       case STATES.AWAITING_ADULTS:
         return await handleAdultsState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_HAS_CHILDREN:
+        return await handleHasChildrenState(session, messageText, phoneNumber);
       
       case STATES.AWAITING_CHILDREN:
         return await handleChildrenState(session, messageText, phoneNumber);
@@ -445,16 +450,78 @@ async function handleAdultsState(session, messageText, phoneNumber) {
   session.data.adults = adults;
   
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_CHILDREN,
+    state: STATES.AWAITING_HAS_CHILDREN,
     data: session.data
   });
 
   return `✅ Adultos: ${adults}
 
-👶 ¿Cuántos *niños menores de 4 años*?
+👶 ¿Viaja con *niños menores de 4 años*?
 
-Ingresa un número (0-5)
+Responde *SÍ* o *NO*
 ⚠️ Los niños menores de 4 años NO pagan.`;
+}
+
+/**
+ * Preguntar si viaja con niños
+ */
+async function handleHasChildrenState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CHILDREN,
+      data: session.data
+    });
+    
+    return `👶 ¿Cuántos *niños menores de 4 años*?
+
+Ingresa un número (1-5)`;
+  } else if (normalized === 'no') {
+    // No viaja con niños
+    session.data.childrenUnder4 = 0;
+    session.data.totalGuests = session.data.adults;
+
+    // Verificar disponibilidad de tipos de habitación
+    const availableTypes = await roomValidator.getAvailableRoomTypes(
+      session.data.checkInDate,
+      session.data.checkOutDate
+    );
+    
+    if (availableTypes.length === 0) {
+      return `❌ Lo sentimos, no hay habitaciones disponibles para las fechas seleccionadas (${session.data.checkInDateFormatted} - ${session.data.checkOutDateFormatted}).
+
+Por favor, escribe *VOLVER* para cambiar las fechas.`;
+    }
+
+    // Filtrar por capacidad
+    const suitableTypes = availableTypes.filter(type => type.base_capacity >= session.data.totalGuests);
+    
+    if (suitableTypes.length === 0) {
+      return `❌ No hay habitaciones con capacidad para ${session.data.totalGuests} huésped(es) en estas fechas.
+
+Por favor, escribe *VOLVER* para cambiar las fechas o el número de huéspedes.`;
+    }
+
+    // Guardar tipos disponibles en sesión
+    session.data.availableRoomTypes = suitableTypes;
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ROOM_TYPE,
+      data: session.data
+    });
+
+    return `✅ Sin niños menores de 4 años
+👥 Total de huéspedes: ${session.data.totalGuests}
+
+🏨 *Paso 2: Selección de Tipo de Habitación*
+
+${await roomValidator.getAvailableRoomTypesMenu(session.data.checkInDate, session.data.checkOutDate, session.data.totalGuests)}
+
+Selecciona el número del tipo de habitación que deseas.`;
+  }
+  
+  return `❌ Por favor responde *SÍ* o *NO*`;
 }
 
 /**
@@ -463,8 +530,8 @@ Ingresa un número (0-5)
 async function handleChildrenState(session, messageText, phoneNumber) {
   const children = parseInt(messageText.trim());
   
-  if (isNaN(children) || children < 0 || children > 5) {
-    return '❌ Por favor, indica un número válido entre 0 y 5.';
+  if (isNaN(children) || children < 1 || children > 5) {
+    return '❌ Por favor, indica un número válido entre 1 y 5.';
   }
 
   session.data.childrenUnder4 = children;

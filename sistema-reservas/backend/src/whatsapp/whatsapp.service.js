@@ -97,73 +97,110 @@ class WhatsAppService {
     try {
       const { phoneNumber, data } = session;
 
+      // Calcular costos para el resumen
+      const nights = data.nights || 1;
+      const roomPrice = data.roomInfo?.price || 0;
+      const roomTotal = roomPrice * nights;
+
+      let breakfastTotal = 0;
+      if (data.services?.breakfast) {
+        const breakfastQty = data.services.breakfastQuantity || 0;
+        const breakfastPrice = 3000; // $3,000 por persona por noche
+        breakfastTotal = breakfastPrice * breakfastQty * nights;
+      }
+
+      const totalReservation = roomTotal + breakfastTotal;
+
+      // Crear resumen detallado completo para Socket.IO
+      const fullSummary = {
+        guest_principal: {
+          name: data.name || '',
+          rut: data.rut || '',
+          email: data.email || '',
+          phone: phoneNumber
+        },
+        reservation: {
+          check_in: data.checkInDateFormatted || data.checkInDate || '',
+          check_out: data.checkOutDateFormatted || data.checkOutDate || '',
+          nights: nights,
+          room_id: data.roomId || null,
+          room_number: data.roomNumber || '',
+          room_type_id: data.roomTypeId || null,
+          room_type_name: data.roomTypeName || '',
+          adults: data.adults || 1,
+          children_under_4: data.childrenUnder4 || 0,
+          total_guests: data.totalGuests || 1,
+          special_requests: data.specialRequests || ''
+        },
+        services: {
+          laundry: data.services?.laundry || false,
+          laundry_quantity: data.services?.laundryQuantity || 0,
+          breakfast: data.services?.breakfast || false,
+          breakfast_quantity: data.services?.breakfastQuantity || 0,
+          breakfast_preferences: data.services?.breakfastPreferences || []
+        },
+        additional_guests: (data.additionalGuests || []).map(guest => ({
+          name: guest.name,
+          rut: guest.rut,
+          email: guest.email || 'N/A',
+          phone: guest.phone || 'N/A',
+          is_child: guest.isChild || false
+        })),
+        costs: {
+          room_price_per_night: roomPrice,
+          room_nights: nights,
+          room_total: roomTotal,
+          breakfast_total: breakfastTotal,
+          services_total: breakfastTotal,
+          total: totalReservation
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      // Crear mensaje corto para el campo detail (max 250 caracteres)
+      const shortDetail = `WhatsApp: ${data.name || 'Cliente'} - ${data.roomTypeName || 'Habitación'} - ${nights}n - $${totalReservation.toLocaleString()}`;
+
       // Crear alerta en la base de datos
       const alert = await prisma.alerts.create({
         data: {
           type: 'booking_request',
           status: 'pending',
-          origin_user_id: null, // No hay usuario registrado aún
+          origin_user_id: null,
           reservation_id: null,
           payment_id: null,
-          detail: JSON.stringify({
-            source: 'whatsapp',
-            phone: phoneNumber,
-            guest_data: {
-              name: data.name || '',
-              rut: data.rut || '',
-              email: data.email || '',
-              phone: phoneNumber
-            },
-            reservation_data: {
-              check_in: data.checkInDate || '',
-              check_out: data.checkOutDate || '',
-              room_id: data.roomId || null,
-              room_number: data.roomNumber || '',
-              room_type_id: data.roomTypeId || null,
-              room_type_name: data.roomTypeName || '',
-              adults: data.adults || 1,
-              children_under_4: data.childrenUnder4 || 0,
-              total_guests: data.totalGuests || 1,
-              special_requests: data.specialRequests || ''
-            },
-            services: {
-              laundry: data.services?.laundry || false,
-              laundry_quantity: data.services?.laundryQuantity || 0,
-              breakfast: data.services?.breakfast || false,
-              breakfast_quantity: data.services?.breakfastQuantity || 0,
-              breakfast_preferences: data.services?.breakfastPreferences || []
-            },
-            additional_guests: (data.additionalGuests || []).map(guest => ({
-              name: guest.name,
-              rut: guest.rut,
-              email: guest.email || '',
-              phone: guest.phone || ''
-            })),
-            timestamp: new Date().toISOString()
-          })
+          detail: shortDetail
         }
       });
 
       console.log(`✅ Alerta creada con ID: ${alert.id}`);
 
-      // Notificar a recepcionistas vía Socket.IO
+      // Notificar a recepcionistas vía Socket.IO con resumen completo
       const io = getIO();
       if (io) {
         io.to('role:receptionist').emit('alert:new', {
           id: alert.id,
           type: 'booking_request',
-          message: `📱 Nueva solicitud de reserva desde WhatsApp de ${data.name || 'Cliente'}`,
+          status: 'pending',
+          message: `📱 Nueva solicitud de reserva WhatsApp`,
+          shortDetail: shortDetail,
           data: {
             phone: phoneNumber,
             guestName: data.name,
-            checkIn: data.checkInDate,
-            checkOut: data.checkOutDate,
-            roomType: data.roomType
+            checkIn: data.checkInDateFormatted || data.checkInDate,
+            checkOut: data.checkOutDateFormatted || data.checkOutDate,
+            roomType: data.roomTypeName,
+            roomNumber: data.roomNumber,
+            nights: nights,
+            totalGuests: data.totalGuests,
+            adults: data.adults,
+            children: data.childrenUnder4,
+            total: totalReservation
           },
+          fullSummary: fullSummary,
           createdAt: alert.created_at
         });
 
-        console.log('📢 Notificación enviada a recepcionistas');
+        console.log('📢 Notificación enviada a recepcionistas con resumen completo');
       }
 
       return alert;
@@ -332,6 +369,34 @@ class WhatsAppService {
       return availableRooms;
     } catch (error) {
       console.error('❌ Error al obtener habitaciones por tipo:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtener servicios activos desde la base de datos
+   */
+  async getActiveServices() {
+    try {
+      const services = await prisma.services.findMany({
+        where: {
+          is_active: true
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          unit: true
+        },
+        orderBy: {
+          name: 'asc'
+        }
+      });
+
+      return services;
+    } catch (error) {
+      console.error('❌ Error al obtener servicios:', error);
       return [];
     }
   }

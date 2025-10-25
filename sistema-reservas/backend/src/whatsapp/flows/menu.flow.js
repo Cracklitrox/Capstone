@@ -34,68 +34,115 @@ async function getHotelInfo() {
     // Obtener tipos de habitación desde la base de datos
     const roomTypes = await whatsappService.getRoomTypes();
     
+    // Obtener servicios activos desde la base de datos
+    const services = await whatsappService.getActiveServices();
+
+    // Construir lista de habitaciones con mejor diseño
     let roomsList = '';
     if (roomTypes && roomTypes.length > 0) {
-      roomsList = roomTypes.map(type => {
-        let info = `• *${type.name}*`;
+      roomsList = roomTypes.map((type, index) => {
+        let info = `┌─ *${type.name}*\n`;
         if (type.base_capacity) {
-          info += ` - Capacidad: ${type.base_capacity} persona(s)`;
+          info += `│ 👥 Capacidad: ${type.base_capacity} persona(s)\n`;
         }
         if (type.price) {
-          info += ` - Desde $${type.price.toLocaleString()}`;
+          info += `│ 💰 Desde: $${type.price.toLocaleString()}\n`;
+        }
+        if (type.bed_configuration) {
+          info += `│ 🛏️ ${type.bed_configuration}\n`;
         }
         if (type.description) {
-          info += `\n  ${type.description}`;
+          info += `│ 📝 ${type.description}\n`;
         }
+        info += `└───────────────`;
         return info;
-      }).join('\n');
+      }).join('\n\n');
     } else {
       roomsList = '• Consultar disponibilidad';
     }
 
-    return `🏨 *Hotel Don Teo*
+    // Construir lista de servicios con mejor diseño
+    let servicesList = '';
+    if (services && services.length > 0) {
+      servicesList = services.map(service => {
+        let info = `┌─ *${service.name}*\n`;
+        if (service.description) {
+          info += `│ 📋 ${service.description}\n`;
+        }
+        info += `│ 💵 Precio: $${service.price.toLocaleString()}`;
+        if (service.unit) {
+          const unitMap = {
+            'per_night': '/noche',
+            'per_unit': '/unidad',
+            'per_person': '/persona',
+            'per_service': '/servicio'
+          };
+          info += ` ${unitMap[service.unit] || ''}`;
+        }
+        info += `\n└───────────────`;
+        return info;
+      }).join('\n\n');
+    } else {
+      servicesList = '• WiFi gratuito\n• Estacionamiento\n• Atención 24/7';
+    }
 
-📍 *Ubicación:*
-Chile, región de Los Lagos, Puerto Montt
+    return `🏨 *HOTEL DON TEO*
+═══════════════════════
 
-🏢 *Sobre nosotros:*
-Hotel familiar con ambiente acogedor y excelente servicio.
+📍 *UBICACIÓN*
+Chile, Región de Los Lagos
+Puerto Montt
 
-🛏️ *Habitaciones:*
+🏢 *SOBRE NOSOTROS*
+Hotel familiar con ambiente acogedor
+y excelente servicio.
+
+─────────────────────
+
+🛏️ *HABITACIONES DISPONIBLES*
+
 ${roomsList}
 
-⭐ *Servicios:*
-• WiFi gratuito
-• Desayuno buffet ($3,000 por persona/noche)
-• Estacionamiento
-• Atención 24/7
+─────────────────────
 
-📞 *Contacto:*
+⭐ *SERVICIOS*
+
+${servicesList}
+
+─────────────────────
+
+📞 *CONTACTO*
 • WhatsApp: Este número
 • Email: info@hoteldonleo.cl
 
-¿Deseas hacer una *reserva*? Escribe *MENU* para ver las opciones.`;
+═══════════════════════
+
+¿Deseas hacer una *reserva*?
+Escribe *MENU* para ver opciones.`;
   } catch (error) {
     console.error('Error al obtener información del hotel:', error);
-    return `🏨 *Hotel Don Teo*
+    return `🏨 *HOTEL DON TEO*
+═══════════════════════
 
-📍 *Ubicación:*
-Chile, región de Los Lagos, Puerto Montt
+📍 *UBICACIÓN*
+Chile, Región de Los Lagos, Puerto Montt
 
-🏢 *Sobre nosotros:*
-Hotel familiar con ambiente acogedor y excelente servicio.
+🏢 *SOBRE NOSOTROS*
+Hotel familiar con ambiente acogedor
+y excelente servicio.
 
-⭐ *Servicios:*
+⭐ *SERVICIOS*
 • WiFi gratuito
-• Desayuno buffet ($3,000 por persona/noche)
+• Desayuno buffet ($3,000/persona/noche)
 • Estacionamiento
 • Atención 24/7
 
-📞 *Contacto:*
+📞 *CONTACTO*
 • WhatsApp: Este número
 • Email: info@hoteldonleo.cl
 
-¿Deseas hacer una *reserva*? Escribe *MENU* para ver las opciones.`;
+¿Deseas hacer una *reserva*?
+Escribe *MENU* para ver opciones.`;
   }
 }
 
