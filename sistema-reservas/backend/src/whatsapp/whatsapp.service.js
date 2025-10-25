@@ -327,14 +327,22 @@ class WhatsAppService {
   /**
    * Obtener habitaciones específicas disponibles por tipo
    */
-  async getAvailableRoomsByType(roomTypeId, checkIn, checkOut) {
+  async getAvailableRoomsByType(roomTypeId, checkIn, checkOut, floor = null) {
     try {
-      // Obtener todas las habitaciones del tipo especificado
+      // Construir condiciones de búsqueda
+      const whereConditions = {
+        room_type_id: roomTypeId,
+        is_active: true
+      };
+
+      // Si se especifica un piso, agregarlo a las condiciones
+      if (floor !== null && floor !== undefined) {
+        whereConditions.floor = floor;
+      }
+
+      // Obtener todas las habitaciones del tipo especificado (y piso si aplica)
       const allRooms = await prisma.rooms.findMany({
-        where: {
-          room_type_id: roomTypeId,
-          is_active: true
-        },
+        where: whereConditions,
         select: {
           id: true,
           room_number: true,
@@ -397,6 +405,61 @@ class WhatsAppService {
       return services;
     } catch (error) {
       console.error('❌ Error al obtener servicios:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtener pisos disponibles con habitaciones activas
+   */
+  async getAvailableFloors(checkIn, checkOut) {
+    try {
+      // Obtener habitaciones disponibles en el rango de fechas
+      const rooms = await prisma.rooms.findMany({
+        where: {
+          is_active: true,
+          floor: {
+            not: null
+          }
+        },
+        select: {
+          id: true,
+          floor: true
+        }
+      });
+
+      if (rooms.length === 0) {
+        return [];
+      }
+
+      // Obtener habitaciones ocupadas
+      const occupiedRoomIds = await prisma.reservation_rooms.findMany({
+        where: {
+          room_id: {
+            in: rooms.map(r => r.id)
+          },
+          reservations: {
+            status: {
+              in: ['pending', 'confirmed', 'in_progress']
+            },
+            check_in_date: { lt: new Date(checkOut) },
+            check_out_date: { gt: new Date(checkIn) }
+          }
+        },
+        select: {
+          room_id: true
+        }
+      });
+
+      const occupiedIds = new Set(occupiedRoomIds.map(r => r.room_id));
+      
+      // Filtrar habitaciones disponibles y obtener pisos únicos
+      const availableRooms = rooms.filter(r => !occupiedIds.has(r.id));
+      const floors = [...new Set(availableRooms.map(r => r.floor))].sort((a, b) => a - b);
+
+      return floors;
+    } catch (error) {
+      console.error('❌ Error al obtener pisos disponibles:', error);
       return [];
     }
   }

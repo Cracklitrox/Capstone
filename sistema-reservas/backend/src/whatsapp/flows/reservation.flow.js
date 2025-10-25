@@ -25,6 +25,7 @@ const STATES = {
   AWAITING_ADULTS: 'AWAITING_ADULTS',
   AWAITING_HAS_CHILDREN: 'AWAITING_HAS_CHILDREN',
   AWAITING_CHILDREN: 'AWAITING_CHILDREN',
+  AWAITING_FLOOR: 'AWAITING_FLOOR',
   // Paso 2: Selección de Habitaciones
   AWAITING_ROOM_TYPE: 'AWAITING_ROOM_TYPE',
   AWAITING_SPECIFIC_ROOM: 'AWAITING_SPECIFIC_ROOM',
@@ -58,7 +59,8 @@ const PREVIOUS_STATE = {
   [STATES.AWAITING_ADULTS]: STATES.AWAITING_CHECK_OUT,
   [STATES.AWAITING_HAS_CHILDREN]: STATES.AWAITING_ADULTS,
   [STATES.AWAITING_CHILDREN]: STATES.AWAITING_HAS_CHILDREN,
-  [STATES.AWAITING_ROOM_TYPE]: STATES.AWAITING_HAS_CHILDREN,
+  [STATES.AWAITING_FLOOR]: STATES.AWAITING_HAS_CHILDREN,
+  [STATES.AWAITING_ROOM_TYPE]: STATES.AWAITING_FLOOR,
   [STATES.AWAITING_SPECIFIC_ROOM]: STATES.AWAITING_ROOM_TYPE,
   [STATES.AWAITING_NAME]: STATES.AWAITING_SPECIFIC_ROOM,
   [STATES.AWAITING_RUT]: STATES.AWAITING_NAME,
@@ -125,6 +127,9 @@ async function processMessage(session, messageText, phoneNumber) {
       
       case STATES.AWAITING_CHILDREN:
         return await handleChildrenState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_FLOOR:
+        return await handleFloorState(session, messageText, phoneNumber);
       
       // Paso 2: Selección de Habitaciones
       case STATES.AWAITING_ROOM_TYPE:
@@ -229,8 +234,23 @@ async function getStatePrompt(state, data) {
       return `👥 ¿Cuántos *adultos* se hospedarán?\n\nIngresa un número (1-10)\nNota: Niños de 5 años o más se consideran adultos.`;
     case STATES.AWAITING_CHILDREN:
       return `👶 ¿Cuántos *niños menores de 4 años*?\n\nIngresa un número (0-5)\n⚠️ Los niños menores de 4 años NO pagan.`;
+    case STATES.AWAITING_FLOOR:
+      // Regenerar menú de pisos
+      if (data && data.checkInDate && data.checkOutDate) {
+        const whatsappService = require('../whatsapp.service');
+        const availableFloors = await whatsappService.getAvailableFloors(
+          data.checkInDate,
+          data.checkOutDate
+        );
+        const floorMenu = availableFloors.map((floor, index) => {
+          const floorName = floor === 0 ? 'Planta baja' : `Piso ${floor}`;
+          return `${index + 1}. ${floorName}`;
+        }).join('\n');
+        return `🏢 *Paso 2: Selección de Piso*\n\n${floorMenu}\n\nSelecciona el número del piso donde deseas hospedarte.`;
+      }
+      return `🏢 *Paso 2: Selección de Piso*\n\nSelecciona el piso donde deseas hospedarte.`;
     case STATES.AWAITING_ROOM_TYPE:
-      return `🏨 *Paso 2: Selección de Habitación*\n\n${await roomValidator.getRoomTypesMenu()}`;
+      return `🏨 *Paso 3: Selección de Tipo de Habitación*\n\n${await roomValidator.getRoomTypesMenu()}`;
     case STATES.AWAITING_NAME:
       return `📝 *Paso 3: Datos del Huésped Principal*\n\n¿Cuál es tu *nombre completo*?`;
     case STATES.AWAITING_RUT:
@@ -482,43 +502,37 @@ Ingresa un número (1-5)`;
     session.data.childrenUnder4 = 0;
     session.data.totalGuests = session.data.adults;
 
-    // Verificar disponibilidad de tipos de habitación
-    const availableTypes = await roomValidator.getAvailableRoomTypes(
+    // Obtener pisos disponibles
+    const availableFloors = await whatsappService.getAvailableFloors(
       session.data.checkInDate,
       session.data.checkOutDate
     );
     
-    if (availableTypes.length === 0) {
+    if (availableFloors.length === 0) {
       return `❌ Lo sentimos, no hay habitaciones disponibles para las fechas seleccionadas (${session.data.checkInDateFormatted} - ${session.data.checkOutDateFormatted}).
 
 Por favor, escribe *VOLVER* para cambiar las fechas.`;
     }
-
-    // Filtrar por capacidad
-    const suitableTypes = availableTypes.filter(type => type.base_capacity >= session.data.totalGuests);
-    
-    if (suitableTypes.length === 0) {
-      return `❌ No hay habitaciones con capacidad para ${session.data.totalGuests} huésped(es) en estas fechas.
-
-Por favor, escribe *VOLVER* para cambiar las fechas o el número de huéspedes.`;
-    }
-
-    // Guardar tipos disponibles en sesión
-    session.data.availableRoomTypes = suitableTypes;
     
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ROOM_TYPE,
+      state: STATES.AWAITING_FLOOR,
       data: session.data
     });
+
+    // Generar menú de pisos
+    const floorMenu = availableFloors.map((floor, index) => {
+      const floorName = floor === 0 ? 'Planta baja' : `Piso ${floor}`;
+      return `${index + 1}. ${floorName}`;
+    }).join('\n');
 
     return `✅ Sin niños menores de 4 años
 👥 Total de huéspedes: ${session.data.totalGuests}
 
-🏨 *Paso 2: Selección de Tipo de Habitación*
+� *Paso 2: Selección de Piso*
 
-${await roomValidator.getAvailableRoomTypesMenu(session.data.checkInDate, session.data.checkOutDate, session.data.totalGuests)}
+${floorMenu}
 
-Selecciona el número del tipo de habitación que deseas.`;
+Selecciona el número del piso donde deseas hospedarte.`;
   }
   
   return `❌ Por favor responde *SÍ* o *NO*`;
@@ -537,25 +551,113 @@ async function handleChildrenState(session, messageText, phoneNumber) {
   session.data.childrenUnder4 = children;
   session.data.totalGuests = session.data.adults + children;
   
-  // Verificar disponibilidad de tipos de habitación para las fechas
+  // Obtener pisos disponibles
+  const availableFloors = await whatsappService.getAvailableFloors(
+    session.data.checkInDate,
+    session.data.checkOutDate
+  );
+  
+  if (availableFloors.length === 0) {
+    return `❌ Lo sentimos, no hay habitaciones disponibles para las fechas seleccionadas (${session.data.checkInDateFormatted} - ${session.data.checkOutDateFormatted}).
+
+Por favor, escribe *VOLVER* para cambiar las fechas.`;
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_FLOOR,
+    data: session.data
+  });
+
+  // Generar menú de pisos
+  const floorMenu = availableFloors.map((floor, index) => {
+    const floorName = floor === 0 ? 'Planta baja' : `Piso ${floor}`;
+    return `${index + 1}. ${floorName}`;
+  }).join('\n');
+
+  return `✅ Niños menores de 4 años: ${children}
+👥 Total de huéspedes: ${session.data.totalGuests}
+
+� *Paso 2: Selección de Piso*
+
+${floorMenu}
+
+Selecciona el número del piso donde deseas hospedarte.`;
+}
+
+/**
+ * Capturar selección de piso
+ */
+async function handleFloorState(session, messageText, phoneNumber) {
+  // Obtener pisos disponibles nuevamente para validar
+  const availableFloors = await whatsappService.getAvailableFloors(
+    session.data.checkInDate,
+    session.data.checkOutDate
+  );
+  
+  if (availableFloors.length === 0) {
+    return `❌ Lo sentimos, no hay habitaciones disponibles.
+
+Por favor, escribe *VOLVER* para cambiar las fechas.`;
+  }
+
+  const input = messageText.trim();
+  const numberInput = parseInt(input);
+  
+  // Validar que el número esté en el rango del menú
+  if (isNaN(numberInput) || numberInput < 1 || numberInput > availableFloors.length) {
+    const floorMenu = availableFloors.map((floor, index) => {
+      const floorName = floor === 0 ? 'Planta baja' : `Piso ${floor}`;
+      return `${index + 1}. ${floorName}`;
+    }).join('\n');
+    
+    return `❌ Por favor, selecciona un número válido:
+
+${floorMenu}`;
+  }
+
+  // Obtener el piso seleccionado (índice - 1)
+  const selectedFloor = availableFloors[numberInput - 1];
+  session.data.selectedFloor = selectedFloor;
+
+  // Ahora verificar tipos de habitación disponibles en ese piso
   const availableTypes = await roomValidator.getAvailableRoomTypes(
     session.data.checkInDate,
     session.data.checkOutDate
   );
   
   if (availableTypes.length === 0) {
-    return `❌ Lo sentimos, no hay habitaciones disponibles para las fechas seleccionadas (${session.data.checkInDateFormatted} - ${session.data.checkOutDateFormatted}).
+    return `❌ Lo sentimos, no hay habitaciones disponibles en el ${selectedFloor === 0 ? 'planta baja' : `piso ${selectedFloor}`}.
 
-Por favor, escribe *VOLVER* para cambiar las fechas.`;
+Por favor, escribe *VOLVER* para seleccionar otro piso.`;
+  }
+
+  // Filtrar tipos que tengan habitaciones en el piso seleccionado
+  const typesOnFloor = [];
+  for (const type of availableTypes) {
+    const roomsOnFloor = await whatsappService.getAvailableRoomsByType(
+      type.id,
+      session.data.checkInDate,
+      session.data.checkOutDate,
+      selectedFloor
+    );
+    if (roomsOnFloor.length > 0) {
+      typesOnFloor.push(type);
+    }
+  }
+
+  if (typesOnFloor.length === 0) {
+    return `❌ No hay tipos de habitación disponibles en el ${selectedFloor === 0 ? 'planta baja' : `piso ${selectedFloor}`}.
+
+Por favor, escribe *VOLVER* para seleccionar otro piso.`;
   }
 
   // Filtrar por capacidad
-  const suitableTypes = availableTypes.filter(type => type.base_capacity >= session.data.totalGuests);
+  const suitableTypes = typesOnFloor.filter(type => type.base_capacity >= session.data.totalGuests);
   
   if (suitableTypes.length === 0) {
-    return `❌ No hay habitaciones con capacidad para ${session.data.totalGuests} huésped(es) en estas fechas.
+    return `❌ No hay habitaciones con capacidad para ${session.data.totalGuests} huésped(es) en el ${selectedFloor === 0 ? 'planta baja' : `piso ${selectedFloor}`}.
 
-Por favor, escribe *VOLVER* para cambiar las fechas o el número de huéspedes.`;
+Por favor, escribe *VOLVER* para seleccionar otro piso o cambiar el número de huéspedes.`;
   }
 
   // Guardar tipos disponibles en sesión
@@ -566,12 +668,20 @@ Por favor, escribe *VOLVER* para cambiar las fechas o el número de huéspedes.`
     data: session.data
   });
 
-  return `✅ Niños menores de 4 años: ${children}
-👥 Total de huéspedes: ${session.data.totalGuests}
+  // Generar menú de tipos de habitación
+  const typeMenu = suitableTypes.map((type, index) => {
+    return `${index + 1}. *${type.name}* - $${type.price?.toLocaleString('es-CL') || 'N/A'}/noche
+   👥 Capacidad: ${type.base_capacity} personas
+   🛏️ ${type.bed_configuration || 'Sin especificar'}`;
+  }).join('\n\n');
 
-🏨 *Paso 2: Selección de Tipo de Habitación*
+  const floorName = selectedFloor === 0 ? 'Planta baja' : `Piso ${selectedFloor}`;
 
-${await roomValidator.getAvailableRoomTypesMenu(session.data.checkInDate, session.data.checkOutDate, session.data.totalGuests)}
+  return `✅ Piso seleccionado: ${floorName}
+
+🏨 *Paso 3: Selección de Tipo de Habitación*
+
+${typeMenu}
 
 Selecciona el número del tipo de habitación que deseas.`;
 }
@@ -622,11 +732,12 @@ Por favor, selecciona otro tipo de habitación o escribe *VOLVER* para cambiar e
   session.data.roomTypeName = selectedType.name;
   session.data.roomInfo = selectedType;
   
-  // Obtener habitaciones específicas disponibles de ese tipo
-  const availableRooms = await roomValidator.getAvailableRoomsByType(
+  // Obtener habitaciones específicas disponibles de ese tipo en el piso seleccionado
+  const availableRooms = await whatsappService.getAvailableRoomsByType(
     selectedType.id,
     session.data.checkInDate,
-    session.data.checkOutDate
+    session.data.checkOutDate,
+    session.data.selectedFloor
   );
 
   if (availableRooms.length === 0) {
@@ -804,6 +915,11 @@ function getConfirmationMessage(data) {
   // Calcular total
   const totalReservation = roomTotal + servicesTotal;
 
+  // Texto de piso
+  const floorText = data.selectedFloor !== undefined && data.selectedFloor !== null 
+    ? (data.selectedFloor === 0 ? 'Planta baja' : `Piso ${data.selectedFloor}`)
+    : 'Por asignar';
+
   return `📋 *Resumen de tu reserva*
 
 👤 *Huésped Principal:*
@@ -818,6 +934,7 @@ function getConfirmationMessage(data) {
    • Noches: ${nights}
    • Habitación: ${data.roomTypeName || data.roomInfo?.name || 'N/A'}
    • Número de habitación: ${data.roomNumber || 'Por asignar'}
+   • Piso: ${floorText}
    • Huéspedes: ${adultsText}${childrenText}
 
 🛎️ *Servicios adicionales:*${servicesText}
