@@ -2,6 +2,8 @@
  * Menú principal del chatbot de WhatsApp
  */
 
+const whatsappService = require('../whatsapp.service');
+
 /**
  * Obtener mensaje de bienvenida
  */
@@ -27,8 +29,31 @@ Escribe el *número* o *nombre* de la opción que deseas.`;
 /**
  * Obtener información del hotel
  */
-function getHotelInfo() {
-  return `🏨 *Hotel Don Teo*
+async function getHotelInfo() {
+  try {
+    // Obtener tipos de habitación desde la base de datos
+    const roomTypes = await whatsappService.getRoomTypes();
+    
+    let roomsList = '';
+    if (roomTypes && roomTypes.length > 0) {
+      roomsList = roomTypes.map(type => {
+        let info = `• *${type.name}*`;
+        if (type.base_capacity) {
+          info += ` - Capacidad: ${type.base_capacity} persona(s)`;
+        }
+        if (type.price) {
+          info += ` - Desde $${type.price.toLocaleString()}`;
+        }
+        if (type.description) {
+          info += `\n  ${type.description}`;
+        }
+        return info;
+      }).join('\n');
+    } else {
+      roomsList = '• Consultar disponibilidad';
+    }
+
+    return `🏨 *Hotel Don Teo*
 
 📍 *Ubicación:*
 Chile, región de Los Lagos, Puerto Montt
@@ -37,13 +62,11 @@ Chile, región de Los Lagos, Puerto Montt
 Hotel familiar con ambiente acogedor y excelente servicio.
 
 🛏️ *Habitaciones:*
-• Standard
-• Doble
-• Suite
+${roomsList}
 
 ⭐ *Servicios:*
 • WiFi gratuito
-• Desayuno incluido
+• Desayuno buffet ($3,000 por persona/noche)
 • Estacionamiento
 • Atención 24/7
 
@@ -52,6 +75,28 @@ Hotel familiar con ambiente acogedor y excelente servicio.
 • Email: info@hoteldonleo.cl
 
 ¿Deseas hacer una *reserva*? Escribe *MENU* para ver las opciones.`;
+  } catch (error) {
+    console.error('Error al obtener información del hotel:', error);
+    return `🏨 *Hotel Don Teo*
+
+📍 *Ubicación:*
+Chile, región de Los Lagos, Puerto Montt
+
+🏢 *Sobre nosotros:*
+Hotel familiar con ambiente acogedor y excelente servicio.
+
+⭐ *Servicios:*
+• WiFi gratuito
+• Desayuno buffet ($3,000 por persona/noche)
+• Estacionamiento
+• Atención 24/7
+
+📞 *Contacto:*
+• WhatsApp: Este número
+• Email: info@hoteldonleo.cl
+
+¿Deseas hacer una *reserva*? Escribe *MENU* para ver las opciones.`;
+  }
 }
 
 /**
@@ -70,12 +115,13 @@ function getHelpMessage() {
 • *MENU* - Ver menú principal
 • *RESERVA* - Iniciar reserva
 • *INFO* - Información del hotel
+• *VOLVER* - Retroceder un paso atras
 • *CANCELAR* - Cancelar proceso actual
 
 *Tips:*
 • Responde con claridad
 • Usa formato DD/MM/AAAA para fechas
-• Si te equivocas, puedes escribir *CANCELAR*
+• Si te equivocas, puedes escribir *Volver*
 
 ¿En qué más puedo ayudarte? Escribe *MENU* para volver al inicio.`;
 }

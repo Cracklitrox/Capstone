@@ -470,11 +470,6 @@ async function handleChildrenState(session, messageText, phoneNumber) {
   session.data.childrenUnder4 = children;
   session.data.totalGuests = session.data.adults + children;
   
-  whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_ROOM_TYPE,
-    data: session.data
-  });
-
   // Verificar disponibilidad de tipos de habitación para las fechas
   const availableTypes = await roomValidator.getAvailableRoomTypes(
     session.data.checkInDate,
@@ -486,6 +481,18 @@ async function handleChildrenState(session, messageText, phoneNumber) {
 
 Por favor, escribe *VOLVER* para cambiar las fechas.`;
   }
+
+  // Filtrar por capacidad
+  const suitableTypes = availableTypes.filter(type => type.base_capacity >= session.data.totalGuests);
+  
+  if (suitableTypes.length === 0) {
+    return `❌ No hay habitaciones con capacidad para ${session.data.totalGuests} huésped(es) en estas fechas.
+
+Por favor, escribe *VOLVER* para cambiar las fechas o el número de huéspedes.`;
+  }
+
+  // Guardar tipos disponibles en sesión
+  session.data.availableRoomTypes = suitableTypes;
   
   whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ROOM_TYPE,
@@ -506,35 +513,57 @@ Selecciona el número del tipo de habitación que deseas.`;
  * Capturar tipo de habitación (solo mostrar tipos disponibles)
  */
 async function handleRoomTypeState(session, messageText, phoneNumber) {
-  const validation = await roomValidator.validateRoomType(messageText);
+  const availableTypes = session.data.availableRoomTypes || [];
   
-  if (!validation.valid) {
-    return validation.message;
+  if (availableTypes.length === 0) {
+    return '❌ Error: No hay tipos de habitación disponibles. Escribe *VOLVER* para reintentar.';
+  }
+
+  const input = messageText.trim();
+  const numberInput = parseInt(input);
+  
+  let selectedType = null;
+  
+  // Validar por número
+  if (!isNaN(numberInput) && numberInput > 0 && numberInput <= availableTypes.length) {
+    selectedType = availableTypes[numberInput - 1];
+  } else {
+    // Intentar por nombre
+    const normalized = input.toLowerCase();
+    selectedType = availableTypes.find(type => 
+      type.name.toLowerCase() === normalized ||
+      type.name.toLowerCase().includes(normalized) ||
+      normalized.includes(type.name.toLowerCase())
+    );
   }
   
-  // Validar capacidad antes de buscar habitaciones
-  const maxCapacity = validation.roomInfo.base_capacity || validation.roomInfo.capacity;
+  if (!selectedType) {
+    return `❌ Opción no válida. Por favor, selecciona un número entre 1 y ${availableTypes.length} o el nombre del tipo de habitación.`;
+  }
+
+  // Validar capacidad
+  const maxCapacity = selectedType.base_capacity;
   if (session.data.totalGuests > maxCapacity) {
-    return `❌ El tipo de habitación *${validation.roomTypeName}* tiene capacidad máxima de *${maxCapacity}* persona(s).
+    return `❌ El tipo de habitación *${selectedType.name}* tiene capacidad máxima de *${maxCapacity}* persona(s).
 
 Has indicado *${session.data.totalGuests}* huéspedes.
 
 Por favor, selecciona otro tipo de habitación o escribe *VOLVER* para cambiar el número de huéspedes.`;
   }
 
-  session.data.roomTypeId = validation.roomTypeId;
-  session.data.roomTypeName = validation.roomTypeName;
-  session.data.roomInfo = validation.roomInfo;
+  session.data.roomTypeId = selectedType.id;
+  session.data.roomTypeName = selectedType.name;
+  session.data.roomInfo = selectedType;
   
   // Obtener habitaciones específicas disponibles de ese tipo
   const availableRooms = await roomValidator.getAvailableRoomsByType(
-    validation.roomTypeId,
+    selectedType.id,
     session.data.checkInDate,
     session.data.checkOutDate
   );
 
   if (availableRooms.length === 0) {
-    return `❌ Lo sentimos, no hay habitaciones *${validation.roomTypeName}* disponibles para las fechas seleccionadas.
+    return `❌ Lo sentimos, no hay habitaciones *${selectedType.name}* disponibles para las fechas seleccionadas.
 
 Por favor, selecciona otro tipo de habitación:
 
@@ -549,7 +578,7 @@ ${await roomValidator.getAvailableRoomTypesMenu(session.data.checkInDate, sessio
     data: session.data
   });
 
-  return `✅ Tipo seleccionado: *${validation.roomTypeName}*
+  return `✅ Tipo seleccionado: *${selectedType.name}*
 📋 Capacidad: ${maxCapacity} persona(s)
 
 🛏️ *Habitaciones disponibles:*
@@ -660,17 +689,32 @@ function getConfirmationMessage(data) {
     ? `\n   ${data.specialRequests}` 
     : '\n   Ninguna';
 
+  // Calcular costos
+  const nights = data.nights || 1;
+  const roomPrice = data.roomInfo?.price || 0;
+  const roomTotal = roomPrice * nights;
+
   // Servicios adicionales
   let servicesText = '\n   Ninguno';
+  let servicesTotal = 0;
+  
   if (data.services && (data.services.laundry || data.services.breakfast)) {
     const servicesList = [];
+    
     if (data.services.laundry) {
       servicesList.push(`Lavandería (${data.services.laundryQuantity} prendas)`);
     }
+    
     if (data.services.breakfast) {
+      const breakfastQty = data.services.breakfastQuantity || 0;
+      const breakfastPrice = 3000; // $3,000 por persona por noche
+      const breakfastTotal = breakfastPrice * breakfastQty * nights;
+      servicesTotal += breakfastTotal;
+      
       const prefs = data.services.breakfastPreferences?.join(', ') || 'Estándar';
-      servicesList.push(`Desayuno (${data.services.breakfastQuantity} personas)\n     Preferencias: ${prefs}`);
+      servicesList.push(`Desayuno (${breakfastQty} personas x ${nights} noches) - $${breakfastTotal.toLocaleString()}\n     Preferencias: ${prefs}`);
     }
+    
     servicesText = '\n   ' + servicesList.join('\n   ');
   }
 
@@ -678,13 +722,20 @@ function getConfirmationMessage(data) {
   let additionalGuestsText = '\n   Ninguno';
   if (data.additionalGuests && data.additionalGuests.length > 0) {
     const guestsList = data.additionalGuests.map((guest, index) => {
-      return `${index + 2}. ${guest.name}\n     RUT: ${guest.rut}\n     Email: ${guest.email}\n     Teléfono: ${guest.phone}`;
+      if (guest.isChild) {
+        return `${index + 2}. ${guest.name} (Niño <4 años)\n     RUT: ${guest.rut}`;
+      } else {
+        return `${index + 2}. ${guest.name}\n     RUT: ${guest.rut}\n     Email: ${guest.email}\n     Teléfono: ${guest.phone}`;
+      }
     });
     additionalGuestsText = '\n   ' + guestsList.join('\n   ');
   }
   
   const adultsText = data.adults ? `${data.adults} adulto(s)` : '';
   const childrenText = data.childrenUnder4 > 0 ? `, ${data.childrenUnder4} niño(s) <4 años` : '';
+
+  // Calcular total
+  const totalReservation = roomTotal + servicesTotal;
 
   return `📋 *Resumen de tu reserva*
 
@@ -697,8 +748,9 @@ function getConfirmationMessage(data) {
 🏨 *Detalles de la reserva:*
    • Entrada: ${data.checkInDateFormatted}
    • Salida: ${data.checkOutDateFormatted}
-   • Noches: ${data.nights}
+   • Noches: ${nights}
    • Habitación: ${data.roomTypeName || data.roomInfo?.name || 'N/A'}
+   • Número de habitación: ${data.roomNumber || 'Por asignar'}
    • Huéspedes: ${adultsText}${childrenText}
 
 🛎️ *Servicios adicionales:*${servicesText}
@@ -706,6 +758,11 @@ function getConfirmationMessage(data) {
 👥 *Huéspedes adicionales:*${additionalGuestsText}
 
 📝 *Solicitudes especiales:*${specialRequests}
+
+💰 *Resumen de Costos:*
+   • Habitación (${nights} noches): $${roomTotal.toLocaleString()}
+   • Servicios adicionales: $${servicesTotal.toLocaleString()}
+   • *TOTAL: $${totalReservation.toLocaleString()}*
 
 ---
 
@@ -885,46 +942,52 @@ async function handleBreakfastState(session, messageText, phoneNumber) {
   if (!session.data.services.breakfastPreferences) {
     session.data.services.breakfastPreferences = [];
   }
+
+  // Obtener items de desayuno desde la base de datos
+  const breakfastItems = await whatsappService.getBreakfastMenuItems();
+  
+  // Guardar items en sesión para validación posterior
+  session.data.breakfastItems = breakfastItems;
   
   whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_BREAKFAST_PREFERENCE,
     data: session.data
   });
+
+  // Construir menú dinámicamente
+  let menu = `✅ Desayuno: ${quantity} persona(s)\n\n🥐 *Preferencias de Desayuno (Opcional)*\n\nPuedes seleccionar varios ingredientes para tu desayuno buffet:\n\n`;
   
-  return `✅ Desayuno: ${quantity} persona(s)
+  if (breakfastItems.length === 0) {
+    menu += 'No hay items de desayuno disponibles en este momento.\n\nResponde *NINGUNO* para continuar.';
+  } else {
+    // Agrupar por categoría si existe
+    const categories = {};
+    breakfastItems.forEach(item => {
+      const cat = item.category || 'Otros';
+      if (!categories[cat]) {
+        categories[cat] = [];
+      }
+      categories[cat].push(item);
+    });
 
-🥐 *Preferencias de Desayuno (Opcional)*
+    let itemNumber = 1;
+    for (const [category, items] of Object.entries(categories)) {
+      menu += `*${category}:*\n`;
+      items.forEach(item => {
+        menu += `${itemNumber}. ${item.name}`;
+        if (item.description) {
+          menu += ` - ${item.description}`;
+        }
+        menu += '\n';
+        itemNumber++;
+      });
+      menu += '\n';
+    }
 
-Puedes seleccionar varios ingredientes para tu desayuno buffet:
+    menu += `Responde con los *números* separados por comas.\nEjemplo: *1,3,5* o *NINGUNO* para continuar.`;
+  }
 
-*Bebidas:*
-1. Café
-2. Té
-3. Jugos naturales
-4. Leche
-
-*Panadería:*
-5. Pan integral
-6. Croissants
-7. Tostadas
-
-*Proteínas:*
-8. Huevos revueltos
-9. Jamón
-10. Queso
-
-*Frutas y Cereales:*
-11. Frutas frescas
-12. Yogurt
-13. Cereales
-
-*Opciones especiales:*
-14. Sin gluten
-15. Vegetariano
-16. Sin lactosa
-
-Responde con los *números* separados por comas.
-Ejemplo: *1,3,5,11* o *NINGUNO* para continuar.`;
+  return menu;
 }
 
 /**
@@ -933,24 +996,8 @@ Ejemplo: *1,3,5,11* o *NINGUNO* para continuar.`;
 async function handleBreakfastPreferenceState(session, messageText, phoneNumber) {
   const normalized = messageText.toLowerCase().trim();
   
-  const breakfastOptions = {
-    1: 'Café',
-    2: 'Té', 
-    3: 'Jugos naturales',
-    4: 'Leche',
-    5: 'Pan integral',
-    6: 'Croissants',
-    7: 'Tostadas',
-    8: 'Huevos revueltos',
-    9: 'Jamón',
-    10: 'Queso',
-    11: 'Frutas frescas',
-    12: 'Yogurt',
-    13: 'Cereales',
-    14: 'Sin gluten',
-    15: 'Vegetariano',
-    16: 'Sin lactosa'
-  };
+  // Obtener items guardados en sesión
+  const breakfastItems = session.data.breakfastItems || [];
   
   if (normalized === 'ninguno' || normalized === 'no' || normalized === 'ninguna') {
     session.data.services.breakfastPreferences = ['Estándar'];
@@ -963,13 +1010,14 @@ async function handleBreakfastPreferenceState(session, messageText, phoneNumber)
     }
     
     // Validar que todos los números estén en el rango
-    const invalidSelections = selections.filter(n => n < 1 || n > 16);
+    const maxNumber = breakfastItems.length;
+    const invalidSelections = selections.filter(n => n < 1 || n > maxNumber);
     if (invalidSelections.length > 0) {
-      return `❌ Algunos números no son válidos. Usa números del 1 al 16.`;
+      return `❌ Algunos números no son válidos. Usa números del 1 al ${maxNumber}.`;
     }
     
-    // Convertir números a nombres
-    session.data.services.breakfastPreferences = selections.map(n => breakfastOptions[n]);
+    // Convertir números a nombres usando los items de la BD
+    session.data.services.breakfastPreferences = selections.map(n => breakfastItems[n - 1].name);
   }
   
   whatsappService.updateSession(phoneNumber, {
@@ -1029,6 +1077,14 @@ async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumb
     if (!session.data.additionalGuests) {
       session.data.additionalGuests = [];
     }
+
+    // Inicializar contador de niños y adultos adicionales
+    if (!session.data.currentChildGuest) {
+      session.data.currentChildGuest = 0;
+    }
+    if (!session.data.currentAdultGuest) {
+      session.data.currentAdultGuest = 0;
+    }
     
     whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
@@ -1037,9 +1093,23 @@ async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumb
     
     const guestNumber = session.data.additionalGuests.length + 2; // +1 por el principal, +1 por el actual
     
-    return `📝 *Huésped ${guestNumber} de ${totalGuests}*
+    // Determinar si es niño o adulto
+    const childrenUnder4 = session.data.childrenUnder4 || 0;
+    const isChild = session.data.currentChildGuest < childrenUnder4;
+    
+    if (isChild) {
+      return `📝 *Niño ${session.data.currentChildGuest + 1} de ${childrenUnder4}* (menor de 4 años)
+
+⚠️ Para niños solo necesitamos:
+• Nombre completo
+• RUT
+
+¿Cuál es el *nombre completo* del niño?`;
+    } else {
+      return `📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
 
 ¿Cuál es el *nombre completo* de este huésped?`;
+    }
   }
   
   return `❌ Por favor responde *CONTINUAR* para registrar los huéspedes adicionales.`;
@@ -1054,10 +1124,14 @@ async function handleAdditionalGuestNameState(session, messageText, phoneNumber)
   if (!validation.valid) {
     return validation.message;
   }
+
+  const childrenUnder4 = session.data.childrenUnder4 || 0;
+  const isChild = session.data.currentChildGuest < childrenUnder4;
   
   // Guardar temporalmente el nombre
   session.data.tempAdditionalGuest = {
-    name: validation.name
+    name: validation.name,
+    isChild: isChild
   };
   
   whatsappService.updateSession(phoneNumber, {
@@ -1101,7 +1175,52 @@ Por favor ingresa un RUT diferente.`;
   }
   
   session.data.tempAdditionalGuest.rut = validation.rut;
+
+  const isChild = session.data.tempAdditionalGuest.isChild;
+
+  // Si es niño, solo pedir nombre y RUT, luego guardar
+  if (isChild) {
+    // Agregar niño a la lista con datos básicos
+    session.data.additionalGuests.push({
+      name: session.data.tempAdditionalGuest.name,
+      rut: session.data.tempAdditionalGuest.rut,
+      isChild: true,
+      email: 'N/A',
+      phone: 'N/A'
+    });
+
+    session.data.currentChildGuest++;
+    delete session.data.tempAdditionalGuest;
+
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_MORE_GUESTS,
+      data: session.data
+    });
+
+    const currentGuestsCount = session.data.additionalGuests.length + 1;
+    const totalGuests = session.data.totalGuests || 1;
+    const remaining = totalGuests - currentGuestsCount;
+
+    if (remaining > 0) {
+      return `✅ Niño registrado
+
+📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
+⚠️ Faltan *${remaining}* huésped(es) por registrar
+
+Responde *CONTINUAR* para agregar el siguiente huésped.`;
+    } else {
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_CONFIRMATION,
+        data: session.data
+      });
+
+      return `✅ ¡Todos los huéspedes registrados! (${currentGuestsCount}/${totalGuests})
+
+${getConfirmationMessage(session.data)}`;
+    }
+  }
   
+  // Si es adulto, continuar con email y teléfono
   whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_EMAIL,
     data: session.data
@@ -1139,7 +1258,7 @@ Formato: +56912345678`;
 }
 
 /**
- * Capturar teléfono de huésped adicional (OBLIGATORIO)
+ * Capturar teléfono de huésped adicional (OBLIGATORIO - solo adultos)
  */
 async function handleAdditionalGuestPhoneState(session, messageText, phoneNumber) {
   const validation = guestValidator.validatePhone(messageText);
@@ -1150,8 +1269,13 @@ async function handleAdditionalGuestPhoneState(session, messageText, phoneNumber
   
   session.data.tempAdditionalGuest.phone = validation.phone;
   
-  // Agregar huésped a la lista
-  session.data.additionalGuests.push({ ...session.data.tempAdditionalGuest });
+  // Agregar adulto a la lista con todos los datos
+  session.data.additionalGuests.push({
+    ...session.data.tempAdditionalGuest,
+    isChild: false
+  });
+
+  session.data.currentAdultGuest++;
   delete session.data.tempAdditionalGuest;
   
   whatsappService.updateSession(phoneNumber, {
@@ -1164,7 +1288,7 @@ async function handleAdditionalGuestPhoneState(session, messageText, phoneNumber
   const remaining = totalGuests - currentGuestsCount;
   
   if (remaining > 0) {
-    return `✅ Huésped ${currentGuestsCount} registrado
+    return `✅ Huésped adulto registrado
 
 📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
 ⚠️ Faltan *${remaining}* huésped(es) por registrar
@@ -1210,10 +1334,24 @@ async function handleMoreGuestsState(session, messageText, phoneNumber) {
     });
     
     const guestNumber = currentGuestsCount + 1;
-    
-    return `📝 *Huésped ${guestNumber} de ${totalGuests}*
+
+    // Determinar si el siguiente huésped es niño o adulto
+    const childrenUnder4 = session.data.childrenUnder4 || 0;
+    const isChild = session.data.currentChildGuest < childrenUnder4;
+
+    if (isChild) {
+      return `📝 *Niño ${session.data.currentChildGuest + 1} de ${childrenUnder4}* (menor de 4 años)
+
+⚠️ Para niños solo necesitamos:
+• Nombre completo
+• RUT
+
+¿Cuál es el *nombre completo* del niño?`;
+    } else {
+      return `📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
 
 ¿Cuál es el *nombre completo* de este huésped?`;
+    }
   }
   
   return `❌ Debes completar el registro de todos los huéspedes.

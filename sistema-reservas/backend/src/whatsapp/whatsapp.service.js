@@ -337,6 +337,34 @@ class WhatsAppService {
   }
 
   /**
+   * Obtener items de desayuno desde la base de datos
+   */
+  async getBreakfastMenuItems() {
+    try {
+      const items = await prisma.breakfast_menu_items.findMany({
+        where: {
+          is_active: true
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          category: true
+        },
+        orderBy: [
+          { category: 'asc' },
+          { name: 'asc' }
+        ]
+      });
+
+      return items;
+    } catch (error) {
+      console.error('❌ Error al obtener items de desayuno:', error);
+      return [];
+    }
+  }
+
+  /**
    * Obtener tipos de habitación disponibles
    */
   async getAvailableRoomTypes() {
