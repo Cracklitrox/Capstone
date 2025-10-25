@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import { fetchAdminRoomTypes } from '../services/adminRooms';
 import {
   LineChart,
   Line,
@@ -57,16 +58,32 @@ const exportToCSV = (data, filename) => {
       return;
     }
 
+    // Asegurarse de que todos los valores estén en formato string y escapados correctamente
     const headers = Object.keys(data[0]);
     const csvContent = [
       headers.join(','),
       ...data.map(row =>
         headers.map(header => {
-          const value = row[header];
-          // Escapar valores que contienen comas
-          if (typeof value === 'string' && value.includes(',')) {
+          let value = row[header];
+          
+          // Convertir valores null o undefined a cadena vacía
+          if (value === null || value === undefined) {
+            return '""';
+          }
+          
+          // Convertir objetos a string JSON
+          if (typeof value === 'object') {
+            value = JSON.stringify(value);
+          }
+          
+          // Convertir el valor a string y escapar caracteres especiales
+          value = String(value).replace(/"/g, '""');
+          
+          // Encerrar en comillas si contiene comas, saltos de línea o comillas
+          if (value.includes(',') || value.includes('\n') || value.includes('"') || value.includes(' ')) {
             return `"${value}"`;
           }
+          
           return value;
         }).join(',')
       )
@@ -246,14 +263,18 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
         pdf.setFontSize(10);
         pdf.text(`Ingresos Totales: ${formatCurrency(data?.revenue?.total || 0)}`, 25, yPosition);
         yPosition += 5;
-        pdf.text(`Ocupación de Habitaciones: ${data?.occupancy?.data?.reduce((sum, d) => sum + (d.occupiedNights || 0), 0)} habitaciones (${data?.occupancy?.average?.toFixed(2) || 0}% del total)`, 25, yPosition);
+        const ocupadas = data?.occupancy?.data?.reduce((sum, d) => sum + (d.occupiedNights || 0), 0) || 0;
+        const disponibles = data?.occupancy?.data?.reduce((sum, d) => sum + (d.availableNights || 0), 0) || 0;
+        pdf.text(`Ocupación de Habitaciones: ${ocupadas} de ${disponibles} habitaciones`, 25, yPosition);
+        pdf.text(`Período: ${format(dateRange.from, "d 'de' MMM yyyy")} al ${format(dateRange.to, "d 'de' MMM yyyy")}`, 25, yPosition + 5);
         yPosition += 5;
         pdf.text(`Habitaciones Disponibles: ${data?.occupancy?.data?.reduce((sum, d) => sum + (d.availableNights || 0), 0)}`, 25, yPosition);
         yPosition += 15;
 
-        // Capturar y añadir cada gráfico
-        for (let section of sections) {
-          const canvas = await html2canvas(section, {
+        // Capturar el contenido principal del reporte
+        const contentElement = previewRef.current;
+        if (contentElement) {
+          const canvas = await html2canvas(contentElement, {
             scale: 2,
             logging: false,
             useCORS: true,
@@ -261,16 +282,18 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
           });
 
           const imgData = canvas.toDataURL('image/png');
-          const imgWidth = 170;
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const imgWidth = pageWidth - 40; // 20mm margen en cada lado
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-          if (yPosition + imgHeight > 270) {
-            pdf.addPage();
-            yPosition = 20;
+          // Si la imagen es más alta que la página, ajustarla
+          if (yPosition + imgHeight > pageHeight - 20) {
+            const scale = (pageHeight - yPosition - 20) / imgHeight;
+            pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth * scale, imgHeight * scale);
+          } else {
+            pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
           }
-
-          pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
-          yPosition += imgHeight + 10;
         }
 
         const fileName = `Reporte_${reportType}_${formatDate(dateRange.from)}_${formatDate(dateRange.to)}.pdf`;
@@ -626,11 +649,14 @@ const CustomReportsSection = () => {
     getRoomCustomReport,
     getRoomTypeCustomReport,
     getTopClientsRevenue,
+    getMonthlyRevenue,
+    getMonthlyOccupancy,
   } = useReportsApi();
 
   const [reportType, setReportType] = useState('client'); // 'client', 'room', 'roomType', 'topClients'
   const [selectedEntity, setSelectedEntity] = useState('');
   const [selectedFloor, setSelectedFloor] = useState(null);
+  const [selectedRoomType, setSelectedRoomType] = useState(null);
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date(),
@@ -643,6 +669,112 @@ const CustomReportsSection = () => {
   const [clients, setClients] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [roomTypes, setRoomTypes] = useState([]);
+  const [filteredRooms, setFilteredRooms] = useState([]);
+
+  // Efecto para filtrar habitaciones cuando cambia el piso seleccionado
+  useEffect(() => {
+    if (selectedFloor) {
+      setFilteredRooms(rooms.filter(room => room.floor === selectedFloor));
+    } else {
+      setFilteredRooms(rooms);
+    }
+  }, [selectedFloor, rooms]);
+
+  // Efecto separado para generar reporte cuando cambia el tipo de habitación
+  useEffect(() => {
+    if (selectedRoomType && reportType === 'roomType') {
+      handleGenerateReport();
+    }
+  }, [selectedRoomType, reportType]);
+
+  // Función para cargar habitaciones basadas en el piso seleccionado
+  const loadRoomsByFloor = async (floor = null) => {
+    try {
+      const url = floor 
+        ? `http://localhost:3001/api/v1/admin/rooms?floor=${floor}`
+        : 'http://localhost:3001/api/v1/admin/rooms';
+      
+      const roomsResponse = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (roomsResponse.ok) {
+        const roomsData = await roomsResponse.json();
+        const rawData = Array.isArray(roomsData) ? roomsData : (roomsData.data || []);
+        const roomsList = rawData
+          .filter(r => r.is_active !== false)
+          .map(r => ({
+            id: r.id,
+            roomNumber: r.room_number || 'S/N',
+            type: r.room_types?.name || 'Sin tipo',
+            floor: r.floor
+          }));
+        setRooms(roomsList);
+      }
+    } catch (error) {
+      console.error('Error al cargar habitaciones:', error);
+      setRooms([]);
+    }
+  };
+
+  // Efecto para recargar habitaciones cuando cambia el piso seleccionado
+  useEffect(() => {
+    loadRoomsByFloor(selectedFloor);
+  }, [selectedFloor]);
+
+  // Efecto para cargar los tipos de habitación
+  useEffect(() => {
+    const loadRoomTypes = async () => {
+      try {
+        console.log('Cargando tipos de habitación...');
+        const response = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Tipos de habitación cargados:', data);
+          // Asegurarse de procesar correctamente la estructura de datos
+          let types;
+          if (Array.isArray(data)) {
+            types = data;
+          } else if (data.data && Array.isArray(data.data)) {
+            types = data.data;
+          } else {
+            types = [];
+          }
+          
+          // Filtrar solo los tipos activos y mapearlos
+          const activeTypes = types
+            .filter(rt => rt.is_active !== false)
+            .map(rt => ({
+              id: rt.id,
+              name: rt.name || 'Sin nombre'
+            }));
+          
+          console.log('Tipos de habitación procesados:', activeTypes);
+          setRoomTypes(activeTypes);
+        } else {
+          console.error('Error al cargar tipos de habitación:', response.status);
+          const errorText = await response.text();
+          console.error('Detalle del error:', errorText);
+        }
+      } catch (error) {
+        console.error('Error al cargar tipos de habitación:', error);
+      }
+    };
+
+    loadRoomTypes();
+    // Recargar cada 30 segundos
+    const interval = setInterval(loadRoomTypes, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Cargar listas reales desde la base de datos
@@ -732,13 +864,19 @@ const CustomReportsSection = () => {
   }, []);
 
   const handleGenerateReport = async () => {
+    if (!dateRange.from || !dateRange.to) {
+      alert('Por favor seleccione un rango de fechas');
+      return;
+    }
+
     setIsLoading(true);
-    const startDate = format(dateRange.from, 'yyyy-MM-dd');
-    const endDate = format(dateRange.to, 'yyyy-MM-dd');
+    setReportData(null); // Limpiar datos anteriores
 
     try {
+      const startDate = format(dateRange.from, 'yyyy-MM-dd');
+      const endDate = format(dateRange.to, 'yyyy-MM-dd');
+      
       let data;
-      // Incluir el filtro de piso en los parámetros de la consulta
       const params = {
         ...(selectedFloor !== null ? { floor: selectedFloor } : {})
       };
@@ -786,47 +924,107 @@ const CustomReportsSection = () => {
   const handleDownload = async (type = 'pdf') => {
     if (!reportData) return;
 
-    if (type === 'pdf') {
-      // Crear documento PDF
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let yPosition = 20;
+    try {
+      if (type === 'pdf') {
+        // Crear documento PDF
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let yPosition = 20;
 
-      // Título
-      pdf.setFontSize(20);
-      pdf.setTextColor(33, 150, 243);
-      pdf.text('Reporte Personalizado', pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 10;
+        try {
+          // Título
+          doc.setFontSize(20);
+          doc.setTextColor(33, 150, 243);
+          doc.text('Reporte Personalizado', pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 10;
 
-      // Período
-      pdf.setFontSize(12);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(
-        `Período: ${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`,
-        pageWidth / 2,
-        yPosition,
-        { align: 'center' }
-      );
-      yPosition += 15;
+          // Período
+          doc.setFontSize(12);
+          doc.setTextColor(100, 100, 100);
+          doc.text(
+            `Período: ${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`,
+            pageWidth / 2,
+            yPosition,
+            { align: 'center' }
+          );
+          yPosition += 15;
 
-      // Contenido según tipo de reporte
-      pdf.setFontSize(14);
-      pdf.setTextColor(0, 0, 0);
-    } else if (type === 'excel') {
+          // Contenido según tipo de reporte
+          doc.setFontSize(14);
+          doc.setTextColor(0, 0, 0);
+
+          // Procesar el contenido según el tipo de reporte
+          if (reportType === 'client' && reportData.data) {
+            const { client, summary, reservations } = reportData.data;
+
+            doc.text(`Cliente: ${client.fullName}`, 20, yPosition);
+            yPosition += 7;
+            doc.setFontSize(10);
+            doc.text(`Email: ${client.email}`, 20, yPosition);
+            yPosition += 5;
+            doc.text(`Teléfono: ${client.phone || 'N/A'}`, 20, yPosition);
+            yPosition += 10;
+
+            doc.setFontSize(12);
+            doc.text('Resumen:', 20, yPosition);
+            yPosition += 7;
+            doc.setFontSize(10);
+            doc.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+            yPosition += 5;
+            doc.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+            yPosition += 5;
+            doc.text(`Noches Totales: ${summary.totalNights}`, 25, yPosition);
+            yPosition += 5;
+            doc.text(`Promedio por Reserva: ${formatCurrency(summary.averageReservationValue)}`, 25, yPosition);
+            yPosition += 10;
+
+            // Agregar tabla de reservaciones si hay datos
+            if (reservations && reservations.length > 0) {
+              autoTable(doc, {
+                startY: yPosition,
+                head: [['Check-in', 'Check-out', 'Noches', 'Total']],
+                body: reservations.map(r => [
+                  format(new Date(r.checkInDate), 'dd/MM/yyyy'),
+                  format(new Date(r.checkOutDate), 'dd/MM/yyyy'),
+                  r.nights.toString(),
+                  formatCurrency(r.totalRevenue)
+                ]),
+                theme: 'grid',
+                headStyles: { fillColor: [33, 150, 243] },
+                margin: { left: 20, right: 20 },
+              });
+            }
+          }
+
+          // Guardar el PDF
+          const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`;
+          doc.save(fileName);
+
+        } catch (pdfError) {
+          console.error('Error al generar el PDF:', pdfError);
+          throw new Error('Error al generar el PDF');
+        }
+      } else if (type === 'excel') {
       // Preparar datos para Excel
       let exportData = [];
 
       if (reportData.data) {
         if (reportType === 'client') {
-          exportData = reportData.data.reservations?.map(r => ({
-            'Fecha Check-in': format(new Date(r.checkInDate), 'dd/MM/yyyy'),
-            'Fecha Check-out': format(new Date(r.checkOutDate), 'dd/MM/yyyy'),
-            'Noches': r.nights,
-            'Habitaciones': r.rooms.map(room => room.roomNumber).join(', '),
-            'Tipo': r.rooms.map(room => room.roomType).join(', '),
-            'Total': r.totalRevenue
-          })) || [];
+          exportData = reportData.data.reservations?.map(r => {
+            // Extraer la información de las habitaciones de manera segura
+            const roomNumbers = Array.isArray(r.rooms) ? r.rooms.map(room => room.roomNumber || 'N/A').join(', ') : 'N/A';
+            const roomTypes = Array.isArray(r.rooms) ? r.rooms.map(room => room.roomType || 'N/A').join(', ') : 'N/A';
+            
+            return {
+              'Fecha Check-in': format(new Date(r.checkInDate), 'dd/MM/yyyy'),
+              'Fecha Check-out': format(new Date(r.checkOutDate), 'dd/MM/yyyy'),
+              'Noches': r.nights || 0,
+              'N° Habitación': roomNumbers,
+              'Tipo de Habitación': roomTypes,
+              'Total': formatCurrency(r.totalRevenue || 0)
+            };
+          }) || [];
         } else if (reportType === 'room' || reportType === 'roomType') {
           exportData = reportData.data.roomsBreakdown?.map(r => ({
             'Habitación': r.roomNumber,
@@ -838,9 +1036,68 @@ const CustomReportsSection = () => {
           })) || [];
         }
 
+        // Agregar resumen al inicio del archivo si hay datos
         if (exportData.length > 0) {
+          const summaryData = [{
+            'Resumen': 'DATOS DEL REPORTE',
+            'Fecha Check-in': '',
+            'Fecha Check-out': '',
+            'Noches': '',
+            'N° Habitación': '',
+            'Tipo de Habitación': '',
+            'Total': ''
+          }, {
+            'Resumen': `Cliente: ${reportData.data.client?.fullName || 'N/A'}`,
+            'Fecha Check-in': '',
+            'Fecha Check-out': '',
+            'Noches': '',
+            'N° Habitación': '',
+            'Tipo de Habitación': '',
+            'Total': ''
+          }, {
+            'Resumen': `Email: ${reportData.data.client?.email || 'N/A'}`,
+            'Fecha Check-in': '',
+            'Fecha Check-out': '',
+            'Noches': '',
+            'N° Habitación': '',
+            'Tipo de Habitación': '',
+            'Total': ''
+          }, {
+            'Resumen': `Teléfono: ${reportData.data.client?.phone || 'N/A'}`,
+            'Fecha Check-in': '',
+            'Fecha Check-out': '',
+            'Noches': '',
+            'N° Habitación': '',
+            'Tipo de Habitación': '',
+            'Total': ''
+          }, {
+            'Resumen': `Total Reservas: ${reportData.data.summary?.totalReservations || 0}`,
+            'Fecha Check-in': '',
+            'Fecha Check-out': '',
+            'Noches': '',
+            'N° Habitación': '',
+            'Tipo de Habitación': '',
+            'Total': ''
+          }, {
+            'Resumen': `Ingresos Totales: ${formatCurrency(reportData.data.summary?.totalRevenue || 0)}`,
+            'Fecha Check-in': '',
+            'Fecha Check-out': '',
+            'Noches': '',
+            'N° Habitación': '',
+            'Tipo de Habitación': '',
+            'Total': ''
+          }, {
+            'Resumen': '',
+            'Fecha Check-in': '',
+            'Fecha Check-out': '',
+            'Noches': '',
+            'N° Habitación': '',
+            'Tipo de Habitación': '',
+            'Total': ''
+          }, ...exportData];
+
           const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`;
-          exportToCSV(exportData, fileName);
+          exportToCSV(summaryData, fileName);
         } else {
           alert('No hay datos para exportar');
         }
@@ -854,31 +1111,31 @@ const CustomReportsSection = () => {
 
         // Generar PDF específico para cliente
         if (type === 'pdf') {
-          pdf.text(`Cliente: ${client.fullName}`, 20, yPosition);
+          doc.text(`Cliente: ${client.fullName}`, 20, yPosition);
           yPosition += 7;
-          pdf.setFontSize(10);
-          pdf.text(`Email: ${client.email}`, 20, yPosition);
+          doc.setFontSize(10);
+          doc.text(`Email: ${client.email}`, 20, yPosition);
           yPosition += 5;
-          pdf.text(`Teléfono: ${client.phone || 'N/A'}`, 20, yPosition);
+          doc.text(`Teléfono: ${client.phone || 'N/A'}`, 20, yPosition);
           yPosition += 10;
 
-          pdf.setFontSize(12);
-          pdf.text('Resumen:', 20, yPosition);
+          doc.setFontSize(12);
+          doc.text('Resumen:', 20, yPosition);
           yPosition += 7;
-          pdf.setFontSize(10);
-          pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+          doc.setFontSize(10);
+          doc.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+          doc.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Noches Totales: ${summary.totalNights}`, 25, yPosition);
+          doc.text(`Noches Totales: ${summary.totalNights}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Promedio por Reserva: ${formatCurrency(summary.averageReservationValue)}`, 25, yPosition);
+          doc.text(`Promedio por Reserva: ${formatCurrency(summary.averageReservationValue)}`, 25, yPosition);
           yPosition += 10;
 
           // Tabla de reservas
           if (reservations && reservations.length > 0) {
-            pdf.setFontSize(12);
-            pdf.text('Historial de Reservas:', 20, yPosition);
+            doc.setFontSize(12);
+            doc.text('Historial de Reservas:', 20, yPosition);
             yPosition += 7;
 
             const tableData = reservations.map(r => [
@@ -889,7 +1146,7 @@ const CustomReportsSection = () => {
             ]);
 
             // Usar la importación de autoTable
-            autoTable(pdf, {
+            autoTable(doc, {
               startY: yPosition,
               head: [['Check-in', 'Check-out', 'Noches', 'Total']],
               body: tableData,
@@ -904,56 +1161,56 @@ const CustomReportsSection = () => {
 
         // Generar PDF específico para habitación
         if (type === 'pdf') {
-          pdf.text(`Habitación: ${room.roomNumber}`, 20, yPosition);
+          doc.text(`Habitación: ${room.roomNumber}`, 20, yPosition);
           yPosition += 7;
-          pdf.setFontSize(10);
-          pdf.text(`Tipo: ${room.roomType}`, 20, yPosition);
+          doc.setFontSize(10);
+          doc.text(`Tipo: ${room.roomType}`, 20, yPosition);
           yPosition += 5;
-          pdf.text(`Piso: ${room.floor}`, 20, yPosition);
+          doc.text(`Piso: ${room.floor}`, 20, yPosition);
           yPosition += 10;
 
-          pdf.setFontSize(12);
-          pdf.text('Resumen:', 20, yPosition);
+          doc.setFontSize(12);
+          doc.text('Resumen:', 20, yPosition);
           yPosition += 7;
-          pdf.setFontSize(10);
-          pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+          doc.setFontSize(10);
+          doc.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+          doc.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
+          doc.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
+          doc.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
         }
       } else if (reportType === 'roomType' && reportData.data) {
         const { roomType, summary, roomsBreakdown } = reportData.data;
 
         // Generar PDF específico para tipo de habitación
         if (type === 'pdf') {
-          pdf.text(`Tipo de Habitación: ${roomType.name}`, 20, yPosition);
+          doc.text(`Tipo de Habitación: ${roomType.name}`, 20, yPosition);
           yPosition += 7;
-          pdf.setFontSize(10);
-          pdf.text(`Total de habitaciones de este tipo: ${roomType.totalRooms}`, 20, yPosition);
+          doc.setFontSize(10);
+          doc.text(`Total de habitaciones de este tipo: ${roomType.totalRooms}`, 20, yPosition);
           yPosition += 10;
 
-          pdf.setFontSize(12);
-          pdf.text('Resumen:', 20, yPosition);
+          doc.setFontSize(12);
+          doc.text('Resumen:', 20, yPosition);
           yPosition += 7;
-          pdf.setFontSize(10);
-          pdf.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
+          doc.setFontSize(10);
+          doc.text(`Total Reservas: ${summary.totalReservations}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
+          doc.text(`Ingresos Totales: ${formatCurrency(summary.totalRevenue)}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
+          doc.text(`Ocupación: ${summary.occupancyRate.toFixed(2)}%`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
+          doc.text(`Tarifa Promedio: ${formatCurrency(summary.averageNightlyRate)}`, 25, yPosition);
           yPosition += 5;
-          pdf.text(`RevPAR: ${formatCurrency(summary.revPAR)}`, 25, yPosition);
+          doc.text(`RevPAR: ${formatCurrency(summary.revPAR)}`, 25, yPosition);
           yPosition += 10;
 
           // Tabla de desglose por habitación
           if (roomsBreakdown && roomsBreakdown.length > 0) {
-            pdf.setFontSize(12);
-            pdf.text('Desglose por Habitaciones:', 20, yPosition);
+            doc.setFontSize(12);
+            doc.text('Desglose por Habitaciones:', 20, yPosition);
             yPosition += 7;
 
             const tableData = roomsBreakdown.map(r => [
@@ -965,7 +1222,7 @@ const CustomReportsSection = () => {
               `${r.occupancyRate?.toFixed(2) || '0'}%`
             ]);
 
-            autoTable(pdf, {
+            autoTable(doc, {
               startY: yPosition,
               head: [['Habitación', 'Piso', 'Reservas', 'Noches', 'Ingresos', 'Ocupación']],
               body: tableData,
@@ -975,8 +1232,8 @@ const CustomReportsSection = () => {
             });
           }
         }
-        pdf.setFontSize(12);
-        pdf.text('Desglose por Habitación:', 20, yPosition);
+        doc.setFontSize(12);
+        doc.text('Desglose por Habitación:', 20, yPosition);
         yPosition += 7;
 
         const tableData = roomsBreakdown.map(r => [
@@ -987,7 +1244,7 @@ const CustomReportsSection = () => {
           formatCurrency(r.revenue)
         ]);
 
-        autoTable(pdf, {
+        autoTable(doc, {
           startY: yPosition,
           head: [['Habitación', 'Piso', 'Reservas', 'Noches', 'Ingresos']],
           body: tableData,
@@ -999,11 +1256,11 @@ const CustomReportsSection = () => {
     } else if (reportType === 'topClients' && reportData.data) {
       const { topClients, totalClients } = reportData.data;
 
-      pdf.text(`Total de Clientes: ${totalClients}`, 20, yPosition);
+      doc.text(`Total de Clientes: ${totalClients}`, 20, yPosition);
       yPosition += 10;
 
-      pdf.setFontSize(12);
-      pdf.text('Top Clientes por Ingresos:', 20, yPosition);
+      doc.setFontSize(12);
+      doc.text('Top Clientes por Ingresos:', 20, yPosition);
       yPosition += 7;
 
       const tableData = topClients.map(c => [
@@ -1013,7 +1270,7 @@ const CustomReportsSection = () => {
         formatCurrency(c.totalRevenue)
       ]);
 
-      autoTable(pdf, {
+      autoTable(doc, {
         startY: yPosition,
         head: [['#', 'Cliente', 'Reservas', 'Ingresos']],
         body: tableData,
@@ -1036,7 +1293,11 @@ const CustomReportsSection = () => {
     } else {
       fileName = `reporte-${reportType}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
     }
-    pdf.save(fileName);
+    doc.save(fileName);
+  } catch (error) {
+    console.error('Error al generar archivo:', error);
+    alert('Error al generar el archivo. Por favor, intenta nuevamente.');
+  }
   };
 
   const formatCurrency = (value) => {
@@ -1157,23 +1418,20 @@ const CustomReportsSection = () => {
                   className="w-full p-3 border rounded-md bg-background text-foreground"
                 >
                   <option value="">Seleccione una Opción</option>
-                  {reportType === 'client' && clients.length > 0 && clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} - {c.email}</option>
-                  ))}
-                  {reportType === 'client' && clients.length === 0 && (
-                    <option disabled>No hay clientes disponibles</option>
+                  {reportType === 'client' && (
+                    clients.length > 0 ? clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} - {c.email}</option>
+                    )) : <option disabled>No hay clientes disponibles</option>
                   )}
-                  {reportType === 'room' && rooms.length > 0 && rooms.map(r => (
-                    <option key={r.id} value={r.id}>Habitación {r.roomNumber} ({r.type})</option>
-                  ))}
-                  {reportType === 'room' && rooms.length === 0 && (
-                    <option disabled>No hay habitaciones disponibles</option>
+                  {reportType === 'room' && (
+                    filteredRooms.length > 0 ? filteredRooms.map(r => (
+                      <option key={r.id} value={r.id}>Habitación {r.roomNumber} ({r.type}) - Piso {r.floor}</option>
+                    )) : <option disabled>No hay habitaciones disponibles</option>
                   )}
-                  {reportType === 'roomType' && roomTypes.length > 0 && roomTypes.map(rt => (
-                    <option key={rt.id} value={rt.id}>{rt.name}</option>
-                  ))}
-                  {reportType === 'roomType' && roomTypes.length === 0 && (
-                    <option disabled>No hay tipos de habitación disponibles</option>
+                  {reportType === 'roomType' && (
+                    roomTypes.length > 0 ? roomTypes.map(rt => (
+                      <option key={rt.id} value={rt.id}>{rt.name}</option>
+                    )) : <option disabled>Cargando tipos de habitación...</option>
                   )}
                 </select>
                 {reportType === 'client' && clients.length === 0 && (
@@ -1461,6 +1719,92 @@ const CustomReportsSection = () => {
   );
 };
 
+// Componente de Comparaciones
+const ComparisonsSection = () => {
+  const [compareType, setCompareType] = useState('days'); // days, months, rooms, clients
+  const [dateRange1, setDateRange1] = useState({ from: null, to: null });
+  const [dateRange2, setDateRange2] = useState({ from: null, to: null });
+  const [compareData, setCompareData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleCompare = async () => {
+    setIsLoading(true);
+    try {
+      // Aquí irían las llamadas a la API según el tipo de comparación
+      const period1Data = await getPeriodData(dateRange1.from, dateRange1.to);
+      const period2Data = await getPeriodData(dateRange2.from, dateRange2.to);
+      
+      setCompareData({
+        period1: period1Data,
+        period2: period2Data
+      });
+    } catch (error) {
+      console.error('Error al generar comparación:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Comparación de Períodos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-4">
+              <Label>Tipo de Comparación</Label>
+              <select
+                value={compareType}
+                onChange={(e) => setCompareType(e.target.value)}
+                className="w-full p-2 border rounded"
+              >
+                <option value="days">Día vs Día</option>
+                <option value="months">Mes vs Mes</option>
+                <option value="rooms">Habitaciones</option>
+                <option value="clients">Clientes</option>
+              </select>
+            </div>
+
+            <div className="space-y-4">
+              <Label>Primer Período</Label>
+              <Calendar
+                mode="range"
+                selected={dateRange1}
+                onSelect={setDateRange1}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <Label>Segundo Período</Label>
+              <Calendar
+                mode="range"
+                selected={dateRange2}
+                onSelect={setDateRange2}
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={handleCompare}
+            disabled={isLoading}
+            className="mt-4"
+          >
+            {isLoading ? 'Comparando...' : 'Generar Comparación'}
+          </Button>
+
+          {compareData && (
+            <div className="mt-6">
+              {/* Aquí irían los gráficos y tablas de comparación */}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 const Reports = () => {
   const {
     getHourlyRevenue,
@@ -1490,8 +1834,8 @@ const Reports = () => {
   const [selectedReportType, setSelectedReportType] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
   const [selectedFloor, setSelectedFloor] = useState(null);
-  const [selectedRoomType, setSelectedRoomType] = useState(null);
   const [roomTypes, setRoomTypes] = useState([]);
+  const [selectedRoomType, setSelectedRoomType] = useState(null);
   const [channelData, setChannelData] = useState([]);
   const [filterMode, setFilterMode] = useState('calendar'); // 'calendar' o 'rolling'
   const [expandedReportType, setExpandedReportType] = useState(null);
@@ -2226,44 +2570,18 @@ const Reports = () => {
     loadRoomTypes();
   }, []);
 
-  // Cargar datos de canal (simulado - en producción vendría del backend)
+  // Cargar datos de canal (usando datos de ejemplo mientras se implementa el endpoint)
   useEffect(() => {
-    // En producción esto debería venir del backend
     const loadChannelData = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/v1/analytics/channel-stats', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const channelsData = await response.json();
-          setChannelData(channelsData.data || []);
-        } else {
-          // Si hay error o no hay datos, usar datos de respaldo
-          const channels = [
-            { name: 'ChatBot/WhatsApp', value: 31, color: COLORS[0] },
-            { name: 'Web', value: 25, color: COLORS[1] },
-            { name: 'Presencial', value: 20, color: COLORS[2] },
-            { name: 'Telefónico', value: 15, color: COLORS[3] },
-            { name: 'Walk-in', value: 9, color: COLORS[4] },
-          ];
-          setChannelData(channels);
-        }
-      } catch (error) {
-        console.error('Error al cargar datos de canales:', error);
-        // Usar datos de respaldo en caso de error
-        const channels = [
-          { name: 'ChatBot/WhatsApp', value: 31, color: COLORS[0] },
-          { name: 'Web', value: 25, color: COLORS[1] },
-          { name: 'Presencial', value: 20, color: COLORS[2] },
-          { name: 'Telefónico', value: 15, color: COLORS[3] },
-          { name: 'Walk-in', value: 9, color: COLORS[4] },
-        ];
-        setChannelData(channels);
-      }
+      // Usar datos de ejemplo mientras se implementa el endpoint real
+      const mockChannels = [
+        { name: 'ChatBot/WhatsApp', value: 31, color: COLORS[0] },
+        { name: 'Web', value: 25, color: COLORS[1] },
+        { name: 'Presencial', value: 20, color: COLORS[2] },
+        { name: 'Telefónico', value: 15, color: COLORS[3] },
+        { name: 'Walk-in', value: 9, color: COLORS[4] },
+      ];
+      setChannelData(mockChannels);
     };
 
     loadChannelData();
@@ -2278,7 +2596,7 @@ const Reports = () => {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="custom" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
