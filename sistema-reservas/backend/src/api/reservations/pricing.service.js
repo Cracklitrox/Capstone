@@ -56,6 +56,9 @@ async function calculateRoomPrice(roomId, checkInDate, checkOutDate) {
 
 /**
  * Calcular precio de servicio
+ * NOTA: Con el nuevo modelo room_service_daily, el frontend ya calcula
+ * la quantity multiplicada por el número de fechas específicas.
+ * Por eso usamos quantity directamente sin multiplicar por nights.
  */
 async function calculateServicePrice(serviceId, quantity, nights, guests, customPrice = null) {
   const service = await prisma.services.findUnique({
@@ -66,6 +69,7 @@ async function calculateServicePrice(serviceId, quantity, nights, guests, custom
     throw new Error(`Servicio ${serviceId} no encontrado`);
   }
 
+  // ✅ Para servicios custom, usar precio y quantity directamente
   if (service.unit === 'custom' && customPrice !== null) {
     return {
       serviceId: service.id,
@@ -78,29 +82,34 @@ async function calculateServicePrice(serviceId, quantity, nights, guests, custom
   }
 
   let subtotal = 0;
-  
+  let unitPrice = service.price;
+
   switch (service.unit) {
     case 'per_night':
-      subtotal = service.price * nights;
+      // ✅ quantity ya viene multiplicada por número de noches desde el frontend
+      subtotal = unitPrice * quantity;
       break;
     case 'per_person':
-      subtotal = service.price * guests * nights;
+      // ✅ quantity ya viene multiplicada por (huéspedes × noches) desde el frontend
+      subtotal = unitPrice * quantity;
       break;
     case 'per_room':
-      subtotal = service.price * quantity;
+      // ✅ quantity es la cantidad exacta
+      subtotal = unitPrice * quantity;
       break;
     case 'per_unit':
-      subtotal = service.price * quantity;
+      // ✅ quantity es la cantidad exacta
+      subtotal = unitPrice * quantity;
       break;
     default:
-      subtotal = service.price;
+      subtotal = unitPrice;
   }
 
   return {
     serviceId: service.id,
     serviceName: service.name,
     unit: service.unit,
-    unitPrice: service.price,
+    unitPrice: unitPrice,
     quantity,
     subtotal,
   };

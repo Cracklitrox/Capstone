@@ -2,7 +2,7 @@
 CREATE TYPE "public"."alert_status_enum" AS ENUM ('pending', 'resolved', 'ignored');
 
 -- CreateEnum
-CREATE TYPE "public"."alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest');
+CREATE TYPE "public"."alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest', 'booking_request');
 
 -- CreateEnum
 CREATE TYPE "public"."error_severity_enum" AS ENUM ('low', 'medium', 'high', 'critical');
@@ -38,7 +38,7 @@ CREATE TYPE "public"."payment_status_enum" AS ENUM ('pending', 'confirmed', 'rej
 CREATE TYPE "public"."reservation_channel_enum" AS ENUM ('chatbot', 'reception', 'in_person', 'walk_in', 'web');
 
 -- CreateEnum
-CREATE TYPE "public"."reservation_status_enum" AS ENUM ('pending', 'confirmed', 'in_progress', 'canceled', 'completed', 'no_show');
+CREATE TYPE "public"."reservation_status_enum" AS ENUM ('pending', 'confirmed', 'ready_for_checkin', 'in_progress', 'pending_checkout', 'canceled', 'completed', 'no_show');
 
 -- CreateEnum
 CREATE TYPE "public"."role_name_enum" AS ENUM ('administrator', 'receptionist', 'guest');
@@ -57,6 +57,12 @@ CREATE TYPE "public"."action_type_enum" AS ENUM ('CREATE_RESERVATION', 'UPDATE_R
 
 -- CreateEnum
 CREATE TYPE "public"."organization_type_enum" AS ENUM ('empresa', 'institucion_educativa', 'institucion_gubernamental', 'ong', 'tour_operador', 'agencia_viajes', 'evento_corporativo', 'otro');
+
+-- CreateEnum
+CREATE TYPE "public"."payment_type_enum" AS ENUM ('full', 'half_upfront', 'daily');
+
+-- CreateEnum
+CREATE TYPE "public"."additional_charge_enum" AS ENUM ('minibar', 'room_damage', 'extra_service', 'penalty', 'other');
 
 -- CreateTable
 CREATE TABLE "public"."activity_logs" (
@@ -170,6 +176,7 @@ CREATE TABLE "public"."payments" (
     "id" SERIAL NOT NULL,
     "reservation_id" INTEGER NOT NULL,
     "payment_method" "public"."payment_method_enum",
+    "payment_type" "public"."payment_type_enum" DEFAULT 'full',
     "status" "public"."payment_status_enum" DEFAULT 'pending',
     "amount" INTEGER NOT NULL,
     "is_deposit" BOOLEAN DEFAULT false,
@@ -256,6 +263,7 @@ CREATE TABLE "public"."reservations" (
     "guest_count" INTEGER NOT NULL,
     "total_amount" INTEGER,
     "paid_amount" INTEGER DEFAULT 0,
+    "payment_blocked" BOOLEAN DEFAULT false,
     "receptionist_id" INTEGER,
     "booking_type" VARCHAR(20) DEFAULT 'individual',
     "booking_group_id" INTEGER,
@@ -475,6 +483,56 @@ CREATE TABLE "public"."room_guest_assignments" (
     CONSTRAINT "room_guest_assignments_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "public"."system_settings" (
+    "id" SERIAL NOT NULL,
+    "setting_key" VARCHAR(100) NOT NULL,
+    "setting_value" TEXT NOT NULL,
+    "description" TEXT,
+    "data_type" VARCHAR(20) NOT NULL DEFAULT 'string',
+    "category" VARCHAR(50),
+    "is_editable" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(6) NOT NULL,
+    "updated_by_id" INTEGER,
+
+    CONSTRAINT "system_settings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."reservation_history" (
+    "id" SERIAL NOT NULL,
+    "reservation_id" INTEGER NOT NULL,
+    "change_type" VARCHAR(50) NOT NULL,
+    "field_changed" VARCHAR(100),
+    "old_value" TEXT,
+    "new_value" TEXT,
+    "changed_by_user_id" INTEGER,
+    "change_reason" TEXT,
+    "metadata" JSONB,
+    "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "reservation_history_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."additional_charges" (
+    "id" SERIAL NOT NULL,
+    "reservation_id" INTEGER NOT NULL,
+    "room_id" INTEGER,
+    "service_id" INTEGER,
+    "charge_type" "public"."additional_charge_enum" NOT NULL,
+    "description" VARCHAR(250) NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
+    "subtotal" INTEGER NOT NULL,
+    "charged_by_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted_at" TIMESTAMP(6),
+
+    CONSTRAINT "additional_charges_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "promotions_code_key" ON "public"."promotions"("code");
 
@@ -507,6 +565,15 @@ CREATE UNIQUE INDEX "user_preferences_user_id_key" ON "public"."user_preferences
 
 -- CreateIndex
 CREATE INDEX "room_guest_assignments_reservation_room_id_guest_id_deleted_idx" ON "public"."room_guest_assignments"("reservation_room_id", "guest_id", "deleted_at", "valid_to");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "system_settings_setting_key_key" ON "public"."system_settings"("setting_key");
+
+-- CreateIndex
+CREATE INDEX "reservation_history_reservation_id_created_at_idx" ON "public"."reservation_history"("reservation_id", "created_at");
+
+-- CreateIndex
+CREATE INDEX "reservation_history_change_type_idx" ON "public"."reservation_history"("change_type");
 
 -- AddForeignKey
 ALTER TABLE "public"."activity_logs" ADD CONSTRAINT "activity_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
@@ -627,3 +694,24 @@ ALTER TABLE "public"."room_guest_assignments" ADD CONSTRAINT "room_guest_assignm
 
 -- AddForeignKey
 ALTER TABLE "public"."room_guest_assignments" ADD CONSTRAINT "room_guest_assignments_changed_by_user_id_fkey" FOREIGN KEY ("changed_by_user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."system_settings" ADD CONSTRAINT "system_settings_updated_by_id_fkey" FOREIGN KEY ("updated_by_id") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "public"."reservation_history" ADD CONSTRAINT "reservation_history_reservation_id_fkey" FOREIGN KEY ("reservation_id") REFERENCES "public"."reservations"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "public"."reservation_history" ADD CONSTRAINT "reservation_history_changed_by_user_id_fkey" FOREIGN KEY ("changed_by_user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "public"."additional_charges" ADD CONSTRAINT "additional_charges_reservation_id_fkey" FOREIGN KEY ("reservation_id") REFERENCES "public"."reservations"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "public"."additional_charges" ADD CONSTRAINT "additional_charges_room_id_fkey" FOREIGN KEY ("room_id") REFERENCES "public"."rooms"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "public"."additional_charges" ADD CONSTRAINT "additional_charges_service_id_fkey" FOREIGN KEY ("service_id") REFERENCES "public"."services"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "public"."additional_charges" ADD CONSTRAINT "additional_charges_charged_by_id_fkey" FOREIGN KEY ("charged_by_id") REFERENCES "public"."users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;

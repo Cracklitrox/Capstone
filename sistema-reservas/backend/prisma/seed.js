@@ -41,11 +41,14 @@ async function cleanDatabase() {
   await prisma.alert_read_status.deleteMany({});
   await prisma.maintenance_tasks.deleteMany({});
   await prisma.alerts.deleteMany({});
+  await prisma.reservation_history.deleteMany({});
+  await prisma.additional_charges.deleteMany({});
   await prisma.system_errors.deleteMany({});
   await prisma.activity_logs.deleteMany({});
   await prisma.cleaning_records.deleteMany({});
   await prisma.reservation_promotions.deleteMany({});
   await prisma.room_service_daily.deleteMany({});
+  await prisma.room_guest_assignments.deleteMany({});
   await prisma.reservation_services.deleteMany({});
   await prisma.reservation_rooms.deleteMany({});
   await prisma.payments.deleteMany({});
@@ -63,6 +66,7 @@ async function cleanDatabase() {
   await prisma.services.deleteMany({});
   await prisma.promotions.deleteMany({});
   await prisma.seasons.deleteMany({});
+  await prisma.system_settings.deleteMany({});
   await prisma.booking_groups.deleteMany({});
   await prisma.roles.deleteMany({});
 
@@ -304,6 +308,148 @@ async function createCoreData() {
     }));
 
   console.log(`✅ Temporadas creadas: 2`);
+
+  // System Settings
+  console.log("⚙️  Creando configuraciones del sistema...");
+
+  const systemSettings = await prisma.system_settings.createMany({
+    data: [
+      // Horarios de Check-in/Check-out
+      {
+        setting_key: 'checkin_start_time',
+        setting_value: '11:00',
+        description: 'Hora de inicio de check-in',
+        data_type: 'time',
+        category: 'schedule',
+        is_editable: true,
+      },
+      {
+        setting_key: 'checkin_end_time',
+        setting_value: '15:00',
+        description: 'Hora límite de check-in (después se marca no-show)',
+        data_type: 'time',
+        category: 'schedule',
+        is_editable: true,
+      },
+      {
+        setting_key: 'checkout_start_time',
+        setting_value: '09:00',
+        description: 'Hora de inicio de check-out',
+        data_type: 'time',
+        category: 'schedule',
+        is_editable: true,
+      },
+      {
+        setting_key: 'checkout_end_time',
+        setting_value: '11:00',
+        description: 'Hora límite de check-out',
+        data_type: 'time',
+        category: 'schedule',
+        is_editable: true,
+      },
+
+      // Tiempos de transición automática
+      {
+        setting_key: 'noshow_hours_after_checkin',
+        setting_value: '2',
+        description: 'Horas después del check-in para marcar no-show',
+        data_type: 'number',
+        category: 'schedule',
+        is_editable: true,
+      },
+      {
+        setting_key: 'pending_expiry_hours',
+        setting_value: '2',
+        description: 'Horas límite para confirmar pago de reservas pending',
+        data_type: 'number',
+        category: 'payments',
+        is_editable: true,
+      },
+
+      // Políticas de cancelación
+      {
+        setting_key: 'cancellation_free_days',
+        setting_value: '7',
+        description: 'Días de anticipación para cancelación sin cargo (100% reembolso)',
+        data_type: 'number',
+        category: 'policies',
+        is_editable: true,
+      },
+      {
+        setting_key: 'cancellation_partial_days',
+        setting_value: '3',
+        description: 'Días de anticipación para cancelación con cargo parcial (50% reembolso)',
+        data_type: 'number',
+        category: 'policies',
+        is_editable: true,
+      },
+
+      // Políticas de pago
+      {
+        setting_key: 'require_full_payment_checkin',
+        setting_value: 'false',
+        description: '¿Requiere pago completo antes de check-in?',
+        data_type: 'boolean',
+        category: 'payments',
+        is_editable: true,
+      },
+      {
+        setting_key: 'min_deposit_percentage',
+        setting_value: '50',
+        description: 'Porcentaje mínimo de depósito',
+        data_type: 'number',
+        category: 'payments',
+        is_editable: true,
+      },
+
+      // Configuraciones de extensión
+      {
+        setting_key: 'allow_room_change_extension',
+        setting_value: 'true',
+        description: '¿Permitir cambio de habitación durante extensión?',
+        data_type: 'boolean',
+        category: 'extensions',
+        is_editable: true,
+      },
+      {
+        setting_key: 'allow_guest_change_extension',
+        setting_value: 'false',
+        description: '¿Permitir cambio de huéspedes durante extensión?',
+        data_type: 'boolean',
+        category: 'extensions',
+        is_editable: true,
+      },
+
+      // Configuraciones generales
+      {
+        setting_key: 'timezone',
+        setting_value: 'America/Santiago',
+        description: 'Zona horaria del hotel',
+        data_type: 'string',
+        category: 'general',
+        is_editable: false,
+      },
+      {
+        setting_key: 'currency',
+        setting_value: 'CLP',
+        description: 'Moneda del hotel',
+        data_type: 'string',
+        category: 'general',
+        is_editable: false,
+      },
+      {
+        setting_key: 'hotel_name',
+        setting_value: 'Hotel Don Teo',
+        description: 'Nombre del hotel',
+        data_type: 'string',
+        category: 'general',
+        is_editable: false,
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log(`✅ Configuraciones del sistema creadas: ${systemSettings.count}`);
 
   return {
     roles: { adminRole, receptionistRole, guestRole },

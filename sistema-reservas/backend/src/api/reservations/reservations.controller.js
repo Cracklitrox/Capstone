@@ -1,6 +1,7 @@
 const reservationsService = require("./reservations.service");
 const availabilityService = require("./availability.service");
 const pricingService = require("./pricing.service");
+const statusService = require("./status.service");
 const { logError } = require("../../utils/errorLogger");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
@@ -146,6 +147,32 @@ async function createReservation(req, res) {
       });
     }
 
+    // Validar paymentType
+    if (!reservationData.paymentType) {
+      return res.status(400).json({
+        message: "Tipo de pago es requerido (full, half_upfront, daily)",
+      });
+    }
+
+    const validPaymentTypes = ['full', 'half_upfront', 'daily'];
+    if (!validPaymentTypes.includes(reservationData.paymentType)) {
+      return res.status(400).json({
+        message: "Tipo de pago inválido. Debe ser: full, half_upfront o daily",
+      });
+    }
+
+    // VALIDACIÓN ESPECIAL: Reservas de 1 día deben ser pago completo
+    const checkIn = new Date(reservationData.checkInDate);
+    const checkOut = new Date(reservationData.checkOutDate);
+    const diffTime = Math.abs(checkOut - checkIn);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1 && reservationData.paymentType !== 'full') {
+      return res.status(400).json({
+        message: "Las reservas de 1 día deben pagarse completas (paymentType: 'full')",
+      });
+    }
+
     const result = await reservationsService.createReservation(
       reservationData,
       receptionistId,
@@ -265,10 +292,242 @@ async function getBreakfastMenu(req, res) {
   }
 }
 
+/**
+ * Cambiar estado de una reserva
+ */
+async function changeStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { newStatus, reason, metadata } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.user_roles[0]?.roles.name || 'guest';
+
+    if (!newStatus) {
+      return res.status(400).json({
+        message: 'El nuevo estado es requerido'
+      });
+    }
+
+    const result = await statusService.changeReservationStatus({
+      reservationId: parseInt(id),
+      newStatus,
+      userId,
+      userRole,
+      reason,
+      metadata
+    });
+
+    return res.status(200).json({
+      message: result.message,
+      reservation: {
+        id: result.reservation.id,
+        code: result.reservation.code,
+        previousStatus: result.previousStatus,
+        currentStatus: result.newStatus
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al cambiar estado:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al cambiar estado de reserva: ${error.message}`,
+      originModule: 'reservations.controller - changeStatus',
+      severity: 'high',
+      errorObject: error
+    });
+
+    return res.status(400).json({
+      message: error.message || 'Error al cambiar estado de reserva'
+    });
+  }
+}
+
+/**
+ * Realizar check-in
+ */
+async function checkIn(req, res) {
+  try {
+    const { id } = req.params;
+    const { reason, metadata } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.user_roles[0]?.roles.name || 'receptionist';
+
+    const result = await statusService.changeReservationStatus({
+      reservationId: parseInt(id),
+      newStatus: 'in_progress',
+      userId,
+      userRole,
+      reason: reason || 'Check-in realizado',
+      metadata
+    });
+
+    return res.status(200).json({
+      message: 'Check-in realizado exitosamente',
+      reservation: {
+        id: result.reservation.id,
+        code: result.reservation.code,
+        status: result.newStatus,
+        roomsOccupied: result.roomsOccupied
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en check-in:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error en check-in: ${error.message}`,
+      originModule: 'reservations.controller - checkIn',
+      severity: 'high',
+      errorObject: error
+    });
+
+    return res.status(400).json({
+      message: error.message || 'Error al realizar check-in'
+    });
+  }
+}
+
+/**
+ * Realizar check-out
+ */
+async function checkOut(req, res) {
+  try {
+    const { id } = req.params;
+    const { reason, metadata } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.user_roles[0]?.roles.name || 'receptionist';
+
+    const result = await statusService.changeReservationStatus({
+      reservationId: parseInt(id),
+      newStatus: 'completed',
+      userId,
+      userRole,
+      reason: reason || 'Check-out realizado',
+      metadata
+    });
+
+    return res.status(200).json({
+      message: 'Check-out realizado exitosamente',
+      reservation: {
+        id: result.reservation.id,
+        code: result.reservation.code,
+        status: result.newStatus,
+        cleaningRecordsCreated: result.cleaningRecordsCreated
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en check-out:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error en check-out: ${error.message}`,
+      originModule: 'reservations.controller - checkOut',
+      severity: 'high',
+      errorObject: error
+    });
+
+    return res.status(400).json({
+      message: error.message || 'Error al realizar check-out'
+    });
+  }
+}
+
+/**
+ * Obtener historial de cambios de una reserva
+ */
+async function getHistory(req, res) {
+  try {
+    const { id } = req.params;
+
+    const history = await statusService.getReservationHistory(parseInt(id));
+
+    return res.status(200).json({
+      reservationId: parseInt(id),
+      history: history.map(h => ({
+        id: h.id,
+        changeType: h.change_type,
+        fieldChanged: h.field_changed,
+        oldValue: h.old_value,
+        newValue: h.new_value,
+        changedBy: h.changed_by_user ? {
+          id: h.changed_by_user.id,
+          name: `${h.changed_by_user.first_name} ${h.changed_by_user.paternal_last_name}`
+        } : null,
+        reason: h.change_reason,
+        metadata: h.metadata,
+        createdAt: h.created_at
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error al obtener historial:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener historial: ${error.message}`,
+      originModule: 'reservations.controller - getHistory',
+      severity: 'medium',
+      errorObject: error
+    });
+
+    return res.status(500).json({
+      message: 'Error al obtener historial de reserva'
+    });
+  }
+}
+
+/**
+ * Obtener transiciones válidas para una reserva
+ */
+async function getValidTransitions(req, res) {
+  try {
+    const { id } = req.params;
+
+    const reservation = await prisma.reservations.findUnique({
+      where: { id: parseInt(id) },
+      select: { status: true }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({
+        message: 'Reserva no encontrada'
+      });
+    }
+
+    const validTransitions = statusService.getValidTransitions(reservation.status);
+
+    return res.status(200).json({
+      currentStatus: reservation.status,
+      validTransitions
+    });
+
+  } catch (error) {
+    console.error('Error al obtener transiciones válidas:', error);
+
+    return res.status(500).json({
+      message: 'Error al obtener transiciones válidas'
+    });
+  }
+}
+
 module.exports = {
   searchAvailability,
   calculatePrice,
   createReservation,
   getAvailableServices,
-  getBreakfastMenu, // NUEVO
+  getBreakfastMenu,
+  // Nuevos endpoints de estado
+  changeStatus,
+  checkIn,
+  checkOut,
+  getHistory,
+  getValidTransitions
 };
