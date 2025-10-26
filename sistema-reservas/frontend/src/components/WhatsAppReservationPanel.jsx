@@ -128,12 +128,12 @@ export function WhatsAppReservationPanel() {
         const additionalGuests = summary.additional_guests || [];
 
         return (
-          <Card key={reservation.id} className="border-l-4 border-l-green-500">
+          <Card key={reservation.id} className="border-l-4 border-l-green-500 dark:border-l-green-400 dark:bg-slate-800">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <MessageSquare className="h-6 w-6 text-green-600" />
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <MessageSquare className="h-6 w-6 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -156,32 +156,32 @@ export function WhatsAppReservationPanel() {
                   <User className="h-4 w-4" />
                   Huésped Principal
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 dark:bg-slate-700/50 p-4 rounded-lg">
                   <div className="flex items-start gap-2">
-                    <User className="h-4 w-4 mt-0.5 text-gray-500" />
+                    <User className="h-4 w-4 mt-0.5 text-gray-500 dark:text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Nombre</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Nombre</p>
                       <p className="font-medium">{guest.name}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Hash className="h-4 w-4 mt-0.5 text-gray-500" />
+                    <Hash className="h-4 w-4 mt-0.5 text-gray-500 dark:text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">RUT</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">RUT</p>
                       <p className="font-medium">{guest.rut}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Mail className="h-4 w-4 mt-0.5 text-gray-500" />
+                    <Mail className="h-4 w-4 mt-0.5 text-gray-500 dark:text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
                       <p className="font-medium">{guest.email || 'No proporcionado'}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Phone className="h-4 w-4 mt-0.5 text-gray-500" />
+                    <Phone className="h-4 w-4 mt-0.5 text-gray-500 dark:text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Teléfono WhatsApp</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Teléfono WhatsApp</p>
                       <p className="font-medium">{guest.phone}</p>
                     </div>
                   </div>
@@ -197,57 +197,57 @@ export function WhatsAppReservationPanel() {
                   Detalles de la Reserva
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="flex items-start gap-2 bg-blue-50 p-3 rounded-lg">
-                    <Calendar className="h-4 w-4 mt-0.5 text-blue-600" />
+                  <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                    <Calendar className="h-4 w-4 mt-0.5 text-blue-600 dark:text-blue-400" />
                     <div>
-                      <p className="text-xs text-gray-600">Check-in</p>
-                      <p className="font-semibold text-blue-600">{res.check_in}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Check-in</p>
+                      <p className="font-semibold text-blue-600 dark:text-blue-400">{res.check_in}</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 bg-orange-50 p-3 rounded-lg">
-                    <Calendar className="h-4 w-4 mt-0.5 text-orange-600" />
+                  <div className="flex items-start gap-2 bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
+                    <Calendar className="h-4 w-4 mt-0.5 text-orange-600 dark:text-orange-400" />
                     <div>
-                      <p className="text-xs text-gray-600">Check-out</p>
-                      <p className="font-semibold text-orange-600">{res.check_out}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Check-out</p>
+                      <p className="font-semibold text-orange-600 dark:text-orange-400">{res.check_out}</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 bg-purple-50 p-3 rounded-lg">
-                    <Clock className="h-4 w-4 mt-0.5 text-purple-600" />
+                  <div className="flex items-start gap-2 bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
+                    <Clock className="h-4 w-4 mt-0.5 text-purple-600 dark:text-purple-400" />
                     <div>
-                      <p className="text-xs text-gray-600">Noches</p>
-                      <p className="font-semibold text-purple-600">{res.nights}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Noches</p>
+                      <p className="font-semibold text-purple-600 dark:text-purple-400">{res.nights}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                  <div className="flex items-start gap-2 bg-gray-50 p-3 rounded-lg">
-                    <Bed className="h-4 w-4 mt-0.5 text-gray-600" />
+                  <div className="flex items-start gap-2 bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg">
+                    <Bed className="h-4 w-4 mt-0.5 text-gray-600 dark:text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Habitación</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Habitación</p>
                       <p className="font-medium">{res.room_type_name}</p>
                       {res.room_number && (
-                        <p className="text-xs text-gray-500">Nº {res.room_number}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Nº {res.room_number}</p>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 bg-gray-50 p-3 rounded-lg">
-                    <Users className="h-4 w-4 mt-0.5 text-gray-600" />
+                  <div className="flex items-start gap-2 bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg">
+                    <Users className="h-4 w-4 mt-0.5 text-gray-600 dark:text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Huéspedes</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Huéspedes</p>
                       <p className="font-medium">
                         {res.adults} adulto{res.adults !== 1 ? 's' : ''}
                         {res.children_under_4 > 0 && `, ${res.children_under_4} niño${res.children_under_4 !== 1 ? 's' : ''} ${'<'}4 años`}
                       </p>
-                      <p className="text-xs text-gray-500">Total: {res.total_guests} personas</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Total: {res.total_guests} personas</p>
                     </div>
                   </div>
                 </div>
 
                 {res.special_requests && (
-                  <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
-                    <p className="text-xs text-amber-700 font-medium mb-1">Solicitudes especiales:</p>
-                    <p className="text-sm text-amber-900">{res.special_requests}</p>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 rounded-lg mt-3">
+                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">Solicitudes especiales:</p>
+                    <p className="text-sm text-amber-900 dark:text-amber-300">{res.special_requests}</p>
                   </div>
                 )}
               </div>
@@ -260,13 +260,13 @@ export function WhatsAppReservationPanel() {
                     <h3 className="font-semibold text-sm mb-3">🛎️ Servicios Adicionales</h3>
                     <div className="space-y-2">
                       {services.laundry && (
-                        <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <div className="flex items-center justify-between bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg">
                           <span className="text-sm">Lavandería</span>
                           <Badge variant="secondary">{services.laundry_quantity} prenda{services.laundry_quantity !== 1 ? 's' : ''}</Badge>
                         </div>
                       )}
                       {services.breakfast && (
-                        <div className="bg-gray-50 p-3 rounded-lg">
+                        <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium">Desayuno</span>
                             <Badge variant="secondary">
@@ -275,7 +275,7 @@ export function WhatsAppReservationPanel() {
                           </div>
                           {services.breakfast_preferences && services.breakfast_preferences.length > 0 && (
                             <div className="mt-2">
-                              <p className="text-xs text-gray-500 mb-1">Preferencias:</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Preferencias:</p>
                               <div className="flex flex-wrap gap-1">
                                 {services.breakfast_preferences.map((pref, idx) => (
                                   <Badge key={idx} variant="outline" className="text-xs">
@@ -303,18 +303,18 @@ export function WhatsAppReservationPanel() {
                     </h3>
                     <div className="space-y-2">
                       {additionalGuests.map((guest, idx) => (
-                        <div key={idx} className="bg-gray-50 p-3 rounded-lg">
+                        <div key={idx} className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <p className="font-medium text-sm flex items-center gap-2">
                                 {guest.name}
                                 {guest.is_child && <Badge variant="secondary" className="text-xs">Niño {'<'}4 años</Badge>}
                               </p>
-                              <p className="text-xs text-gray-500 mt-1">RUT: {guest.rut}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">RUT: {guest.rut}</p>
                               {!guest.is_child && (
                                 <>
-                                  <p className="text-xs text-gray-500">Email: {guest.email}</p>
-                                  <p className="text-xs text-gray-500">Teléfono: {guest.phone}</p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Email: {guest.email}</p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Teléfono: {guest.phone}</p>
                                 </>
                               )}
                             </div>
@@ -334,21 +334,21 @@ export function WhatsAppReservationPanel() {
                   <DollarSign className="h-4 w-4" />
                   Resumen de Costos
                 </h3>
-                <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-lg space-y-2">
+                <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 p-4 rounded-lg space-y-2 border border-green-200 dark:border-green-800">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Habitación ({costs.room_nights} noche{costs.room_nights !== 1 ? 's' : ''})</span>
+                    <span className="text-gray-600 dark:text-gray-300">Habitación ({costs.room_nights} noche{costs.room_nights !== 1 ? 's' : ''})</span>
                     <span className="font-medium">${costs.room_total.toLocaleString('es-CL')}</span>
                   </div>
                   {costs.breakfast_total > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Desayuno</span>
+                      <span className="text-gray-600 dark:text-gray-300">Desayuno</span>
                       <span className="font-medium">${costs.breakfast_total.toLocaleString('es-CL')}</span>
                     </div>
                   )}
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>TOTAL</span>
-                    <span className="text-green-600">${costs.total.toLocaleString('es-CL')}</span>
+                    <span className="text-green-600 dark:text-green-400">${costs.total.toLocaleString('es-CL')}</span>
                   </div>
                 </div>
               </div>
