@@ -14,7 +14,7 @@ const guestsRoutes = require("./guests/guests.routes");
 const reservationsRoutes = require("./reservations/reservations.routes");
 const systemRoutes = require("./system/system.routes");
 const notificationsRoutes = require('./notifications/notifications.routes');
-const whatsappRoutes = require('../whatsapp/whatsapp.routes');
+const whatsappRoutes = require('./whatsapp/whatsapp.routes');
 
 const { authenticate } = require("../middleware/auth.middleware");
 

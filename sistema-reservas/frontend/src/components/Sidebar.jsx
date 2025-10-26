@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useSocketNotifications } from "../hooks/useSocketNotifications.js";
@@ -13,7 +13,7 @@ import {
   BellIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, MessageSquare } from "lucide-react";
 
 // Menú principal con submenú para habitaciones
 const navLinks = [
@@ -30,23 +30,36 @@ const navLinks = [
     roles: ["administrator", "receptionist"],
   },
   {
-    href: "/checkout-alerts",
-    label: "Check-outs Hoy",
-    icon: BellAlertIcon,
-    roles: ["administrator", "receptionist"],
-    showBadge: true,
-  },
-  {
     href: "/guests",
     label: "Huéspedes",
     icon: UserGroupIcon,
     roles: ["administrator", "receptionist"],
   },
   {
-    href: "/notifications",
     label: "Notificaciones",
     icon: BellIcon,
     roles: ["administrator", "receptionist"],
+    submenu: [
+      {
+        href: "/notifications",
+        label: "Centro de Notificaciones",
+        icon: BellIcon,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/notifications/checkouts",
+        label: "Check-outs",
+        icon: BellAlertIcon,
+        roles: ["administrator", "receptionist"],
+        showBadge: true,
+      },
+      {
+        href: "/notifications/chatbot",
+        label: "Chatbot WhatsApp",
+        icon: MessageSquare,
+        roles: ["administrator", "receptionist"],
+      },
+    ],
   },
   {
     label: "Gestionar Habitaciones",
@@ -130,10 +143,20 @@ const NavLink = ({
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { user } = useAuth();
   const closeSidebar = () => setSidebarOpen(false);
-  const [roomsOpen, setRoomsOpen] = useState(false);
+  const [openMenus, setOpenMenus] = useState({
+    'gestionar-habitaciones': false,
+    'notificaciones': false,
+  });
   
   // ⭐ Usar WebSocket en lugar de polling
   const { checkoutCount, isConnected } = useSocketNotifications();
+
+  const toggleMenu = (menuKey) => {
+    setOpenMenus((prev) => ({
+      ...prev,
+      [menuKey]: !prev[menuKey],
+    }));
+  };
 
   return (
     <>
@@ -168,9 +191,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       <button
                         type="button"
                         className="flex items-center gap-2 font-semibold text-[var(--secondary)] mb-1 w-full focus:outline-none px-2"
-                        onClick={() => setRoomsOpen((open) => !open)}
-                        aria-expanded={roomsOpen}
-                        aria-controls="submenu-habitaciones"
+                        onClick={() => toggleMenu(link.label.toLowerCase().replace(/\s+/g, '-'))}
+                        aria-expanded={openMenus[link.label.toLowerCase().replace(/\s+/g, '-')]}
+                        aria-controls={`submenu-${link.label.toLowerCase().replace(/\s+/g, '-')}`}
                         style={{ minHeight: "40px" }}
                       >
                         {link.icon && (
@@ -178,7 +201,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         )}
                         <span className="flex-1 text-left">{link.label}</span>
                         <svg
-                          className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${roomsOpen ? "rotate-90" : ""}`}
+                          className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${openMenus[link.label.toLowerCase().replace(/\s+/g, '-')] ? "rotate-90" : ""}`}
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -192,9 +215,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         </svg>
                       </button>
                       <ul
-                        id="submenu-habitaciones"
-                        className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${roomsOpen ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}
-                        style={{ maxHeight: roomsOpen ? "200px" : "0px" }}
+                        id={`submenu-${link.label.toLowerCase().replace(/\s+/g, '-')}`}
+                        className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${openMenus[link.label.toLowerCase().replace(/\s+/g, '-')] ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}
+                        style={{ maxHeight: openMenus[link.label.toLowerCase().replace(/\s+/g, '-')] ? "200px" : "0px" }}
                       >
                         {link.submenu
                           .filter((sub) => sub.roles.includes(user.role))
@@ -213,6 +236,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                                   overflowWrap: "break-word",
                                   hyphens: "auto",
                                 }}
+                                badge={sub.showBadge ? checkoutCount : null}
                               />
                             </li>
                           ))}
@@ -225,7 +249,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         label={link.label}
                         icon={link.icon}
                         onClick={closeSidebar}
-                        badge={link.showBadge ? checkoutCount : null}
                       />
                     </li>
                   )

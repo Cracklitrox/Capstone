@@ -1,5 +1,6 @@
 const prisma = require('../db/prisma.client');
 const { getIO } = require('../config/socket');
+const { storeAlertSummary } = require('../api/whatsapp/whatsapp.controller');
 
 // Almacenamiento en memoria para sesiones de chat (temporal)
 // TODO: Migrar a Redis para producción
@@ -173,6 +174,9 @@ class WhatsAppService {
       });
 
       console.log(`✅ Alerta creada con ID: ${alert.id}`);
+
+      // Almacenar el fullSummary en memoria
+      storeAlertSummary(alert.id, fullSummary);
 
       // Notificar a recepcionistas vía Socket.IO con resumen completo
       const io = getIO();
