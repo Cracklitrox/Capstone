@@ -7,7 +7,7 @@ const { authenticate, authorize } = require('../../middleware/auth.middleware');
 // Limitador de tasa para endpoints de reportes
 const reportsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Límite de 100 solicitudes por ventana por IP
+  max: 200, // Límite de 200 solicitudes por ventana por IP (aumentado para pantalla de reportes compleja)
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Demasiadas solicitudes a los reportes. Por favor, inténtalo más tarde.'
@@ -266,6 +266,74 @@ router.get(
   authenticate,
   authorize(['administrator', 'receptionist']),
   reportsController.getTopClientsRevenue
+);
+
+/**
+ * @route GET /api/v1/reports/clients-with-reservations
+ * @desc Obtiene lista de clientes que tienen reservas según filtros aplicados
+ * @query floor, roomTypeId, startDate, endDate
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/clients-with-reservations',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getClientsWithReservations
+);
+
+// ============================================
+// NUEVOS REPORTES ESPECIALIZADOS
+// ============================================
+
+/**
+ * @route GET /api/v1/reports/by-country
+ * @desc Obtiene reporte de reservas agrupadas por país
+ * @query startDate, endDate
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/by-country',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getReportByCountry
+);
+
+/**
+ * @route GET /api/v1/reports/available-countries
+ * @desc Obtiene lista de países únicos registrados en la BD
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/available-countries',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getAvailableCountries
+);
+
+/**
+ * @route GET /api/v1/reports/by-age
+ * @desc Obtiene reporte de reservas agrupadas por rango de edad
+ * @query startDate, endDate, ageRange (opcional)
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/by-age',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getReportByAge
+);
+
+/**
+ * @route GET /api/v1/reports/by-spending
+ * @desc Obtiene reporte de reservas agrupadas por rango de monto
+ * @query startDate, endDate, spendingRange (opcional)
+ * @access Administrador y Recepcionista
+ */
+router.get(
+  '/by-spending',
+  authenticate,
+  authorize(['administrator', 'receptionist']),
+  reportsController.getReportBySpending
 );
 
 module.exports = router;

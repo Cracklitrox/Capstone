@@ -178,7 +178,7 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
   const reservations = await prisma.reservations.findMany({
     where: {
       deleted_at: null,
-      status: { in: ['confirmed', 'in_progress', 'completed'] },
+      status: 'completed',
       OR: [
         {
           check_in_date: { gte: start, lte: end }
@@ -251,23 +251,26 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
   const uniqueClients = new Set(reservations.map(r => r.main_guest_id));
   const totalClients = uniqueClients.size;
 
-  // Identificar clientes nuevos (primera reserva en el período)
+  // Identificar clientes nuevos (primera reserva en el período) - OPTIMIZADO: evitar N+1
   const clientIds = Array.from(uniqueClients);
-  let newClientsCount = 0;
   
-  for (const clientId of clientIds) {
-    const firstReservation = await prisma.reservations.findFirst({
-      where: {
-        main_guest_id: clientId,
-        deleted_at: null
-      },
-      orderBy: { created_at: 'asc' }
-    });
-    
-    if (firstReservation && firstReservation.created_at >= start && firstReservation.created_at <= end) {
-      newClientsCount++;
+  // Obtener TODAS las primeras reservas en una sola consulta
+  const firstReservations = await prisma.reservations.groupBy({
+    by: ['main_guest_id'],
+    where: {
+      main_guest_id: { in: clientIds },
+      deleted_at: null
+    },
+    _min: {
+      created_at: true
     }
-  }
+  });
+  
+  // Contar cuántos clientes tuvieron su primera reserva en el período
+  const newClientsCount = firstReservations.filter(fr => {
+    const firstDate = fr._min.created_at;
+    return firstDate >= start && firstDate <= end;
+  }).length;
 
   // Calcular tasa de cancelación
   const cancelledReservations = await prisma.reservations.count({
@@ -307,6 +310,11 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
   });
   const averageStayDuration = reservationCount > 0 ? totalNights / reservationCount : 0;
 
+  // Calcular total de huéspedes (personas)
+  const totalGuests = reservations.reduce((sum, res) => {
+    return sum + (res.guest_count || 0);
+  }, 0);
+
   const currentKPIs = {
     occupancyRate: parseFloat(occupancyRate.toFixed(2)),
     totalRevenue: Math.round(totalRevenue),
@@ -315,6 +323,7 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
     totalReservations,
     averageStayDuration: parseFloat(averageStayDuration.toFixed(2)),
     totalClients,
+    totalGuests, // Total de personas/huéspedes
     newClients: newClientsCount,
     returningClients: totalClients - newClientsCount,
     cancellationRate: parseFloat(cancellationRate.toFixed(2)),
@@ -406,7 +415,7 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       ],
       reservations: {
         deleted_at: null,
-        status: 'completed' // SOLO reservas completadas
+        status: 'completed'
       }
     },
     include: {
@@ -445,6 +454,11 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       const occupancyRate = totalRooms > 0 ? (occupiedRoomCount / totalRooms) * 100 : 0;
       const uniqueReservations = new Set(reservationsOnThisDay.map(rr => rr.reservation_id));
       
+      // Calcular total de huéspedes (personas)
+      const totalGuests = reservationsOnThisDay.reduce((sum, rr) => {
+        return sum + (rr.reservations?.guest_count || 0);
+      }, 0);
+      
       const period = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
       
       result.push({
@@ -455,7 +469,8 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
         totalRooms,
         occupiedRoomNights: occupiedRoomCount, // Para este día específico
         availableRoomNights: totalRooms - occupiedRoomCount,
-        reservationCount: uniqueReservations.size
+        reservationCount: uniqueReservations.size,
+        totalGuests // Número total de personas
       });
       
       currentDate.setDate(currentDate.getDate() + 1);
@@ -470,6 +485,11 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
   // Calcular métricas para cada grupo
   const result = Object.keys(grouped).sort().map(period => {
     const periodData = grouped[period];
+    
+    // Calcular total de huéspedes (personas)
+    const totalGuests = periodData.reduce((sum, rr) => {
+      return sum + (rr.reservations?.guest_count || 0);
+    }, 0);
     
     // Calcular noches ocupadas en este período
     let occupiedRoomNights = 0;
@@ -515,7 +535,8 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       totalRooms,
       occupiedRoomNights,
       availableRoomNights: totalAvailableNights - occupiedRoomNights,
-      reservationCount: uniqueReservations.size
+      reservationCount: uniqueReservations.size,
+      totalGuests // Número total de personas
     };
   });
 
@@ -593,7 +614,7 @@ function generateAllPeriods(start, end, groupBy) {
 /**
  * Obtiene datos de ingresos agrupados por período
  */
-async function getRevenueData(startDate, endDate, groupBy, includeServices = true) {
+async function getRevenueData(startDate, endDate, groupBy, includeServices = true, roomTypeId = null, floor = null) {
   // Normalizar fechas para incluir todo el día
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
@@ -601,12 +622,27 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
+  // Construir filtros para reservation_rooms según roomTypeId y floor
+  const roomFilters = {};
+  if (roomTypeId || floor) {
+    const roomWhere = {
+      is_active: true,
+      ...(roomTypeId && { room_type_id: roomTypeId }),
+      ...(floor && { floor })
+    };
+    const filteredRooms = await prisma.rooms.findMany({
+      where: roomWhere,
+      select: { id: true }
+    });
+    roomFilters.room_id = { in: filteredRooms.map(r => r.id) };
+  }
+
   // Obtener reservas con pagos en el período - CORREGIDO: considerar cualquier reserva que se superponga
-  // Solo incluir reservas COMPLETADAS (no confirmed ni in_progress)
+  // Incluir solo reservas completadas
   const reservations = await prisma.reservations.findMany({
     where: {
       deleted_at: null,
-      status: 'completed', // SOLO reservas completadas
+      status: 'completed',
       OR: [
         {
           check_in_date: { gte: start, lte: end }
@@ -620,11 +656,22 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
             { check_out_date: { gte: end } }
           ]
         }
-      ]
+      ],
+      ...(Object.keys(roomFilters).length > 0 && {
+        reservation_rooms: {
+          some: {
+            deleted_at: null,
+            ...roomFilters
+          }
+        }
+      })
     },
     include: {
       reservation_rooms: {
-        where: { deleted_at: null }
+        where: { 
+          deleted_at: null,
+          ...roomFilters
+        }
       },
       reservation_services: includeServices ? {
         where: { deleted_at: null }
@@ -767,12 +814,12 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
 async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
   const { start, end } = normalizeDateRange(startDate, endDate);
 
-  // Obtener todos los clientes que tuvieron reservas COMPLETED en el período
+  // Obtener todos los clientes que tuvieron reservas válidas en el período
   const clientReservations = await prisma.reservations.groupBy({
     by: ['main_guest_id'],
     where: {
       deleted_at: null,
-      status: 'completed', // SOLO reservas completadas
+      status: 'completed',
       check_in_date: { gte: start, lte: end }
     },
     _count: {
@@ -795,12 +842,17 @@ async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
         }
       });
 
-      // Obtener reservas COMPLETED del cliente en el período
+      // Si el usuario fue eliminado, saltar este registro
+      if (!user) {
+        return null;
+      }
+
+      // Obtener reservas válidas del cliente en el período
       const reservations = await prisma.reservations.findMany({
         where: {
           main_guest_id: cr.main_guest_id,
           deleted_at: null,
-          status: 'completed', // SOLO reservas completadas
+          status: 'completed',
           check_in_date: { gte: start, lte: end }
         },
         include: {
@@ -871,12 +923,15 @@ async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
     })
   );
 
+  // Filtrar clientes nulos (usuarios eliminados)
+  const validClients = clientsData.filter(client => client !== null);
+
   // Ordenar según el criterio especificado
   const sortField = sortBy === 'revenue' ? 'totalSpent' : 
                     sortBy === 'reservations' ? 'totalReservations' :
                     sortBy === 'frequency' ? 'totalReservations' : 'lastReservation';
 
-  clientsData.sort((a, b) => {
+  validClients.sort((a, b) => {
     if (order === 'asc') {
       return a[sortField] > b[sortField] ? 1 : -1;
     } else {
@@ -885,17 +940,17 @@ async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
   });
 
   // Contar nuevos vs recurrentes
-  const newClientsCount = clientsData.filter(c => {
+  const newClientsCount = validClients.filter(c => {
     if (!c.firstReservation) return false;
     const firstDate = new Date(c.firstReservation);
     return firstDate >= start && firstDate <= end;
   }).length;
 
   return {
-    totalClients: clientsData.length,
+    totalClients: validClients.length,
     newClients: newClientsCount,
-    returningClients: clientsData.length - newClientsCount,
-    clients: clientsData.slice(0, limit)
+    returningClients: validClients.length - newClientsCount,
+    clients: validClients.slice(0, limit)
   };
 }
 
@@ -936,7 +991,7 @@ async function getClientDetail(clientId, startDate = null, endDate = null) {
     where: {
       main_guest_id: clientId,
       deleted_at: null,
-      status: { in: ['confirmed', 'in_progress', 'completed'] },
+      status: 'completed',
       ...dateFilter
     },
     include: {
@@ -1070,7 +1125,7 @@ async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId =
   // Filtro base
   const whereClause = {
     deleted_at: null,
-    status: { in: ['confirmed', 'in_progress', 'completed'] },
+    status: 'completed',
     check_in_date: { gte: start, lte: end },
     ...(clientId && { main_guest_id: clientId })
   };
@@ -1106,21 +1161,26 @@ async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId =
     });
   }
 
-  // Para todos los clientes: separar nuevos vs recurrentes
-  const clientFirstReservations = {};
+  // Para todos los clientes: separar nuevos vs recurrentes - OPTIMIZADO: evitar N+1
+  const uniqueClientIds = [...new Set(reservations.map(r => r.main_guest_id))];
   
-  for (const res of reservations) {
-    if (!clientFirstReservations[res.main_guest_id]) {
-      const firstRes = await prisma.reservations.findFirst({
-        where: {
-          main_guest_id: res.main_guest_id,
-          deleted_at: null
-        },
-        orderBy: { created_at: 'asc' }
-      });
-      clientFirstReservations[res.main_guest_id] = firstRes.created_at;
+  // Obtener TODAS las primeras reservas en una sola consulta
+  const firstReservationsData = await prisma.reservations.groupBy({
+    by: ['main_guest_id'],
+    where: {
+      main_guest_id: { in: uniqueClientIds },
+      deleted_at: null
+    },
+    _min: {
+      created_at: true
     }
-  }
+  });
+  
+  // Crear mapa de primera fecha por cliente
+  const clientFirstReservations = {};
+  firstReservationsData.forEach(fr => {
+    clientFirstReservations[fr.main_guest_id] = fr._min.created_at;
+  });
 
   // Clasificar reservas
   const newClientReservations = [];
@@ -1184,12 +1244,12 @@ async function getClientStats(startDate, endDate) {
 
   const totalClientsCount = allClients.length;
 
-  // Obtener clientes que hicieron reservas COMPLETED en el período (para estadísticas)
+  // Obtener clientes que hicieron reservas válidas en el período (para estadísticas)
   const clientsInPeriod = await prisma.reservations.groupBy({
     by: ['main_guest_id'],
     where: {
       deleted_at: null,
-      status: 'completed', // Solo reservas completadas
+      status: 'completed',
       check_in_date: { gte: start, lte: end }
     },
     _count: {
@@ -1198,17 +1258,13 @@ async function getClientStats(startDate, endDate) {
   });
 
   // Identificar clientes nuevos (registrados en este período)
-  let newClientsCount = 0;
-  let recurringClientsCount = 0;
-
-  for (const client of allClients) {
+  // OPTIMIZADO: usar filter en lugar de bucle (sin await, es síncrono)
+  const newClientsCount = allClients.filter(client => {
     const registrationDate = new Date(client.created_at);
-    if (registrationDate >= start && registrationDate <= end) {
-      newClientsCount++;
-    } else {
-      recurringClientsCount++;
-    }
-  }
+    return registrationDate >= start && registrationDate <= end;
+  }).length;
+  
+  const recurringClientsCount = totalClientsCount - newClientsCount;
 
   // Calcular segmentación por tipo de cliente con colores para el frontend
   const segmentation = [
@@ -1378,7 +1434,11 @@ async function getTopRoomTypes(startDate, endDate, metric) {
               OR: [
                 { start_date: { gte: start, lte: end } },
                 { end_date: { gte: start, lte: end } }
-              ]
+              ],
+              reservations: {
+                deleted_at: null,
+                status: 'completed'
+              }
             }
           }
         }
@@ -1386,7 +1446,7 @@ async function getTopRoomTypes(startDate, endDate, metric) {
     }
   });
 
-  // Calcular estadísticas por tipo
+  // Calcular estadísticas por tipo (INCLUIR TODOS aunque no tengan reservas)
   const typeStats = roomTypes.map(type => {
     let totalRevenue = 0;
     let totalNights = 0;
@@ -1916,7 +1976,7 @@ async function getRoomTypeCustomReport(roomTypeId, startDate, endDate) {
 async function getTopClientsRevenue(startDate, endDate, limit = 50) {
   const { start, end } = normalizeDateRange(startDate, endDate);
 
-  // Obtener todas las reservas completadas en el período
+  // Obtener todas las reservas válidas en el período
   const reservations = await prisma.reservations.findMany({
     where: {
       deleted_at: null,
@@ -1990,6 +2050,327 @@ async function getTopClientsRevenue(startDate, endDate, limit = 50) {
   };
 }
 
+/**
+ * Obtiene lista de clientes que tienen reservas según filtros aplicados
+ * @param {Object} filters - Filtros: floor, roomTypeId, startDate, endDate
+ * @returns {Promise<Array>} Lista de clientes únicos
+ */
+async function getClientsWithReservations(filters) {
+  const { floor, roomTypeId, startDate, endDate } = filters;
+
+  // Construir condiciones del WHERE
+  const whereConditions = {
+    status: 'completed'
+  };
+
+  // Filtro por fechas
+  if (startDate && endDate) {
+    whereConditions.check_in_date = {
+      gte: new Date(startDate),
+      lte: new Date(endDate)
+    };
+  }
+
+  // Filtro por piso o tipo de habitación (usando relación con reservation_rooms -> rooms)
+  if (floor || roomTypeId) {
+    whereConditions.reservation_rooms = {
+      some: {
+        rooms: {
+          ...(floor && { floor: parseInt(floor) }),
+          ...(roomTypeId && { room_type_id: parseInt(roomTypeId) })
+        }
+      }
+    };
+  }
+
+  // Obtener reservas con filtros
+  const reservations = await prisma.reservations.findMany({
+    where: whereConditions,
+    include: {
+      users_reservations_main_guest_idTousers: {
+        select: {
+          id: true,
+          first_name: true,
+          paternal_last_name: true,
+          maternal_last_name: true,
+          email: true
+        }
+      }
+    },
+    orderBy: {
+      created_at: 'desc'
+    }
+  });
+
+  // Extraer clientes únicos
+  const clientsMap = new Map();
+  reservations.forEach(reservation => {
+    const user = reservation.users_reservations_main_guest_idTousers;
+    if (user && !clientsMap.has(reservation.main_guest_id)) {
+      // Construir nombre completo
+      const fullName = `${user.first_name} ${user.paternal_last_name}${user.maternal_last_name ? ' ' + user.maternal_last_name : ''}`.trim();
+      clientsMap.set(reservation.main_guest_id, {
+        userId: user.id,
+        fullName: fullName,
+        email: user.email,
+        reservationCount: 1
+      });
+    } else if (user && clientsMap.has(reservation.main_guest_id)) {
+      const client = clientsMap.get(reservation.main_guest_id);
+      client.reservationCount++;
+    }
+  });
+
+  return Array.from(clientsMap.values());
+}
+
+/**
+ * Obtiene reporte de reservas agrupado por país
+ */
+async function getReportByCountry(startDate, endDate) {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const reservations = await prisma.reservations.findMany({
+    where: {
+      deleted_at: null,
+      status: 'completed',
+      OR: [
+        { check_in_date: { gte: start, lte: end } },
+        { check_out_date: { gte: start, lte: end } },
+        {
+          AND: [
+            { check_in_date: { lte: start } },
+            { check_out_date: { gte: end } }
+          ]
+        }
+      ]
+    },
+    include: {
+      users_reservations_main_guest_idTousers: {
+        select: {
+          country: true
+        }
+      },
+      payments: {
+        where: {
+          status: 'confirmed',
+          deleted_at: null
+        }
+      }
+    }
+  });
+
+  // Agrupar por país
+  const countryMap = new Map();
+  
+  reservations.forEach(reservation => {
+    const country = reservation.users_reservations_main_guest_idTousers?.country || 'Sin especificar';
+    
+    if (!countryMap.has(country)) {
+      countryMap.set(country, {
+        country,
+        reservationCount: 0,
+        totalGuests: 0,
+        totalRevenue: 0
+      });
+    }
+    
+    const data = countryMap.get(country);
+    data.reservationCount++;
+    data.totalGuests += reservation.guest_count || 0;
+    data.totalRevenue += reservation.payments.reduce((sum, p) => sum + p.amount, 0);
+  });
+
+  return Array.from(countryMap.values()).sort((a, b) => b.reservationCount - a.reservationCount);
+}
+
+/**
+ * Obtiene lista de países únicos registrados en la BD
+ */
+async function getAvailableCountries() {
+  const countries = await prisma.users.findMany({
+    where: {
+      deleted_at: null,
+      country: { not: null }
+    },
+    select: {
+      country: true
+    },
+    distinct: ['country']
+  });
+
+  return countries
+    .map(u => u.country)
+    .filter(c => c && c.trim() !== '')
+    .sort();
+}
+
+/**
+ * Obtiene reporte de reservas agrupado por rangos de edad
+ */
+async function getReportByAge(startDate, endDate, ageRange = null) {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const reservations = await prisma.reservations.findMany({
+    where: {
+      deleted_at: null,
+      status: 'completed',
+      OR: [
+        { check_in_date: { gte: start, lte: end } },
+        { check_out_date: { gte: start, lte: end } },
+        {
+          AND: [
+            { check_in_date: { lte: start } },
+            { check_out_date: { gte: end } }
+          ]
+        }
+      ]
+    },
+    include: {
+      users_reservations_main_guest_idTousers: {
+        select: {
+          birth_date: true
+        }
+      },
+      payments: {
+        where: {
+          status: 'confirmed',
+          deleted_at: null
+        }
+      }
+    }
+  });
+
+  // Agrupar por rango de edad (desde 4 años)
+  const ageRangeMap = new Map([
+    ['4-17', { min: 4, max: 17, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['18-25', { min: 18, max: 25, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['26-35', { min: 26, max: 35, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['36-45', { min: 36, max: 45, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['46-60', { min: 46, max: 60, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['Mayor de 60', { min: 61, max: 999, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['Sin datos', { min: null, max: null, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }]
+  ]);
+
+  reservations.forEach(reservation => {
+    const birthDate = reservation.users_reservations_main_guest_idTousers?.birth_date;
+    let rangeKey = 'Sin datos';
+    
+    if (birthDate) {
+      const age = Math.floor((new Date() - new Date(birthDate)) / (365.25 * 24 * 60 * 60 * 1000));
+      
+      for (const [key, value] of ageRangeMap.entries()) {
+        if (value.min !== null && age >= value.min && age <= value.max) {
+          rangeKey = key;
+          break;
+        }
+      }
+    }
+    
+    const data = ageRangeMap.get(rangeKey);
+    data.reservationCount++;
+    data.totalGuests += reservation.guest_count || 0;
+    data.totalRevenue += reservation.payments.reduce((sum, p) => sum + p.amount, 0);
+  });
+
+  // Convertir a array y filtrar por rango específico si se proporciona
+  let result = Array.from(ageRangeMap.entries()).map(([range, data]) => ({
+    ageRange: range,
+    ...data
+  }));
+
+  if (ageRange) {
+    result = result.filter(r => r.ageRange === ageRange);
+  }
+
+  return result;
+}
+
+/**
+ * Obtiene reporte de reservas agrupado por rangos de monto
+ */
+async function getReportBySpending(startDate, endDate, spendingRange = null) {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const reservations = await prisma.reservations.findMany({
+    where: {
+      deleted_at: null,
+      status: 'completed',
+      OR: [
+        { check_in_date: { gte: start, lte: end } },
+        { check_out_date: { gte: start, lte: end } },
+        {
+          AND: [
+            { check_in_date: { lte: start } },
+            { check_out_date: { gte: end } }
+          ]
+        }
+      ]
+    },
+    include: {
+      payments: {
+        where: {
+          status: 'confirmed',
+          deleted_at: null
+        }
+      }
+    }
+  });
+
+  // Agrupar por rango de monto
+  const spendingRangeMap = new Map([
+    ['Menos de $50.000', { min: 0, max: 49999, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['$50.000 - $99.999', { min: 50000, max: 99999, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['$100.000 - $199.999', { min: 100000, max: 199999, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['$200.000 - $499.999', { min: 200000, max: 499999, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['$500.000 o más', { min: 500000, max: Infinity, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
+    ['Sin monto', { min: null, max: null, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }]
+  ]);
+
+  reservations.forEach(reservation => {
+    const totalAmount = reservation.payments.reduce((sum, p) => sum + p.amount, 0);
+    let rangeKey = 'Sin monto';
+    
+    if (totalAmount > 0) {
+      for (const [key, value] of spendingRangeMap.entries()) {
+        if (value.min !== null && totalAmount >= value.min && totalAmount <= value.max) {
+          rangeKey = key;
+          break;
+        }
+      }
+    }
+    
+    const data = spendingRangeMap.get(rangeKey);
+    data.reservationCount++;
+    data.totalGuests += reservation.guest_count || 0;
+    data.totalRevenue += totalAmount;
+  });
+
+  // Convertir a array y filtrar por rango específico si se proporciona
+  let result = Array.from(spendingRangeMap.entries()).map(([range, data]) => ({
+    spendingRange: range,
+    ...data
+  }));
+
+  if (spendingRange) {
+    result = result.filter(r => r.spendingRange === spendingRange);
+  }
+
+  return result;
+}
+
 module.exports = {
   calculateKPIs,
   getOccupancyData,
@@ -2008,5 +2389,10 @@ module.exports = {
   getClientCustomReport,
   getRoomCustomReport,
   getRoomTypeCustomReport,
-  getTopClientsRevenue
+  getTopClientsRevenue,
+  getClientsWithReservations,
+  getReportByCountry,
+  getAvailableCountries,
+  getReportByAge,
+  getReportBySpending
 };

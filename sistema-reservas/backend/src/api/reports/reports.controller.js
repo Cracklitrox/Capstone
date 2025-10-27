@@ -125,7 +125,7 @@ async function getOccupancy(req, res) {
  */
 async function getRevenue(req, res) {
   try {
-    const { startDate, endDate, groupBy = 'day', includeServices = 'true' } = req.query;
+    const { startDate, endDate, groupBy = 'day', includeServices = 'true', roomTypeId, floor } = req.query;
 
     // Validar parámetros requeridos
     if (!startDate || !endDate) {
@@ -148,7 +148,9 @@ async function getRevenue(req, res) {
       startDate,
       endDate,
       groupBy,
-      includeServices === 'true'
+      includeServices === 'true',
+      roomTypeId ? parseInt(roomTypeId) : null,
+      floor ? parseInt(floor) : null
     );
 
     return res.status(200).json({
@@ -933,6 +935,205 @@ async function getTopClientsRevenue(req, res) {
   }
 }
 
+/**
+ * Controlador para obtener clientes que tienen reservas según filtros
+ * @route GET /api/v1/reports/clients-with-reservations
+ */
+async function getClientsWithReservations(req, res) {
+  try {
+    const { floor, roomTypeId, startDate, endDate } = req.query;
+
+    const clients = await reportsService.getClientsWithReservations({
+      floor: floor ? parseInt(floor) : null,
+      roomTypeId: roomTypeId ? parseInt(roomTypeId) : null,
+      startDate,
+      endDate
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: clients,
+      message: 'Clientes con reservas obtenidos exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener clientes con reservas:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener clientes con reservas: ${error.message}`,
+      originModule: 'reports.controller - getClientsWithReservations',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener clientes con reservas',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener reporte por país
+ * @route GET /api/v1/reports/by-country
+ */
+async function getReportByCountry(req, res) {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los parámetros startDate y endDate son requeridos'
+      });
+    }
+
+    const report = await reportsService.getReportByCountry(startDate, endDate);
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Reporte por país obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener reporte por país:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener reporte por país: ${error.message}`,
+      originModule: 'reports.controller - getReportByCountry',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el reporte por país',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener países disponibles
+ * @route GET /api/v1/reports/available-countries
+ */
+async function getAvailableCountries(req, res) {
+  try {
+    const countries = await reportsService.getAvailableCountries();
+
+    return res.status(200).json({
+      success: true,
+      data: countries,
+      message: 'Países obtenidos exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener países:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener países: ${error.message}`,
+      originModule: 'reports.controller - getAvailableCountries',
+      severity: 'low',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener los países',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener reporte por edad
+ * @route GET /api/v1/reports/by-age
+ */
+async function getReportByAge(req, res) {
+  try {
+    const { startDate, endDate, ageRange } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los parámetros startDate y endDate son requeridos'
+      });
+    }
+
+    const report = await reportsService.getReportByAge(startDate, endDate, ageRange || null);
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Reporte por edad obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener reporte por edad:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener reporte por edad: ${error.message}`,
+      originModule: 'reports.controller - getReportByAge',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el reporte por edad',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * Controlador para obtener reporte por monto
+ * @route GET /api/v1/reports/by-spending
+ */
+async function getReportBySpending(req, res) {
+  try {
+    const { startDate, endDate, spendingRange } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los parámetros startDate y endDate son requeridos'
+      });
+    }
+
+    const report = await reportsService.getReportBySpending(startDate, endDate, spendingRange || null);
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Reporte por monto obtenido exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener reporte por monto:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener reporte por monto: ${error.message}`,
+      originModule: 'reports.controller - getReportBySpending',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el reporte por monto',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
 module.exports = {
   getKPIs,
   getOccupancy,
@@ -952,5 +1153,10 @@ module.exports = {
   getRoomCustomReport,
   getRoomTypeCustomReport,
   getTopClientsRevenue,
+  getClientsWithReservations,
+  getReportByCountry,
+  getAvailableCountries,
+  getReportByAge,
+  getReportBySpending,
 };
 

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useReportsApi } from '../hooks/useReportsApi';
+import socketService from '../services/socketService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
@@ -21,10 +22,16 @@ import {
   Repeat,
   BarChart3,
   FileSpreadsheet,
-  Building2
+  Building2,
+  ArrowLeftRight,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  Globe
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -50,57 +57,26 @@ import {
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1', '#a855f7'];
 
-// Función auxiliar para exportar datos a CSV (alternativa a Excel sin dependencias)
-const exportToCSV = (data, filename) => {
+// Función auxiliar para exportar datos a Excel (.xlsx)
+const exportToExcel = (data, filename) => {
   try {
     if (!data || data.length === 0) {
       alert('No hay datos para exportar');
       return;
     }
 
-    // Asegurarse de que todos los valores estén en formato string y escapados correctamente
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row =>
-        headers.map(header => {
-          let value = row[header];
-          
-          // Convertir valores null o undefined a cadena vacía
-          if (value === null || value === undefined) {
-            return '""';
-          }
-          
-          // Convertir objetos a string JSON
-          if (typeof value === 'object') {
-            value = JSON.stringify(value);
-          }
-          
-          // Convertir el valor a string y escapar caracteres especiales
-          value = String(value).replace(/"/g, '""');
-          
-          // Encerrar en comillas si contiene comas, saltos de línea o comillas
-          if (value.includes(',') || value.includes('\n') || value.includes('"') || value.includes(' ')) {
-            return `"${value}"`;
-          }
-          
-          return value;
-        }).join(',')
-      )
-    ].join('\n');
-
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Crear worksheet desde los datos
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    
+    // Crear workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte');
+    
+    // Generar archivo Excel y descargarlo
+    XLSX.writeFile(workbook, `${filename}.xlsx`);
   } catch (error) {
-    console.error('Error al exportar a CSV:', error);
-    alert('Error al generar el archivo CSV');
+    console.error('Error al exportar a Excel:', error);
+    alert('Error al exportar el archivo');
   }
 };
 
@@ -151,7 +127,7 @@ const DownloadButton = ({ onDownloadPDF, onDownloadExcel, className = "" }) => {
             className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent rounded-b-md"
           >
             <FileSpreadsheet className="h-4 w-4 text-green-600" />
-            Descargar CSV
+            Descargar Excel
           </button>
         </div>
       )}
@@ -331,7 +307,7 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
 
         if (summaryData.length > 0) {
           const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`;
-          exportToCSV(summaryData, fileName);
+          exportToExcel(summaryData, fileName);
         } else {
           alert('No hay datos para exportar');
         }
@@ -541,28 +517,7 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
-        {statsData.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <div className={`${stat.bgColor} p-2 rounded-lg`}>
-                  <Icon className={`h-4 w-4 ${stat.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      
-
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-[1fr,auto]">
         <Card>
           <CardHeader>
             <CardTitle>Top 5 Clientes por Ingresos</CardTitle>
@@ -599,6 +554,35 @@ const ClientsSection = ({ topClientsData, clientStats }) => {
             )}
           </CardContent>
         </Card>
+
+        {/* Total Clientes y Clientes Nuevos verticalmente */}
+        <div className="flex flex-col gap-4 min-w-[200px]">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Clientes</CardTitle>
+              <Users className="h-4 w-4 text-cyan-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-cyan-600">
+                {clientStats?.totalClients || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Clientes activos</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Clientes Nuevos</CardTitle>
+              <Users className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600">
+                {clientStats?.newClients || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Últimos 30 días</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card>
@@ -653,23 +637,58 @@ const CustomReportsSection = () => {
     getMonthlyOccupancy,
   } = useReportsApi();
 
-  const [reportType, setReportType] = useState('client'); // 'client', 'room', 'roomType', 'topClients'
-  const [selectedEntity, setSelectedEntity] = useState('');
+  const [reportType, setReportType] = useState('room'); // 'client', 'room', 'roomType', 'topClients' - iniciar con 'room'
+  const [selectedEntity, setSelectedEntity] = useState(''); // Todas las habitaciones por defecto
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedRoomType, setSelectedRoomType] = useState(null);
+  const [selectedRoom, setSelectedRoom] = useState(null); // Default: todas las habitaciones
+  const [availableFloors, setAvailableFloors] = useState([]);
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
-    to: new Date(),
+    to: new Date(new Date().setDate(new Date().getDate() - 1)), // AYER, no hoy
   });
   const [reportData, setReportData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Estados para nuevos reportes
+  const [selectedAgeRange, setSelectedAgeRange] = useState(null);
+  const [selectedSpendingRange, setSelectedSpendingRange] = useState(null);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [selectedRegion, setSelectedRegion] = useState(null);
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [availableCountries, setAvailableCountries] = useState([]);
+  const [availableRegions, setAvailableRegions] = useState([]);
+  const [availableCities, setAvailableCities] = useState([]);
+  const [quickPeriodCustom, setQuickPeriodCustom] = useState('30days');
+  const [autoGenerated, setAutoGenerated] = useState(false);
 
   // Listas de ejemplo (en producción deberían venir de la API)
   const [clients, setClients] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [roomTypes, setRoomTypes] = useState([]);
   const [filteredRooms, setFilteredRooms] = useState([]);
+
+  // Constantes para rangos
+  const AGE_RANGES = [
+    { value: '4-17', label: '4-17 años' },
+    { value: '18-25', label: '18-25 años' },
+    { value: '26-35', label: '26-35 años' },
+    { value: '36-45', label: '36-45 años' },
+    { value: '46-60', label: '46-60 años' },
+    { value: 'Mayor de 60', label: 'Mayor de 60 años' },
+  ];
+
+  const SPENDING_RANGES = [
+    { value: 'Menos de $50.000', label: 'Menos de $50.000' },
+    { value: '$50.000 - $99.999', label: '$50.000 - $99.999' },
+    { value: '$100.000 - $199.999', label: '$100.000 - $199.999' },
+    { value: '$200.000 - $499.999', label: '$200.000 - $499.999' },
+    { value: '$500.000 o más', label: '$500.000 o más' },
+  ];
+
+  const COLORS = ['#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316'];
 
   // Efecto para filtrar habitaciones cuando cambia el piso seleccionado
   useEffect(() => {
@@ -686,6 +705,104 @@ const CustomReportsSection = () => {
       handleGenerateReport();
     }
   }, [selectedRoomType, reportType]);
+
+  // useEffect para cargar países cuando se selecciona reporte por ubicación
+  useEffect(() => {
+    if (reportType === 'byLocation') {
+      const loadCountries = async () => {
+        try {
+          const response = await fetch('http://localhost:3001/api/v1/reports/available-countries', {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const result = await response.json();
+          if (result.success) {
+            setAvailableCountries(result.data);
+          }
+        } catch (error) {
+          console.error('Error al cargar países:', error);
+        }
+      };
+      loadCountries();
+    }
+  }, [reportType]);
+
+  // useEffect para cargar regiones cuando se selecciona un país
+  useEffect(() => {
+    if (selectedCountry && reportType === 'byLocation') {
+      const loadRegions = async () => {
+        try {
+          // Aquí deberías crear un endpoint en el backend que devuelva regiones por país
+          // Por ahora, simularemos con los datos que ya existen en la BD
+          const response = await fetch(`http://localhost:3001/api/v1/reports/by-country?startDate=2000-01-01&endDate=${format(new Date(), 'yyyy-MM-dd')}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const result = await response.json();
+          if (result.success) {
+            // Extraer regiones únicas del país seleccionado
+            const regions = [...new Set(
+              result.data
+                .filter(item => item.country === selectedCountry && item.region)
+                .map(item => item.region)
+            )];
+            setAvailableRegions(regions);
+          }
+        } catch (error) {
+          console.error('Error al cargar regiones:', error);
+        }
+      };
+      loadRegions();
+      // NO generar aquí, se genera en el componente Reports
+    } else {
+      setAvailableRegions([]);
+      setSelectedRegion(null);
+    }
+  }, [selectedCountry, reportType]);
+
+  // useEffect para cargar ciudades cuando se selecciona una región
+  useEffect(() => {
+    if (selectedRegion && selectedCountry && reportType === 'byLocation') {
+      const loadCities = async () => {
+        try {
+          const response = await fetch(`http://localhost:3001/api/v1/reports/by-country?startDate=2000-01-01&endDate=${format(new Date(), 'yyyy-MM-dd')}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const result = await response.json();
+          if (result.success) {
+            // Extraer ciudades únicas de la región seleccionada
+            const cities = [...new Set(
+              result.data
+                .filter(item => 
+                  item.country === selectedCountry && 
+                  item.region === selectedRegion && 
+                  item.city
+                )
+                .map(item => item.city)
+            )];
+            setAvailableCities(cities);
+          }
+        } catch (error) {
+          console.error('Error al cargar ciudades:', error);
+        }
+      };
+      loadCities();
+      // NO generar aquí, se genera en el componente Reports
+    } else {
+      setAvailableCities([]);
+      setSelectedCity(null);
+    }
+  }, [selectedRegion, selectedCountry, reportType]);
+
+  // useEffect para generar reporte cuando cambia la ciudad (REMOVIDO - se maneja en el componente Reports)
+  // Los cambios de ubicación se detectarán cuando el usuario esté en el componente Reports
 
   // Función para cargar habitaciones basadas en el piso seleccionado
   const loadRoomsByFloor = async (floor = null) => {
@@ -725,56 +842,84 @@ const CustomReportsSection = () => {
     loadRoomsByFloor(selectedFloor);
   }, [selectedFloor]);
 
-  // Efecto para cargar los tipos de habitación
+  // Cargar pisos disponibles
   useEffect(() => {
-    const loadRoomTypes = async () => {
+    const loadAvailableFloors = async () => {
       try {
-        console.log('Cargando tipos de habitación...');
-        const response = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types', {
+        const response = await fetch('http://localhost:3001/api/v1/admin/rooms', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
           }
         });
-
+        
         if (response.ok) {
           const data = await response.json();
-          console.log('Tipos de habitación cargados:', data);
-          // Asegurarse de procesar correctamente la estructura de datos
-          let types;
-          if (Array.isArray(data)) {
-            types = data;
-          } else if (data.data && Array.isArray(data.data)) {
-            types = data.data;
-          } else {
-            types = [];
-          }
-          
-          // Filtrar solo los tipos activos y mapearlos
-          const activeTypes = types
-            .filter(rt => rt.is_active !== false)
-            .map(rt => ({
-              id: rt.id,
-              name: rt.name || 'Sin nombre'
-            }));
-          
-          console.log('Tipos de habitación procesados:', activeTypes);
-          setRoomTypes(activeTypes);
-        } else {
-          console.error('Error al cargar tipos de habitación:', response.status);
-          const errorText = await response.text();
-          console.error('Detalle del error:', errorText);
+          const rooms = Array.isArray(data) ? data : (data.data || []);
+          const floors = [...new Set(rooms.map(room => room.floor))].filter(f => f != null).sort((a, b) => a - b);
+          setAvailableFloors(floors);
         }
       } catch (error) {
-        console.error('Error al cargar tipos de habitación:', error);
+        console.error('Error al cargar pisos:', error);
       }
     };
 
-    loadRoomTypes();
-    // Recargar cada 30 segundos
-    const interval = setInterval(loadRoomTypes, 30000);
-    return () => clearInterval(interval);
+    loadAvailableFloors();
   }, []);
+
+  // useEffect para regenerar reporte automáticamente cuando cambian los filtros
+  useEffect(() => {
+    if (reportType && dateRange.from && dateRange.to) {
+      // Delay de 500ms para evitar múltiples llamadas mientras el usuario cambia filtros
+      const timer = setTimeout(() => {
+        generateReportPreview();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [reportType, dateRange, selectedFloor, selectedRoomType, selectedEntity, selectedCountry, selectedRegion, selectedCity, selectedAgeRange, selectedSpendingRange]);
+
+
+
+  // Cargar clientes filtrados según piso, tipo de habitación y fechas
+  const loadFilteredClients = async () => {
+    try {
+      // Construir query params con filtros
+      const params = new URLSearchParams();
+      if (selectedFloor) params.append('floor', selectedFloor);
+      if (selectedRoomType) params.append('roomTypeId', selectedRoomType);
+      if (dateRange.from) params.append('startDate', format(dateRange.from, 'yyyy-MM-dd'));
+      if (dateRange.to) params.append('endDate', format(dateRange.to, 'yyyy-MM-dd'));
+      
+      const url = `http://localhost:3001/api/v1/reports/clients-with-reservations?${params.toString()}`;
+      console.log('🔍 Cargando clientes filtrados:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const clientsList = (data.data || []).map(c => ({
+          id: c.userId || c.id,
+          name: c.fullName || c.name,
+          email: c.email
+        }));
+        console.log('✅ Clientes filtrados cargados:', clientsList.length);
+        setClients(clientsList);
+      } else {
+        console.error('❌ Error al cargar clientes filtrados:', response.status);
+        setClients([]);
+      }
+    } catch (error) {
+      console.error('Error al cargar clientes filtrados:', error);
+      setClients([]);
+    }
+  };
+
+  // Ya no se necesita recargar clientes (sección eliminada)
 
   useEffect(() => {
     // Cargar listas reales desde la base de datos
@@ -792,7 +937,6 @@ const CustomReportsSection = () => {
           const allGuests = clientsData.data || [];
           // Filtrar solo clientes con reservas
           const clientsWithReservations = allGuests.filter(g => g.totalReservations > 0);
-          console.log('Clientes con reservas:', clientsWithReservations.length);
           setClients(clientsWithReservations.map(c => ({
             id: c.id,
             name: c.fullName,
@@ -807,10 +951,8 @@ const CustomReportsSection = () => {
             'Content-Type': 'application/json'
           }
         });
-        console.log('📡 Respuesta habitaciones:', roomsResponse.status, roomsResponse.statusText);
         if (roomsResponse.ok) {
           const roomsData = await roomsResponse.json();
-          console.log('📦 Datos habitaciones raw:', roomsData);
           // El backend puede devolver el array directamente o en { data: [...] }
           const rawData = Array.isArray(roomsData) ? roomsData : (roomsData.data || []);
           // Filtrar solo habitaciones activas y mapear los datos
@@ -821,7 +963,6 @@ const CustomReportsSection = () => {
               roomNumber: r.room_number || 'S/N',
               type: r.room_types?.name || 'Sin tipo'
             }));
-          console.log('✅ Habitaciones procesadas:', roomsList.length, roomsList);
           setRooms(roomsList);
         } else {
           const errorText = await roomsResponse.text();
@@ -835,17 +976,14 @@ const CustomReportsSection = () => {
             'Content-Type': 'application/json'
           }
         });
-        console.log('📡 Respuesta tipos de habitación:', typesResponse.status, typesResponse.statusText);
         if (typesResponse.ok) {
           const typesData = await typesResponse.json();
-          console.log('📦 Datos tipos habitación raw:', typesData);
           // El backend puede devolver el array directamente o en { data: [...] }
           const rawData = Array.isArray(typesData) ? typesData : (typesData.data || []);
           const typesList = rawData.map(rt => ({
             id: rt.id,
             name: rt.name
           }));
-          console.log('✅ Tipos de habitación procesados:', typesList.length, typesList);
           setRoomTypes(typesList);
         } else {
           const errorText = await typesResponse.text();
@@ -862,6 +1000,164 @@ const CustomReportsSection = () => {
 
     loadData();
   }, []);
+
+  // Función para manejar períodos rápidos
+  const handleQuickPeriodCustom = (period) => {
+    setQuickPeriodCustom(period);
+    // Usar AYER como fecha final (excepto para "all" que usa HOY para coincidir con Ingresos Totales)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    let from;
+    let to = yesterday; // Por defecto ayer
+    
+    switch(period) {
+      case 'today':
+        from = yesterday; // Mostrar datos de ayer
+        break;
+      case '7days':
+        from = new Date(yesterday.getTime() - 6 * 24 * 60 * 60 * 1000); // 7 días total
+        break;
+      case '14days':
+        from = new Date(yesterday.getTime() - 13 * 24 * 60 * 60 * 1000);
+        break;
+      case '30days':
+        from = new Date(yesterday.getTime() - 29 * 24 * 60 * 60 * 1000);
+        break;
+      case '90days':
+        from = new Date(yesterday.getTime() - 89 * 24 * 60 * 60 * 1000);
+        break;
+      case '365days':
+        from = new Date(yesterday.getTime() - 364 * 24 * 60 * 60 * 1000);
+        break;
+      case 'all':
+        // Desde siempre: desde el inicio de 2025 hasta AYER
+        from = new Date(2025, 0, 1); // 1 de enero de 2025
+        to = yesterday; // AYER, no hoy
+        break;
+      default:
+        from = new Date(yesterday.getTime() - 29 * 24 * 60 * 60 * 1000);
+    }
+    
+    setDateRange({ from, to });
+  };
+
+  // Función para procesar datos de reportes (debe estar antes de handleGenerateReport)
+  const processReportData = (revenueData, occupancyData) => {
+    const revenueArray = revenueData?.data || [];
+    const occupancyArray = occupancyData?.data || [];
+
+    const processedRevenue = {
+      data: revenueArray.map(item => ({
+        date: item.period || item.periodLabel,
+        period: item.period,
+        total: item.totalRevenue || 0,
+        roomRevenue: item.roomRevenue || 0,
+        servicesRevenue: item.servicesRevenue || 0,
+      })),
+      total: revenueArray.reduce((sum, item) => sum + (item.totalRevenue || 0), 0),
+      count: revenueArray.reduce((sum, item) => sum + (item.reservationCount || 0), 0),
+    };
+
+    const processedOccupancy = {
+      data: occupancyArray.map(item => ({
+        date: item.period || item.periodLabel,
+        period: item.period,
+        percentage: item.occupancyPercentage || 0,
+        occupiedNights: item.occupiedRoomNights || 0,
+        availableNights: item.availableRoomNights || 0,
+        totalGuests: item.totalGuests || 0,
+      })),
+      average: occupancyArray.length > 0
+        ? occupancyArray.reduce((sum, item) => sum + (item.occupancyPercentage || 0), 0) / occupancyArray.length
+        : 0,
+    };
+
+    const processedCheckIns = {
+      data: revenueArray.map(item => ({
+        date: item.period || item.periodLabel,
+        period: item.period,
+        count: item.reservationCount || 0,
+      })),
+      total: revenueArray.reduce((sum, item) => sum + (item.reservationCount || 0), 0),
+      count: revenueArray.length,
+    };
+
+    // Calcular totalGuests sumando todos los períodos
+    const totalGuests = occupancyArray.reduce((sum, item) => sum + (item.totalGuests || 0), 0);
+
+    return {
+      revenue: processedRevenue,
+      occupancy: processedOccupancy,
+      checkIns: processedCheckIns,
+      totalGuests, // Total de personas en todo el período
+    };
+  };
+
+  // useEffect para generar reporte automáticamente cuando cambian los filtros
+  useEffect(() => {
+    if (reportType && dateRange.from && dateRange.to) {
+      // Delay de 300ms para evitar múltiples llamadas mientras el usuario cambia filtros
+      const timer = setTimeout(() => {
+        generateReportPreview();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [reportType, dateRange, selectedFloor, selectedRoomType, selectedEntity, selectedCountry, selectedRegion, selectedCity, selectedAgeRange, selectedSpendingRange]);
+
+  const generateReportPreview = async () => {
+    if (!dateRange.from || !dateRange.to) return;
+    
+    setIsGeneratingPreview(true);
+    try {
+      const startDate = format(dateRange.from, 'yyyy-MM-dd');
+      const endDate = format(dateRange.to, 'yyyy-MM-dd');
+      
+      // Calcular días para determinar el groupBy apropiado
+      const days = Math.ceil((dateRange.to - dateRange.from) / (1000 * 60 * 60 * 24));
+      let groupBy = 'day';
+      if (days > 90) groupBy = 'month';
+      else if (days > 31) groupBy = 'week';
+      
+      // Construir params con filtros
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+        groupBy
+      });
+      
+      if (selectedFloor) params.append('floor', selectedFloor);
+      if (selectedRoomType) params.append('roomTypeId', selectedRoomType);
+      
+      const [revenueRes, occupancyRes] = await Promise.all([
+        fetch(`http://localhost:3001/api/v1/reports/revenue?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`http://localhost:3001/api/v1/reports/occupancy?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
+      
+      const revenue = await revenueRes.json();
+      const occupancy = await occupancyRes.json();
+      
+      const processed = processReportData(
+        { data: revenue.data || [] },
+        { data: occupancy.data || [] }
+      );
+      
+      setReportData(processed); // Usar reportData en lugar de previewReportData
+    } catch (error) {
+      console.error('Error al generar preview:', error);
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
 
   const handleGenerateReport = async () => {
     if (!dateRange.from || !dateRange.to) {
@@ -891,23 +1187,155 @@ const CustomReportsSection = () => {
           data = await getClientCustomReport(selectedEntity, startDate, endDate, params);
           break;
         case 'room':
-          if (!selectedEntity) {
-            alert('Seleccione una habitación');
-            setIsLoading(false);
-            return;
+          // Permitir generar reporte de todas las habitaciones si no se selecciona una específica
+          if (selectedEntity) {
+            data = await getRoomCustomReport(selectedEntity, startDate, endDate, params);
+          } else {
+            // Generar reporte general de todas las habitaciones
+            const params2 = new URLSearchParams();
+            params2.append('startDate', startDate);
+            params2.append('endDate', endDate);
+            params2.append('groupBy', 'day');
+            if (selectedFloor) params2.append('floor', selectedFloor);
+            
+            const [revenueRes, occupancyRes] = await Promise.all([
+              fetch(`http://localhost:3001/api/v1/reports/revenue?${params2.toString()}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              }),
+              fetch(`http://localhost:3001/api/v1/reports/occupancy?${params2.toString()}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              })
+            ]);
+            
+            const revenue = await revenueRes.json();
+            const occupancy = await occupancyRes.json();
+            data = processReportData(revenue, occupancy);
           }
-          data = await getRoomCustomReport(selectedEntity, startDate, endDate, params);
           break;
         case 'roomType':
-          if (!selectedEntity) {
-            alert('Seleccione un tipo de habitación');
-            setIsLoading(false);
-            return;
+          // Si no hay selectedEntity, generar reporte general de todos los tipos
+          if (selectedEntity) {
+            data = await getRoomTypeCustomReport(selectedEntity, startDate, endDate, params);
+          } else {
+            // Generar reporte general de tipos de habitación
+            const params2 = new URLSearchParams();
+            params2.append('startDate', startDate);
+            params2.append('endDate', endDate);
+            params2.append('groupBy', 'day');
+            
+            const [revenueRes, occupancyRes] = await Promise.all([
+              fetch(`http://localhost:3001/api/v1/reports/revenue?${params2.toString()}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              }),
+              fetch(`http://localhost:3001/api/v1/reports/occupancy?${params2.toString()}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              })
+            ]);
+            
+            const revenue = await revenueRes.json();
+            const occupancy = await occupancyRes.json();
+            data = processReportData(revenue, occupancy);
           }
-          data = await getRoomTypeCustomReport(selectedEntity, startDate, endDate, params);
           break;
         case 'topClients':
           data = await getTopClientsRevenue(startDate, endDate, 50, params);
+          break;
+        case 'byLocation':
+          try {
+            const countryParams = new URLSearchParams({
+              startDate,
+              endDate
+            });
+            
+            if (selectedFloor) countryParams.append('floor', selectedFloor);
+            if (selectedRoomType) countryParams.append('roomTypeId', selectedRoomType);
+            if (selectedCountry) countryParams.append('country', selectedCountry);
+            if (selectedRegion) countryParams.append('region', selectedRegion);
+            if (selectedCity) countryParams.append('city', selectedCity);
+            
+            const countryRes = await fetch(`http://localhost:3001/api/v1/reports/by-country?${countryParams}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const countryData = await countryRes.json();
+            
+            if (countryData.success) {
+              data = {
+                type: 'byLocation',
+                data: countryData.data,
+                period: { from: dateRange.from, to: dateRange.to },
+                filters: {
+                  country: selectedCountry,
+                  region: selectedRegion,
+                  city: selectedCity
+                }
+              };
+            }
+          } catch (error) {
+            console.error('Error al generar reporte por ubicación:', error);
+          }
+          break;
+        case 'byAge':
+          try {
+            const ageParams = new URLSearchParams({
+              startDate,
+              endDate
+            });
+            
+            if (selectedAgeRange) ageParams.append('ageRange', selectedAgeRange);
+            if (selectedFloor) ageParams.append('floor', selectedFloor);
+            if (selectedRoomType) ageParams.append('roomTypeId', selectedRoomType);
+            
+            const ageRes = await fetch(`http://localhost:3001/api/v1/reports/by-age?${ageParams}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const ageData = await ageRes.json();
+            
+            if (ageData.success) {
+              data = {
+                type: 'byAge',
+                data: ageData.data,
+                period: { from: dateRange.from, to: dateRange.to }
+              };
+            }
+          } catch (error) {
+            console.error('Error al generar reporte por edad:', error);
+          }
+          break;
+        case 'bySpending':
+          try {
+            const spendingParams = new URLSearchParams({
+              startDate,
+              endDate
+            });
+            
+            if (selectedSpendingRange) spendingParams.append('spendingRange', selectedSpendingRange);
+            if (selectedFloor) spendingParams.append('floor', selectedFloor);
+            if (selectedRoomType) spendingParams.append('roomTypeId', selectedRoomType);
+            
+            const spendingRes = await fetch(`http://localhost:3001/api/v1/reports/by-spending?${spendingParams}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const spendingData = await spendingRes.json();
+            
+            if (spendingData.success) {
+              data = {
+                type: 'bySpending',
+                data: spendingData.data,
+                period: { from: dateRange.from, to: dateRange.to }
+              };
+            }
+          } catch (error) {
+            console.error('Error al generar reporte por monto:', error);
+          }
           break;
         default:
           break;
@@ -997,6 +1425,44 @@ const CustomReportsSection = () => {
             }
           }
 
+          // Capturar gráficos con html2canvas
+          const chartElements = document.querySelectorAll('.recharts-wrapper');
+          if (chartElements.length > 0) {
+            yPosition = doc.lastAutoTable ? doc.lastAutoTable.finalY + 15 : yPosition + 15;
+            
+            doc.setFontSize(14);
+            doc.text('Gráficos:', 20, yPosition);
+            yPosition += 10;
+
+            for (let i = 0; i < chartElements.length; i++) {
+              const chart = chartElements[i];
+              
+              try {
+                // Capturar el gráfico como imagen
+                const canvas = await html2canvas(chart, {
+                  scale: 2,
+                  backgroundColor: '#ffffff',
+                  logging: false
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 170; // ancho en mm
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                // Si no cabe en la página actual, agregar nueva página
+                if (yPosition + imgHeight > pageHeight - 20) {
+                  doc.addPage();
+                  yPosition = 20;
+                }
+                
+                doc.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
+                yPosition += imgHeight + 10;
+              } catch (canvasError) {
+                console.error('Error al capturar gráfico:', canvasError);
+              }
+            }
+          }
+
           // Guardar el PDF
           const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`;
           doc.save(fileName);
@@ -1034,6 +1500,41 @@ const CustomReportsSection = () => {
             'Ingresos': r.revenue,
             'Ocupación %': r.occupancyRate?.toFixed(2) || '0'
           })) || [];
+        } else if (reportType === 'topClients') {
+          exportData = reportData.data.topClients?.map(c => ({
+            'Ranking': c.rank,
+            'Nombre Completo': c.fullName,
+            'Email': c.email,
+            'Total Reservas': c.totalReservations,
+            'Ingresos Totales': formatCurrency(c.totalRevenue),
+            'Promedio por Reserva': formatCurrency(c.averageReservationValue)
+          })) || [];
+        } else if (reportType === 'byLocation') {
+          exportData = reportData.data.map(item => ({
+            'País': item.country,
+            'Región': item.region || 'N/A',
+            'Ciudad': item.city || 'N/A',
+            'Total Reservas': item.reservationCount,
+            'Total Personas': item.totalGuests,
+            'Ingresos Totales': formatCurrency(item.totalRevenue),
+            'Promedio por Reserva': formatCurrency(item.totalRevenue / item.reservationCount)
+          }));
+        } else if (reportType === 'byAge') {
+          exportData = reportData.data.map(item => ({
+            'Rango de Edad': item.ageRange,
+            'Total Reservas': item.reservationCount,
+            'Total Personas': item.totalGuests,
+            'Ingresos Totales': formatCurrency(item.totalRevenue),
+            'Promedio por Reserva': formatCurrency(item.totalRevenue / item.reservationCount)
+          }));
+        } else if (reportType === 'bySpending') {
+          exportData = reportData.data.map(item => ({
+            'Rango de Gasto': item.spendingRange,
+            'Total Reservas': item.reservationCount,
+            'Total Personas': item.totalGuests,
+            'Ingresos Totales': formatCurrency(item.totalRevenue),
+            'Promedio por Reserva': formatCurrency(item.totalRevenue / item.reservationCount)
+          }));
         }
 
         // Agregar resumen al inicio del archivo si hay datos
@@ -1097,7 +1598,7 @@ const CustomReportsSection = () => {
           }, ...exportData];
 
           const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`;
-          exportToCSV(summaryData, fileName);
+          exportToExcel(summaryData, fileName);
         } else {
           alert('No hay datos para exportar');
         }
@@ -1278,6 +1779,100 @@ const CustomReportsSection = () => {
         headStyles: { fillColor: [16, 185, 129] },
         margin: { left: 20, right: 20 },
       });
+    } else if (reportType === 'byLocation' && Array.isArray(reportData.data)) {
+      doc.setFontSize(14);
+      doc.text('Reporte de Reservas por Ubicación Geográfica', 20, yPosition);
+      yPosition += 10;
+
+      if (selectedCountry) {
+        doc.setFontSize(10);
+        doc.text(`País: ${selectedCountry}`, 20, yPosition);
+        yPosition += 5;
+      }
+      if (selectedRegion) {
+        doc.text(`Región: ${selectedRegion}`, 20, yPosition);
+        yPosition += 5;
+      }
+      if (selectedCity) {
+        doc.text(`Ciudad: ${selectedCity}`, 20, yPosition);
+        yPosition += 5;
+      }
+      yPosition += 2;
+
+      const tableData = reportData.data.map(item => [
+        item.country,
+        item.region || 'N/A',
+        item.city || 'N/A',
+        item.reservationCount.toString(),
+        item.totalGuests.toString(),
+        formatCurrency(item.totalRevenue),
+        formatCurrency(item.totalRevenue / item.reservationCount)
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['País', 'Región', 'Ciudad', 'Reservas', 'Personas', 'Ingresos Totales', 'Promedio/Reserva']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+        margin: { left: 20, right: 20 },
+      });
+    } else if (reportType === 'byAge' && Array.isArray(reportData.data)) {
+      doc.setFontSize(14);
+      doc.text('Reporte de Reservas por Rango de Edad', 20, yPosition);
+      yPosition += 10;
+
+      if (selectedAgeRange) {
+        const rangeLabel = AGE_RANGES.find(r => r.value === selectedAgeRange)?.label;
+        doc.setFontSize(10);
+        doc.text(`Rango seleccionado: ${rangeLabel}`, 20, yPosition);
+        yPosition += 7;
+      }
+
+      const tableData = reportData.data.map(item => [
+        item.ageRange,
+        item.reservationCount.toString(),
+        item.totalGuests.toString(),
+        formatCurrency(item.totalRevenue),
+        formatCurrency(item.totalRevenue / item.reservationCount)
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Rango de Edad', 'Reservas', 'Personas', 'Ingresos Totales', 'Promedio/Reserva']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [245, 158, 11] },
+        margin: { left: 20, right: 20 },
+      });
+    } else if (reportType === 'bySpending' && Array.isArray(reportData.data)) {
+      doc.setFontSize(14);
+      doc.text('Reporte de Reservas por Monto Gastado', 20, yPosition);
+      yPosition += 10;
+
+      if (selectedSpendingRange) {
+        const rangeLabel = SPENDING_RANGES.find(r => r.value === selectedSpendingRange)?.label;
+        doc.setFontSize(10);
+        doc.text(`Rango seleccionado: ${rangeLabel}`, 20, yPosition);
+        yPosition += 7;
+      }
+
+      const tableData = reportData.data.map(item => [
+        item.spendingRange,
+        item.reservationCount.toString(),
+        item.totalGuests.toString(),
+        formatCurrency(item.totalRevenue),
+        formatCurrency(item.totalRevenue / item.reservationCount)
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Rango de Gasto', 'Reservas', 'Personas', 'Ingresos Totales', 'Promedio/Reserva']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [139, 92, 246] },
+        margin: { left: 20, right: 20 },
+      });
     }
 
     // Descargar PDF con nombre personalizado
@@ -1310,62 +1905,114 @@ const CustomReportsSection = () => {
 
   return (
     <div className="space-y-6">
+      {/* Generador de Reportes Personalizados */}
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Generador de Reportes Personalizados</CardTitle>
-          <p className="text-muted-foreground">Crea reportes detallados por cliente, habitación o ranking</p>
+          <p className="text-muted-foreground">Crea reportes detallados por habitación, tipo de habitación, ranking de clientes, país, edad y más</p>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Selector de tipo de reporte */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card
-              className={`cursor-pointer transition-all ${reportType === 'client' ? 'ring-2 ring-blue-500' : 'hover:shadow-lg'}`}
-              onClick={() => { setReportType('client'); setSelectedEntity(''); setReportData(null); }}
-            >
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center text-center">
-                  <Users className="h-12 w-12 mb-2 text-blue-600" />
-                  <h3 className="font-semibold">Por Cliente</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Historial y métricas de un cliente específico</p>
-                </div>
-              </CardContent>
-            </Card>
-
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             <Card
               className={`cursor-pointer transition-all ${reportType === 'room' ? 'ring-2 ring-green-500' : 'hover:shadow-lg'}`}
-              onClick={() => { setReportType('room'); setSelectedEntity(''); setReportData(null); }}
+              onClick={() => { 
+                setReportType('room');
+                setSelectedEntity(''); // Todas las habitaciones
+                setSelectedFloor(null); // Todos los pisos
+                setSelectedRoomType(''); // Todos los tipos
+              }}
             >
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
                   <Home className="h-12 w-12 mb-2 text-green-600" />
                   <h3 className="font-semibold">Por Habitación</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Ocupación e ingresos de una habitación</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ocupación e ingresos</p>
                 </div>
               </CardContent>
             </Card>
 
             <Card
               className={`cursor-pointer transition-all ${reportType === 'roomType' ? 'ring-2 ring-purple-500' : 'hover:shadow-lg'}`}
-              onClick={() => { setReportType('roomType'); setSelectedEntity(''); setReportData(null); }}
+              onClick={() => { 
+                setReportType('roomType');
+                setSelectedEntity(''); // Todos los tipos
+                setSelectedFloor(null);
+                setSelectedRoomType('');
+              }}
             >
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
                   <Home className="h-12 w-12 mb-2 text-purple-600" />
-                  <h3 className="font-semibold">Por Tipo de Habitación</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Rendimiento por tipo de habitación</p>
+                  <h3 className="font-semibold">Por Tipo Habitación</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Rendimiento por tipo</p>
                 </div>
               </CardContent>
             </Card>
 
             <Card
               className={`cursor-pointer transition-all ${reportType === 'topClients' ? 'ring-2 ring-orange-500' : 'hover:shadow-lg'}`}
-              onClick={() => { setReportType('topClients'); setSelectedEntity(''); setReportData(null); }}
+              onClick={() => { 
+                setReportType('topClients');
+                setSelectedFloor(null);
+                setSelectedRoomType('');
+              }}
             >
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
                   <TrendingUp className="h-12 w-12 mb-2 text-orange-600" />
                   <h3 className="font-semibold">Top Clientes</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Ranking de clientes por ingresos</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ranking por ingresos</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-all ${reportType === 'byLocation' ? 'ring-2 ring-blue-500' : 'hover:shadow-lg'}`}
+              onClick={() => { 
+                setReportType('byLocation');
+                setSelectedCountry(null); // Todos los países
+                setSelectedRegion(null);
+                setSelectedCity(null);
+              }}
+            >
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center">
+                  <Globe className="h-12 w-12 mb-2 text-blue-600" />
+                  <h3 className="font-semibold">Por Ubicación</h3>
+                  <p className="text-xs text-muted-foreground mt-1">País / Región / Ciudad</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-all ${reportType === 'byAge' ? 'ring-2 ring-pink-500' : 'hover:shadow-lg'}`}
+              onClick={() => { 
+                setReportType('byAge');
+                setSelectedAgeRange(''); // Todos los rangos
+              }}
+            >
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center">
+                  <Users className="h-12 w-12 mb-2 text-pink-600" />
+                  <h3 className="font-semibold">Por Edad</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Rangos de edad</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-all ${reportType === 'bySpending' ? 'ring-2 ring-teal-500' : 'hover:shadow-lg'}`}
+              onClick={() => { 
+                setReportType('bySpending');
+                setSelectedSpendingRange(''); // Todos los rangos
+              }}
+            >
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center">
+                  <DollarSign className="h-12 w-12 mb-2 text-teal-600" />
+                  <h3 className="font-semibold">Por Monto</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Clientes por gasto</p>
                 </div>
               </CardContent>
             </Card>
@@ -1375,29 +2022,23 @@ const CustomReportsSection = () => {
           <div className="grid gap-4 md:grid-cols-2">
             {/* Filtro de Piso */}
             <div className="space-y-2">
-              <Label>Filtrar por Piso</Label>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={selectedFloor === null ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedFloor(null)}
-                  className="h-8"
-                >
-                  Todos
-                </Button>
-                {[1, 2, 3, 4].map((floor) => (
-                  <Button
-                    key={floor}
-                    variant={selectedFloor === floor ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedFloor(floor)}
-                    className="h-8"
-                  >
-                    <Building2 className="mr-1 h-4 w-4" />
+              <Label className="text-sm font-semibold">Filtrar por Piso</Label>
+              <select
+                value={selectedFloor || ''}
+                onChange={(e) => {
+                  e.preventDefault();
+                  const value = e.target.value ? parseInt(e.target.value) : null;
+                  setSelectedFloor(value);
+                }}
+                className="w-full p-3 border rounded-md bg-background text-foreground"
+              >
+                <option value="">Todos los Pisos</option>
+                {availableFloors.map((floor) => (
+                  <option key={floor} value={floor}>
                     Piso {floor}
-                  </Button>
+                  </option>
                 ))}
-              </div>
+              </select>
               {selectedFloor && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Filtrando por: Piso {selectedFloor}
@@ -1405,10 +2046,38 @@ const CustomReportsSection = () => {
               )}
             </div>
 
+            {/* Filtro de Tipo de Habitación */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Filtrar por Tipo de Habitación</Label>
+              <select
+                value={selectedRoomType || ''}
+                onChange={(e) => {
+                  e.preventDefault();
+                  const value = e.target.value ? parseInt(e.target.value) : null;
+                  setSelectedRoomType(value);
+                }}
+                className="w-full p-3 border rounded-md bg-background text-foreground"
+              >
+                <option value="">Todos los Tipos</option>
+                {roomTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+              {selectedRoomType && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Filtrando por: {roomTypes.find(t => t.id === selectedRoomType)?.name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Selección de Entidad */}
+          <div className="grid gap-4 md:grid-cols-2">
             {reportType !== 'topClients' && (
               <div className="space-y-2">
                 <Label>
-                  {reportType === 'client' && 'Seleccionar Cliente'}
                   {reportType === 'room' && 'Seleccionar Habitación'}
                   {reportType === 'roomType' && 'Seleccionar Tipo de Habitación'}
                 </Label>
@@ -1417,12 +2086,7 @@ const CustomReportsSection = () => {
                   onChange={(e) => setSelectedEntity(e.target.value)}
                   className="w-full p-3 border rounded-md bg-background text-foreground"
                 >
-                  <option value="">Seleccione una Opción</option>
-                  {reportType === 'client' && (
-                    clients.length > 0 ? clients.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} - {c.email}</option>
-                    )) : <option disabled>No hay clientes disponibles</option>
-                  )}
+                  <option value="">Todas las Habitaciones</option>
                   {reportType === 'room' && (
                     filteredRooms.length > 0 ? filteredRooms.map(r => (
                       <option key={r.id} value={r.id}>Habitación {r.roomNumber} ({r.type}) - Piso {r.floor}</option>
@@ -1434,9 +2098,6 @@ const CustomReportsSection = () => {
                     )) : <option disabled>Cargando tipos de habitación...</option>
                   )}
                 </select>
-                {reportType === 'client' && clients.length === 0 && (
-                  <p className="text-xs text-yellow-600 mt-1">⚠️ No se encontraron clientes. Verifica los permisos.</p>
-                )}
                 {reportType === 'room' && rooms.length === 0 && (
                   <p className="text-xs text-yellow-600 mt-1">⚠️ No se encontraron habitaciones. Verifica los permisos.</p>
                 )}
@@ -1446,71 +2107,218 @@ const CustomReportsSection = () => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Rango de Fechas</Label>
-              <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dateRange.from && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
-                        </>
-                      ) : (
-                        format(dateRange.from, 'dd/MM/yyyy')
-                      )
-                    ) : (
-                      <span>Seleccionar fechas</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange.from}
-                    selected={dateRange}
-                    onSelect={(range) => {
-                      if (range) {
-                        setDateRange(range);
-                      }
+            {/* Selectores de rangos para nuevos reportes */}
+            {reportType === 'byAge' && (
+              <div className="space-y-2">
+                <Label>Rango de Edad</Label>
+                <select
+                  value={selectedAgeRange || ''}
+                  onChange={(e) => setSelectedAgeRange(e.target.value || null)}
+                  className="w-full p-3 border rounded-md bg-background text-foreground"
+                >
+                  <option value="">Todos los rangos</option>
+                  {AGE_RANGES.map((range) => (
+                    <option key={range.value} value={range.value}>
+                      {range.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {reportType === 'bySpending' && (
+              <div className="space-y-2">
+                <Label>Rango de Monto</Label>
+                <select
+                  value={selectedSpendingRange || ''}
+                  onChange={(e) => setSelectedSpendingRange(e.target.value || null)}
+                  className="w-full p-3 border rounded-md bg-background text-foreground"
+                >
+                  <option value="">Todos los rangos</option>
+                  {SPENDING_RANGES.map((range) => (
+                    <option key={range.value} value={range.value}>
+                      {range.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {reportType === 'byLocation' && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>País</Label>
+                  <select
+                    value={selectedCountry || ''}
+                    onChange={(e) => {
+                      const newCountry = e.target.value || null;
+                      setSelectedCountry(newCountry);
+                      // Resetear región y ciudad cuando cambia el país
+                      setSelectedRegion(null);
+                      setSelectedCity(null);
                     }}
-                    numberOfMonths={2}
-                    locale={es}
-                  />
-                </PopoverContent>
-              </Popover>
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los países</option>
+                    {availableCountries.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
+                  {availableCountries.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Cargando países...</p>
+                  )}
+                </div>
+
+                {selectedCountry && (
+                  <div className="space-y-2">
+                    <Label>Región</Label>
+                    <select
+                      value={selectedRegion || ''}
+                      onChange={(e) => {
+                        const newRegion = e.target.value || null;
+                        setSelectedRegion(newRegion);
+                        // Resetear ciudad cuando cambia la región
+                        setSelectedCity(null);
+                      }}
+                      className="w-full p-3 border rounded-md bg-background text-foreground"
+                      disabled={availableRegions.length === 0}
+                    >
+                      <option value="">Todas las regiones</option>
+                      {availableRegions.map((region) => (
+                        <option key={region} value={region}>
+                          {region}
+                        </option>
+                      ))}
+                    </select>
+                    {availableRegions.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">No hay regiones disponibles para este país</p>
+                    )}
+                  </div>
+                )}
+
+                {selectedRegion && (
+                  <div className="space-y-2">
+                    <Label>Ciudad</Label>
+                    <select
+                      value={selectedCity || ''}
+                      onChange={(e) => setSelectedCity(e.target.value || null)}
+                      className="w-full p-3 border rounded-md bg-background text-foreground"
+                      disabled={availableCities.length === 0}
+                    >
+                      <option value="">Todas las ciudades</option>
+                      {availableCities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                    {availableCities.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">No hay ciudades disponibles para esta región</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Período</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickPeriodCustom === 'today' ? 'default' : 'outline'}
+                  onClick={() => handleQuickPeriodCustom('today')}
+                >
+                  Hoy
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickPeriodCustom === '7days' ? 'default' : 'outline'}
+                  onClick={() => handleQuickPeriodCustom('7days')}
+                >
+                  7 días
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickPeriodCustom === '14days' ? 'default' : 'outline'}
+                  onClick={() => handleQuickPeriodCustom('14days')}
+                >
+                  14 días
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickPeriodCustom === '30days' ? 'default' : 'outline'}
+                  onClick={() => handleQuickPeriodCustom('30days')}
+                >
+                  30 días
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickPeriodCustom === '90days' ? 'default' : 'outline'}
+                  onClick={() => handleQuickPeriodCustom('90days')}
+                >
+                  Trimestre
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickPeriodCustom === '365days' ? 'default' : 'outline'}
+                  onClick={() => handleQuickPeriodCustom('365days')}
+                >
+                  Anual
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickPeriodCustom === 'all' ? 'default' : 'outline'}
+                  onClick={() => handleQuickPeriodCustom('all')}
+                >
+                  Desde siempre
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {dateRange.from && dateRange.to && (
+                  <>
+                    {format(dateRange.from, "d 'de' MMM yyyy", { locale: es })} - {format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}
+                  </>
+                )}
+              </p>
             </div>
           </div>
 
-          {/* Botones de acción */}
-          <div className="flex gap-3">
+          {/* Botón para Generar Reporte */}
+          <div className="mt-6">
             <Button
-              onClick={handleGenerateReport}
-              disabled={isLoading || (reportType !== 'topClients' && !selectedEntity)}
-              className="flex-1"
+              onClick={generateReportPreview}
+              disabled={isGeneratingPreview || !dateRange.from || !dateRange.to}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg py-6"
             >
-              {isLoading ? (
+              {isGeneratingPreview ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Generando...
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                  Generando Reporte...
                 </>
               ) : (
                 <>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Generar Reporte
+                  <FileText className="h-5 w-5 mr-2" />
+                  GENERAR REPORTE
                 </>
               )}
             </Button>
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              Haz clic para generar el reporte con los filtros seleccionados
+            </p>
+          </div>
 
-            {reportData && (reportData.data || reportData.topClients) && (
+          {/* Botones de descarga */}
+          {reportData && (reportData.data || reportData.topClients) && (
+            <div className="flex gap-3 mt-4">
               <DownloadButton
                 onDownloadPDF={() => handleDownload('pdf')}
                 onDownloadExcel={() => {
@@ -1518,17 +2326,138 @@ const CustomReportsSection = () => {
                   if (data.length > 0) {
                     // Preparar los datos para Excel basado en el tipo de reporte
                     const fileName = `Reporte_${reportType}_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}`;
-                    exportToCSV(data, fileName);
+                    exportToExcel(data, fileName);
                   } else {
                     alert('No hay datos para exportar');
                   }
                 }}
                 className="flex-1"
               />
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Visualización de Preview Automático (revenue, occupancy, checkIns) */}
+      {reportData && reportData.revenue && !reportData.data && (
+        <Card>
+          <CardHeader>
+            <CardTitle>📊 Vista Previa del Reporte</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Análisis de ingresos y ocupación para el período seleccionado
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Tarjetas de resumen */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-green-600">
+                    {formatCurrency(reportData.revenue.total || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Ingresos Totales</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {(reportData.occupancy.average || 0).toFixed(1)}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">Ocupación Promedio</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {reportData.checkIns.total || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Check-ins</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {reportData.totalGuests || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total Personas</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Gráficos */}
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Gráfico de Barras - Ingresos */}
+              {reportData.revenue.data && reportData.revenue.data.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Ingresos por Período</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={reportData.revenue.data}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="date" 
+                          tick={{ fontSize: 12 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value) => formatCurrency(value)}
+                          labelStyle={{ color: '#000' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="total" fill="#10b981" name="Ingresos Totales" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Gráfico Circular - Distribución de Ingresos */}
+              {reportData.revenue.data && reportData.revenue.data.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribución de Ingresos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { 
+                              name: 'Habitaciones', 
+                              value: reportData.revenue.data.reduce((sum, item) => sum + (item.roomRevenue || 0), 0) 
+                            },
+                            { 
+                              name: 'Servicios', 
+                              value: reportData.revenue.data.reduce((sum, item) => sum + (item.servicesRevenue || 0), 0) 
+                            }
+                          ].filter(item => item.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
+                          outerRadius={90}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {[0, 1].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Visualización de datos del reporte */}
       {reportData && reportData.data && (
@@ -1627,8 +2556,8 @@ const CustomReportsSection = () => {
                   </Card>
                   <Card>
                     <CardContent className="pt-6">
-                      <div className="text-2xl font-bold text-blue-600">{reportData.data.summary.occupancyRate.toFixed(1)}%</div>
-                      <p className="text-xs text-muted-foreground">Ocupación</p>
+                      <div className="text-2xl font-bold text-blue-600">{reportData.data.summary.totalGuests || 0}</div>
+                      <p className="text-xs text-muted-foreground">Personas</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -1663,8 +2592,8 @@ const CustomReportsSection = () => {
                   </Card>
                   <Card>
                     <CardContent className="pt-6">
-                      <div className="text-2xl font-bold text-blue-600">{reportData.data.summary.occupancyRate.toFixed(1)}%</div>
-                      <p className="text-xs text-muted-foreground">Tasa de Ocupación</p>
+                      <div className="text-2xl font-bold text-blue-600">{reportData.data.summary.totalGuests || 0}</div>
+                      <p className="text-xs text-muted-foreground">Total Personas</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -1712,6 +2641,247 @@ const CustomReportsSection = () => {
                 </div>
               </div>
             )}
+
+            {reportType === 'byLocation' && reportData.data && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Reporte de Reservas por País</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedCountry 
+                      ? `País seleccionado: ${selectedCountry}` 
+                      : `Total de países: ${reportData.data.length}`}
+                  </p>
+                </div>
+
+                {/* Gráficos */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Gráfico de Barras */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Reservas por País</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={reportData.data}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="country" angle={-45} textAnchor="end" height={100} />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="reservationCount" fill={COLORS[0]} name="Reservas" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  {/* Gráfico de Pastel */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Distribución de Ingresos por País</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={reportData.data}
+                            dataKey="totalRevenue"
+                            nameKey="country"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={(entry) => `${entry.country}: ${formatCurrency(entry.totalRevenue)}`}
+                          >
+                            {reportData.data.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => formatCurrency(value)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Tabla de datos */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">País</th>
+                        <th className="text-center p-2">Reservas</th>
+                        <th className="text-center p-2">Total Personas</th>
+                        <th className="text-right p-2">Ingresos Totales</th>
+                        <th className="text-right p-2">Promedio/Reserva</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.data.map((item, idx) => (
+                        <tr key={idx} className="border-b hover:bg-muted/50">
+                          <td className="p-2 font-semibold">{item.country}</td>
+                          <td className="text-center p-2">{item.reservationCount}</td>
+                          <td className="text-center p-2">{item.totalGuests}</td>
+                          <td className="text-right p-2 font-semibold text-green-600">{formatCurrency(item.totalRevenue)}</td>
+                          <td className="text-right p-2">{formatCurrency(item.totalRevenue / item.reservationCount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {reportType === 'byAge' && reportData.data && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Reporte de Reservas por Rango de Edad</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedAgeRange 
+                      ? `Rango seleccionado: ${AGE_RANGES.find(r => r.value === selectedAgeRange)?.label}` 
+                      : `Total de rangos: ${reportData.data.length}`}
+                  </p>
+                </div>
+
+                {/* Gráficos */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Gráfico de Pastel */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Distribución por Edad</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={reportData.data}
+                            dataKey="reservationCount"
+                            nameKey="ageRange"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={(entry) => `${entry.ageRange}: ${entry.reservationCount}`}
+                          >
+                            {reportData.data.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  {/* Gráfico de Barras */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Ingresos por Rango de Edad</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={reportData.data}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="ageRange" />
+                          <YAxis />
+                          <Tooltip formatter={(value) => formatCurrency(value)} />
+                          <Legend />
+                          <Bar dataKey="totalRevenue" fill={COLORS[2]} name="Ingresos" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Tabla de datos */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Rango de Edad</th>
+                        <th className="text-center p-2">Reservas</th>
+                        <th className="text-center p-2">Total Personas</th>
+                        <th className="text-right p-2">Ingresos Totales</th>
+                        <th className="text-right p-2">Promedio/Reserva</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.data.map((item, idx) => (
+                        <tr key={idx} className="border-b hover:bg-muted/50">
+                          <td className="p-2 font-semibold">{item.ageRange}</td>
+                          <td className="text-center p-2">{item.reservationCount}</td>
+                          <td className="text-center p-2">{item.totalGuests}</td>
+                          <td className="text-right p-2 font-semibold text-green-600">{formatCurrency(item.totalRevenue)}</td>
+                          <td className="text-right p-2">{formatCurrency(item.totalRevenue / item.reservationCount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {reportType === 'bySpending' && reportData.data && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Reporte de Reservas por Monto Gastado</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedSpendingRange 
+                      ? `Rango seleccionado: ${SPENDING_RANGES.find(r => r.value === selectedSpendingRange)?.label}` 
+                      : `Total de rangos: ${reportData.data.length}`}
+                  </p>
+                </div>
+
+                {/* Gráfico de Barras */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribución de Reservas por Monto Gastado</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={400}>
+                      <BarChart data={reportData.data} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis dataKey="spendingRange" type="category" width={120} />
+                        <Tooltip 
+                          formatter={(value, name) => {
+                            if (name === 'Ingresos Totales') return formatCurrency(value);
+                            return value;
+                          }}
+                        />
+                        <Legend />
+                        <Bar dataKey="reservationCount" fill={COLORS[3]} name="Reservas" />
+                        <Bar dataKey="totalRevenue" fill={COLORS[4]} name="Ingresos Totales" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Tabla de datos */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Rango de Gasto</th>
+                        <th className="text-center p-2">Reservas</th>
+                        <th className="text-center p-2">Total Personas</th>
+                        <th className="text-right p-2">Ingresos Totales</th>
+                        <th className="text-right p-2">Promedio/Reserva</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.data.map((item, idx) => (
+                        <tr key={idx} className="border-b hover:bg-muted/50">
+                          <td className="p-2 font-semibold">{item.spendingRange}</td>
+                          <td className="text-center p-2">{item.reservationCount}</td>
+                          <td className="text-center p-2">{item.totalGuests}</td>
+                          <td className="text-right p-2 font-semibold text-green-600">{formatCurrency(item.totalRevenue)}</td>
+                          <td className="text-right p-2">{formatCurrency(item.totalRevenue / item.reservationCount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1721,28 +2891,112 @@ const CustomReportsSection = () => {
 
 // Componente de Comparaciones
 const ComparisonsSection = () => {
-  const [compareType, setCompareType] = useState('days'); // days, months, rooms, clients
+  const [compareType, setCompareType] = useState('periods'); // periods, rooms, roomTypes
   const [dateRange1, setDateRange1] = useState({ from: null, to: null });
   const [dateRange2, setDateRange2] = useState({ from: null, to: null });
   const [compareData, setCompareData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [rooms, setRooms] = useState([]);
+  const [roomTypes, setRoomTypes] = useState([]);
+  const [selectedItems, setSelectedItems] = useState([]);
+
+  // Cargar habitaciones y tipos al montar
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Cargar habitaciones
+        const roomsRes = await fetch('http://localhost:3001/api/v1/rooms', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (roomsRes.ok) {
+          const roomsData = await roomsRes.json();
+          setRooms(Array.isArray(roomsData) ? roomsData : (roomsData.data || []));
+        }
+
+        // Cargar tipos de habitación
+        const typesData = await fetchAdminRoomTypes();
+        setRoomTypes(typesData || []);
+      } catch (error) {
+        console.error('Error al cargar datos:', error);
+      }
+    };
+    loadData();
+  }, []);
+
+  const getPeriodData = async (from, to) => {
+    if (!from || !to) return null;
+    
+    try {
+      const startDate = format(from, 'yyyy-MM-dd');
+      const endDate = format(to, 'yyyy-MM-dd');
+      const params = new URLSearchParams({ startDate, endDate, groupBy: 'day' });
+      
+      const [revenueRes, occupancyRes] = await Promise.all([
+        fetch(`http://localhost:3001/api/v1/reports/revenue?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`http://localhost:3001/api/v1/reports/occupancy?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
+      
+      const revenue = await revenueRes.json();
+      const occupancy = await occupancyRes.json();
+      
+      return {
+        revenue: revenue.data || [],
+        occupancy: occupancy.data || [],
+        totalRevenue: (revenue.data || []).reduce((sum, item) => sum + (item.totalRevenue || 0), 0),
+        avgOccupancy: (occupancy.data || []).length > 0 
+          ? (occupancy.data || []).reduce((sum, item) => sum + (item.occupancyPercentage || 0), 0) / occupancy.data.length
+          : 0
+      };
+    } catch (error) {
+      console.error('Error al obtener datos del período:', error);
+      return null;
+    }
+  };
 
   const handleCompare = async () => {
+    if (!dateRange1.from || !dateRange1.to || !dateRange2.from || !dateRange2.to) {
+      alert('Por favor selecciona ambos rangos de fechas');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Aquí irían las llamadas a la API según el tipo de comparación
       const period1Data = await getPeriodData(dateRange1.from, dateRange1.to);
       const period2Data = await getPeriodData(dateRange2.from, dateRange2.to);
       
       setCompareData({
         period1: period1Data,
-        period2: period2Data
+        period2: period2Data,
+        period1Label: `${format(dateRange1.from, 'd MMM', { locale: es })} - ${format(dateRange1.to, 'd MMM yyyy', { locale: es })}`,
+        period2Label: `${format(dateRange2.from, 'd MMM', { locale: es })} - ${format(dateRange2.to, 'd MMM yyyy', { locale: es })}`
       });
     } catch (error) {
       console.error('Error al generar comparación:', error);
+      alert('Error al generar la comparación');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+      minimumFractionDigits: 0,
+    }).format(value || 0);
   };
 
   return (
@@ -1750,53 +3004,247 @@ const ComparisonsSection = () => {
       <Card>
         <CardHeader>
           <CardTitle>Comparación de Períodos</CardTitle>
+          <p className="text-sm text-muted-foreground">Compara el rendimiento entre dos períodos de tiempo</p>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Selector de tipo de comparación */}
+            <div className="space-y-2">
               <Label>Tipo de Comparación</Label>
               <select
                 value={compareType}
                 onChange={(e) => setCompareType(e.target.value)}
-                className="w-full p-2 border rounded"
+                className="w-full p-3 border rounded-md bg-background text-foreground"
               >
-                <option value="days">Día vs Día</option>
-                <option value="months">Mes vs Mes</option>
-                <option value="rooms">Habitaciones</option>
-                <option value="clients">Clientes</option>
+                <option value="periods">Comparar Períodos</option>
+                <option value="rooms" disabled>Comparar Habitaciones (Próximamente)</option>
+                <option value="roomTypes" disabled>Comparar Tipos de Habitación (Próximamente)</option>
               </select>
             </div>
 
-            <div className="space-y-4">
-              <Label>Primer Período</Label>
-              <Calendar
-                mode="range"
-                selected={dateRange1}
-                onSelect={setDateRange1}
-              />
+            {/* Selectores de fecha */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-lg font-semibold">Primer Período</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange1.from && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange1.from ? (
+                        dateRange1.to ? (
+                          <>
+                            {format(dateRange1.from, "d 'de' MMM", { locale: es })} -{" "}
+                            {format(dateRange1.to, "d 'de' MMM yyyy", { locale: es })}
+                          </>
+                        ) : (
+                          format(dateRange1.from, "d 'de' MMM yyyy", { locale: es })
+                        )
+                      ) : (
+                        <span>Seleccionar fechas</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange1.from}
+                      selected={dateRange1}
+                      onSelect={setDateRange1}
+                      numberOfMonths={2}
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-lg font-semibold">Segundo Período</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange2.from && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange2.from ? (
+                        dateRange2.to ? (
+                          <>
+                            {format(dateRange2.from, "d 'de' MMM", { locale: es })} -{" "}
+                            {format(dateRange2.to, "d 'de' MMM yyyy", { locale: es })}
+                          </>
+                        ) : (
+                          format(dateRange2.from, "d 'de' MMM yyyy", { locale: es })
+                        )
+                      ) : (
+                        <span>Seleccionar fechas</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange2.from}
+                      selected={dateRange2}
+                      onSelect={setDateRange2}
+                      numberOfMonths={2}
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              <Label>Segundo Período</Label>
-              <Calendar
-                mode="range"
-                selected={dateRange2}
-                onSelect={setDateRange2}
-              />
-            </div>
+            {/* Botón de comparar */}
+            <Button
+              onClick={handleCompare}
+              disabled={isLoading || !dateRange1.from || !dateRange1.to || !dateRange2.from || !dateRange2.to}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Comparando...
+                </>
+              ) : (
+                <>
+                  <ArrowLeftRight className="h-4 w-4 mr-2" />
+                  Generar Comparación
+                </>
+              )}
+            </Button>
           </div>
 
-          <Button
-            onClick={handleCompare}
-            disabled={isLoading}
-            className="mt-4"
-          >
-            {isLoading ? 'Comparando...' : 'Generar Comparación'}
-          </Button>
-
+          {/* Resultados de la comparación */}
           {compareData && (
-            <div className="mt-6">
-              {/* Aquí irían los gráficos y tablas de comparación */}
+            <div className="mt-8 space-y-6">
+              <h3 className="text-xl font-bold">Resultados de la Comparación</h3>
+              
+              {/* Tarjetas de resumen */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="border-blue-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{compareData.period1Label}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ingresos Totales</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {formatCurrency(compareData.period1?.totalRevenue || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ocupación Promedio</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {(compareData.period1?.avgOccupancy || 0).toFixed(1)}%
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{compareData.period2Label}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ingresos Totales</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {formatCurrency(compareData.period2?.totalRevenue || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ocupación Promedio</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {(compareData.period2?.avgOccupancy || 0).toFixed(1)}%
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Diferencias */}
+              <Card className="bg-slate-50 dark:bg-slate-900">
+                <CardHeader>
+                  <CardTitle>Diferencias</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Variación en Ingresos:</span>
+                    <span className={cn(
+                      "text-lg font-bold",
+                      (compareData.period2?.totalRevenue || 0) >= (compareData.period1?.totalRevenue || 0) 
+                        ? "text-green-600" 
+                        : "text-red-600"
+                    )}>
+                      {((compareData.period2?.totalRevenue || 0) - (compareData.period1?.totalRevenue || 0)) >= 0 ? '+' : ''}
+                      {formatCurrency((compareData.period2?.totalRevenue || 0) - (compareData.period1?.totalRevenue || 0))}
+                      {' '}
+                      ({((((compareData.period2?.totalRevenue || 0) - (compareData.period1?.totalRevenue || 0)) / (compareData.period1?.totalRevenue || 1)) * 100).toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Variación en Ocupación:</span>
+                    <span className={cn(
+                      "text-lg font-bold",
+                      (compareData.period2?.avgOccupancy || 0) >= (compareData.period1?.avgOccupancy || 0) 
+                        ? "text-green-600" 
+                        : "text-red-600"
+                    )}>
+                      {((compareData.period2?.avgOccupancy || 0) - (compareData.period1?.avgOccupancy || 0)) >= 0 ? '+' : ''}
+                      {((compareData.period2?.avgOccupancy || 0) - (compareData.period1?.avgOccupancy || 0)).toFixed(1)}%
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Gráfico de comparación */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Comparación de Ingresos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={[
+                      {
+                        name: compareData.period1Label,
+                        ingresos: compareData.period1?.totalRevenue || 0,
+                        ocupacion: compareData.period1?.avgOccupancy || 0
+                      },
+                      {
+                        name: compareData.period2Label,
+                        ingresos: compareData.period2?.totalRevenue || 0,
+                        ocupacion: compareData.period2?.avgOccupancy || 0
+                      }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (name === 'ingresos') return formatCurrency(value);
+                          if (name === 'ocupacion') return `${value.toFixed(1)}%`;
+                          return value;
+                        }}
+                      />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="ingresos" fill="#10b981" name="Ingresos" />
+                      <Bar yAxisId="right" dataKey="ocupacion" fill="#3b82f6" name="Ocupación %" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
             </div>
           )}
         </CardContent>
@@ -1830,7 +3278,6 @@ const Reports = () => {
   });
   const [reportData, setReportData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
   const [selectedFloor, setSelectedFloor] = useState(null);
@@ -1838,6 +3285,12 @@ const Reports = () => {
   const [selectedRoomType, setSelectedRoomType] = useState(null);
   const [channelData, setChannelData] = useState([]);
   const [filterMode, setFilterMode] = useState('calendar'); // 'calendar' o 'rolling'
+  const [availableFloors, setAvailableFloors] = useState([]);
+  const [isFloorFilterEnabled, setIsFloorFilterEnabled] = useState(false);
+  const [isRoomTypeFilterEnabled, setIsRoomTypeFilterEnabled] = useState(true);
+  const [showReportPreview, setShowReportPreview] = useState(false);
+  const [previewReportData, setPreviewReportData] = useState(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [expandedReportType, setExpandedReportType] = useState(null);
   const [selectedCharts, setSelectedCharts] = useState({
     bar: true,
@@ -1856,39 +3309,69 @@ const Reports = () => {
     stats: null,
   });
   const [loadingDashboard, setLoadingDashboard] = useState(true);
+  
+  // Estados para Comparaciones
+  const [comparisonType, setComparisonType] = useState('roomTypes'); // roomTypes, clients, rooms
+  const [selectedItemsToCompare, setSelectedItemsToCompare] = useState([]);
+  const [comparisonData, setComparisonData] = useState(null);
+  const [isLoadingComparison, setIsLoadingComparison] = useState(false);
+  const [comparisonDateRange, setComparisonDateRange] = useState({
+    from: new Date(new Date().setDate(new Date().getDate() - 30)),
+    to: new Date()
+  });
+  const [comparisonSelectedPeriod, setComparisonSelectedPeriod] = useState('30days');
+  
+  // Estados para rooms y clients (necesarios para Comparaciones)
+  const [rooms, setRooms] = useState([]);
+  const [clients, setClients] = useState([]);
+  
+  // Estados para búsqueda de clientes
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [filteredClients, setFilteredClients] = useState([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
 
-  // Cargar datos del dashboard al montar
+  // Cargar datos del dashboard al montar (consolidado para evitar error 429)
   useEffect(() => {
-    loadDashboardData();
-    loadClientsData();
+    const loadAllData = async () => {
+      setLoadingDashboard(true);
+      try {
+        await loadDashboardData();
+        await loadClientsData();
+        await loadRoomsAndClients();
+      } catch (error) {
+        console.error('Error al cargar datos iniciales:', error);
+      } finally {
+        setLoadingDashboard(false);
+      }
+    };
+    loadAllData();
   }, []);
 
   const loadDashboardData = async () => {
-    setLoadingDashboard(true);
     try {
-      // Obtener datos de las últimas 4 semanas
-      const endDate = format(new Date(), 'yyyy-MM-dd');
+      // Usar AYER como fecha final para todos los cálculos
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const endDate = format(yesterday, 'yyyy-MM-dd');
       const startDate = format(new Date(new Date().setDate(new Date().getDate() - 28)), 'yyyy-MM-dd');
 
-      // Obtener datos del mes actual completo para el KPI de ingresos (día 1 al último día)
+      // Para "Ingresos del Mes": MES ACTUAL COMPLETO (del día 1 al último día del mes)
       const today = new Date();
       const monthStart = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
-      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      const monthEnd = format(lastDayOfMonth, 'yyyy-MM-dd');
+      const monthEndDate = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
 
-      // Calcular últimos 7 días + hoy = 8 días total para el gráfico
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(today.getDate() - 7); // Retroceder 7 días desde hoy
-
-      const weekStart = format(sevenDaysAgo, 'yyyy-MM-dd');
-      const weekEnd = format(today, 'yyyy-MM-dd');
+      // Para "Ingresos Diarios Promedio": Últimos 7 días desde AYER
+      const weekEndDate = format(yesterday, 'yyyy-MM-dd');
+      const weekStartDate7 = new Date(yesterday);
+      weekStartDate7.setDate(yesterday.getDate() - 6); // 7 días total incluyendo ayer
+      const weekStart = format(weekStartDate7, 'yyyy-MM-dd');
 
       const [weeklyRev, dailyOcc, dailyRev, roomTypes, monthlyRev, totalPaid] = await Promise.all([
         getWeeklyRevenue(startDate, endDate),
-        getDailyOccupancy(weekStart, weekEnd),
-        getDailyRevenue(weekStart, weekEnd),
-        getRoomTypeStats(monthStart, monthEnd),
-        getMonthlyRevenue(monthStart, monthEnd),
+        getDailyOccupancy(weekStart, weekEndDate),
+        getDailyRevenue(weekStart, weekEndDate),
+        getRoomTypeStats(monthStart, monthEndDate),
+        getMonthlyRevenue(monthStart, monthEndDate),
         getTotalPaidAmount(),
       ]);
 
@@ -1916,48 +3399,17 @@ const Reports = () => {
         return {
           semana: label,
           ingresos: item.totalRevenue || 0,
-        };        // Si el backend proporciona startDate y endDate en el futuro, usar eso
-        // Por ahora, usar el periodLabel del backend
-        if (periodString.includes('W')) {
-          // Extraer el número de semana del formato "2025-W41"
-          const weekNumber = periodString.split('-W')[1];
-          label = `Sem ${weekNumber}`;
-
-          // Calcular fechas de inicio y fin de la semana
-          const year = parseInt(periodString.split('-W')[0]);
-          const week = parseInt(weekNumber);
-
-          // Calcular el primer día de la semana (Lunes)
-          const firstDayOfYear = new Date(year, 0, 1);
-          const daysOffset = (week - 1) * 7;
-          const weekStart = new Date(firstDayOfYear);
-          weekStart.setDate(firstDayOfYear.getDate() + daysOffset - firstDayOfYear.getDay() + 1);
-
-          // Calcular el último día de la semana (Domingo)
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 6);
-
-          // Formatear las fechas
-          const startFormatted = format(weekStart, 'dd/MM/yyyy');
-          const endFormatted = format(weekEnd, 'dd/MM/yyyy');
-
-          label = `Sem ${weekNumber}: ${startFormatted} - ${endFormatted}`;
-        }
-
-        return {
-          semana: label,
-          ingresos: item.totalRevenue || 0,
         };
       }) || [];
 
-      // Procesar ocupación diaria (últimos 8 días incluyendo hoy)
-      // Generar TODOS los días desde sevenDaysAgo hasta today, incluso si no hay datos
+      // Procesar ocupación diaria (últimos 7 días desde ayer)
+      // Generar TODOS los días desde weekStartDate7 hasta yesterday, incluso si no hay datos
       const allDays = [];
       const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-      for (let i = 0; i < 8; i++) {
-        const currentDate = new Date(sevenDaysAgo);
-        currentDate.setDate(sevenDaysAgo.getDate() + i);
+      for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(weekStartDate7);
+        currentDate.setDate(weekStartDate7.getDate() + i);
         const dayName = dayNames[currentDate.getDay()];
         const dayNumber = currentDate.getDate();
         const periodKey = format(currentDate, 'yyyy-MM-dd');
@@ -1981,9 +3433,12 @@ const Reports = () => {
 
       // Calcular total de ingresos del mes actual
       const monthlyRevenueTotal = monthlyRev?.data?.reduce((sum, item) => sum + (item.totalRevenue || 0), 0) || 0;
+      console.log('💰 Ingresos del mes (últimos 30 días desde ayer):', monthlyRevenueTotal);
+      console.log('📊 Datos mensuales recibidos:', monthlyRev);
 
       // Obtener total de paid_amount
       const totalPaidAmount = totalPaid?.data?.totalPaidAmount || 0;
+      console.log('💵 Total pagado efectivo:', totalPaidAmount);
 
       // Procesar ingresos diarios (últimos 7 días)
       const revenueByDayData = dailyRev?.data?.map((item) => ({
@@ -2010,18 +3465,19 @@ const Reports = () => {
         monthlyRevenueTotal: 0,
         totalPaidAmount: 0,
       });
-    } finally {
-      setLoadingDashboard(false);
     }
   };
 
   const loadClientsData = async () => {
     try {
       console.log('Iniciando carga de datos de clientes...');
-      // Usar HOY como fecha final para incluir clientes creados hoy
+      // Usar AYER como fecha final (últimos 30 días desde ayer)
       const today = new Date();
-      const endDate = format(today, 'yyyy-MM-dd');
-      const startDate = format(new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+      // Usar mes actual completo (primer día del mes hasta último día del mes)
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const startDate = format(monthStart, 'yyyy-MM-dd');
+      const endDate = format(monthEnd, 'yyyy-MM-dd');
 
       // Cargar top 5 clientes desde el endpoint real
       const topClientsResponse = await getTopClients(startDate, endDate, 5);
@@ -2066,21 +3522,115 @@ const Reports = () => {
     }
   };
 
+  // Cargar habitaciones y clientes para usar en Comparaciones
+  const loadRoomsAndClients = async () => {
+    try {
+      // Cargar habitaciones
+      const roomsResponse = await fetch('http://localhost:3001/api/v1/admin/rooms', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (roomsResponse.ok) {
+        const roomsData = await roomsResponse.json();
+        const rawData = Array.isArray(roomsData) ? roomsData : (roomsData.data || []);
+        const roomsList = rawData
+          .filter(r => r.is_active !== false)
+          .map(r => ({
+            id: r.id,
+            roomNumber: r.room_number || 'S/N',
+            type: r.room_types?.name || 'Sin tipo',
+            floor: r.floor
+          }));
+        setRooms(roomsList);
+        console.log('✅ Habitaciones cargadas para Comparaciones:', roomsList.length);
+      }
+
+      // Cargar clientes
+      const clientsResponse = await fetch('http://localhost:3001/api/v1/guests?limit=500', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (clientsResponse.ok) {
+        const clientsData = await clientsResponse.json();
+        const allGuests = clientsData.data || [];
+        const clientsList = allGuests.map(c => ({
+          id: c.id,
+          name: c.fullName || c.full_name || 'Sin nombre',
+          email: c.email || '',
+          rut: c.rut || c.guest_details?.rut || '',
+          passport: c.passport || c.guest_details?.passport || ''
+        }));
+        setClients(clientsList);
+        console.log('✅ Clientes cargados para Comparaciones:', clientsList.length);
+      }
+    } catch (error) {
+      console.error('Error al cargar rooms y clients para Comparaciones:', error);
+    }
+  };
+
+  // Función para filtrar clientes por RUT, pasaporte o nombre
+  const filterClientsBySearch = (query) => {
+    if (!query || query.trim().length < 2) {
+      setFilteredClients([]);
+      setShowClientDropdown(false);
+      return;
+    }
+
+    const searchQuery = query.toLowerCase().trim();
+    const filtered = clients.filter(client => {
+      const nameMatch = client.name?.toLowerCase().includes(searchQuery);
+      const rutMatch = client.rut?.toLowerCase().includes(searchQuery);
+      const passportMatch = client.passport?.toLowerCase().includes(searchQuery);
+      const emailMatch = client.email?.toLowerCase().includes(searchQuery);
+      
+      return nameMatch || rutMatch || passportMatch || emailMatch;
+    });
+
+    setFilteredClients(filtered.slice(0, 20)); // Máximo 20 resultados
+    setShowClientDropdown(filtered.length > 0);
+  };
+
+  // Función para toggle selección de cliente
+  const toggleClientSelection = (clientId) => {
+    setSelectedItemsToCompare(prev => {
+      if (prev.includes(clientId)) {
+        return prev.filter(id => id !== clientId);
+      } else {
+        return [...prev, clientId];
+      }
+    });
+    setClientSearchQuery('');
+    setShowClientDropdown(false);
+  };
+
+  // Función para procesar datos de reportes
   const processReportData = (revenueData, occupancyData) => {
     const revenueArray = revenueData?.data || [];
     const occupancyArray = occupancyData?.data || [];
 
+    console.log('🔍 [Dashboard] Procesando datos - primer item de revenue:', revenueArray[0]);
+    console.log('🔍 [Dashboard] Procesando datos - primer item de occupancy:', occupancyArray[0]);
+
     const processedRevenue = {
       data: revenueArray.map(item => ({
-        date: item.period || item.periodLabel,
+        date: item.period || item.periodLabel || item.dia || item.semana || item.mes || item.date,
         period: item.period,
-        total: item.totalRevenue || 0,
+        total: item.totalRevenue || item.totalAmount || item.ingresos || item.value || 0,
         roomRevenue: item.roomRevenue || 0,
         servicesRevenue: item.servicesRevenue || 0,
       })),
-      total: revenueArray.reduce((sum, item) => sum + (item.totalRevenue || 0), 0),
-      count: revenueArray.reduce((sum, item) => sum + (item.reservationCount || 0), 0),
+      total: revenueArray.reduce((sum, item) => sum + (item.totalRevenue || item.totalAmount || item.ingresos || item.value || 0), 0),
+      count: revenueArray.reduce((sum, item) => sum + (item.reservationCount || item.count || item.reservas || 0), 0),
     };
+
+    console.log('💰 [Dashboard] Total de ingresos calculado:', processedRevenue.total);
+    console.log('📊 [Dashboard] Primer período procesado:', processedRevenue.data[0]);
 
     const processedOccupancy = {
       data: occupancyArray.map(item => ({
@@ -2089,6 +3639,7 @@ const Reports = () => {
         percentage: item.occupancyPercentage || 0,
         occupiedNights: item.occupiedRoomNights || 0,
         availableNights: item.availableRoomNights || 0,
+        totalGuests: item.totalGuests || 0,
       })),
       average: occupancyArray.length > 0
         ? occupancyArray.reduce((sum, item) => sum + (item.occupancyPercentage || 0), 0) / occupancyArray.length
@@ -2105,13 +3656,17 @@ const Reports = () => {
       count: revenueArray.length,
     };
 
+    const totalGuests = occupancyArray.reduce((sum, item) => sum + (item.totalGuests || 0), 0);
+
     return {
       revenue: processedRevenue,
       occupancy: processedOccupancy,
       checkIns: processedCheckIns,
+      totalGuests,
     };
   };
 
+  // Generar preview automático del reporte
   const handleGenerateReport = async (rangeType, mode = filterMode) => {
     setIsLoading(true);
     setSelectedReportType(rangeType);
@@ -2274,13 +3829,10 @@ const Reports = () => {
           ]);
           break;
         case 'Anual':
-          // Para el reporte anual, usamos el año actual
-          const currentYear = new Date().getFullYear();
-          const yearStart = `${currentYear}-01-01`;
-          const yearEnd = format(new Date(), 'yyyy-MM-dd');
+          // Para el reporte anual, usamos los últimos 365 días
           [revenue, occupancy] = await Promise.all([
-            getYearlyRevenue(yearStart, yearEnd),
-            getYearlyOccupancy(yearStart, yearEnd),
+            getMonthlyRevenue(startDate, endDate),
+            getMonthlyOccupancy(startDate, endDate),
           ]);
           break;
         case 'Anual (Últimos 12 meses)':
@@ -2312,7 +3864,8 @@ const Reports = () => {
       });
 
       setReportData(processed);
-      setIsModalOpen(true);
+      setShowReportPreview(true); // ✅ MOSTRAR LA PREVISUALIZACIÓN
+      console.log('👁️ Previsualización activada - debería mostrarse abajo');
     } catch (err) {
       console.error('Error al obtener reportes:', err);
     } finally {
@@ -2371,7 +3924,7 @@ const Reports = () => {
 
       const processed = processReportData(revenue, occupancy);
       setReportData(processed);
-      setIsModalOpen(true);
+      // NO abrir modal - el reporte se muestra hacia abajo
     } catch (err) {
       console.error('Error al obtener reportes personalizados:', err);
     } finally {
@@ -2406,36 +3959,39 @@ const Reports = () => {
 
   // Función para manejar períodos rápidos (estilo Planning)
   const handleQuickPeriod = async (period) => {
-    const today = new Date();
-    let from, to = new Date(today);
+    // Usar AYER como fecha final porque hoy no tiene datos completos
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    let from, to = new Date(yesterday);
 
     switch (period) {
       case 'today':
-        from = new Date(today);
+        from = new Date(yesterday); // Mostrar datos de ayer
         break;
       case '7days':
-        from = new Date(today);
-        from.setDate(today.getDate() - 6); // 7 días total incluyendo hoy
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 6); // 7 días total incluyendo ayer
         break;
       case '14days':
-        from = new Date(today);
-        from.setDate(today.getDate() - 13);
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 13);
         break;
       case '30days':
-        from = new Date(today);
-        from.setDate(today.getDate() - 29);
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 29);
         break;
       case '90days':
-        from = new Date(today);
-        from.setDate(today.getDate() - 89); // 90 días incluyendo hoy
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 89);
         break;
       case '365days':
-        from = new Date(today);
-        from.setDate(today.getDate() - 364); // 365 días incluyendo hoy
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 364);
         break;
       default:
-        from = new Date(today);
-        from.setDate(today.getDate() - 29);
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 29);
     }
 
     setDateRange({ from, to });
@@ -2444,9 +4000,6 @@ const Reports = () => {
     // Auto-generar reporte con tipo inteligente
     const reportType = getIntelligentReportType(from, to);
     await handleGenerateReport(reportType, 'rolling');
-
-    // Recargar datos del dashboard con el nuevo rango
-    await loadDashboardData();
   };
 
   // Descargar gráfico como PDF
@@ -2489,7 +4042,7 @@ const Reports = () => {
         'Ocupación': item.ocupacion || item.percentage || 0,
       }));
 
-      exportToCSV(csvData, `${chartName}_${format(new Date(), 'yyyy-MM-dd')}`);
+      exportToExcel(csvData, `${chartName}_${format(new Date(), 'yyyy-MM-dd')}`);
     } catch (error) {
       console.error('Error al generar CSV:', error);
       alert('Error al generar el archivo CSV');
@@ -2538,11 +4091,271 @@ const Reports = () => {
         'Porcentaje': `${((item.value / total) * 100).toFixed(1)}%`
       }));
 
-      exportToCSV(csvData, `Reservas_por_Canal_${format(new Date(), 'yyyy-MM-dd')}`);
+      exportToExcel(csvData, `Reservas_por_Canal_${format(new Date(), 'yyyy-MM-dd')}`);
     } catch (error) {
       console.error('Error al generar CSV:', error);
       alert('Error al generar el archivo CSV');
     }
+  };
+
+  // Generar comparaciones entre entidades seleccionadas
+  const generateComparison = async () => {
+    if (selectedItemsToCompare.length < 2) {
+      alert('Debes seleccionar al menos 2 elementos para comparar');
+      return;
+    }
+
+    setIsLoadingComparison(true);
+    try {
+      const startDate = format(comparisonDateRange.from, 'yyyy-MM-dd');
+      const endDate = format(comparisonDateRange.to, 'yyyy-MM-dd');
+
+      console.log('🔍 Generando comparación:');
+      console.log('  - Tipo:', comparisonType);
+      console.log('  - Items seleccionados:', selectedItemsToCompare);
+      console.log('  - Rango de fechas:', startDate, 'a', endDate);
+
+      let comparisonResults = [];
+
+      // Según el tipo de comparación, obtener datos para cada elemento
+      for (const itemId of selectedItemsToCompare) {
+        let itemData = null;
+        let itemName = '';
+
+        if (comparisonType === 'roomTypes') {
+          const type = roomTypes.find(rt => rt.id === parseInt(itemId));
+          itemName = type?.name || `Tipo ${itemId}`;
+          
+          const params = new URLSearchParams({
+            startDate,
+            endDate,
+            roomTypeId: itemId,
+            groupBy: 'month'
+          });
+
+          const [revenueRes, occupancyRes] = await Promise.all([
+            fetch(`http://localhost:3001/api/v1/reports/revenue?${params.toString()}`, {
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            }),
+            fetch(`http://localhost:3001/api/v1/reports/occupancy?${params.toString()}`, {
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            })
+          ]);
+
+          const revenue = await revenueRes.json();
+          const occupancy = await occupancyRes.json();
+
+          console.log(`  📊 Datos de tipo "${itemName}":`, {
+            revenue: revenue.data,
+            occupancy: occupancy.data
+          });
+
+          // Calcular totales con los nombres correctos de las propiedades
+          const totalRevenue = revenue.data?.reduce((sum, r) => sum + (r.totalRevenue || r.totalAmount || 0), 0) || 0;
+          const totalReservations = revenue.data?.reduce((sum, r) => sum + (r.reservationCount || r.count || 0), 0) || 0;
+          const totalGuests = occupancy.data?.reduce((sum, o) => sum + (o.totalGuests || 0), 0) || 0;
+          const avgOccupancy = occupancy.data?.length > 0
+            ? occupancy.data.reduce((sum, o) => sum + (o.occupancyPercentage || o.occupancyRate || 0), 0) / occupancy.data.length
+            : 0;
+
+          console.log(`  💰 Totales calculados:`, {
+            totalRevenue,
+            totalReservations,
+            totalGuests,
+            avgOccupancy
+          });
+
+          itemData = {
+            id: itemId,
+            name: itemName,
+            totalRevenue,
+            avgOccupancy,
+            totalReservations,
+            totalGuests,
+            revenueData: revenue.data || [],
+            occupancyData: occupancy.data || []
+          };
+        } else if (comparisonType === 'rooms') {
+          const room = rooms.find(r => r.id === parseInt(itemId));
+          itemName = `Habitación ${room?.roomNumber}`;
+
+          const params = new URLSearchParams({
+            startDate,
+            endDate,
+            roomId: itemId,
+            groupBy: 'month'
+          });
+
+          const [revenueRes, occupancyRes] = await Promise.all([
+            fetch(`http://localhost:3001/api/v1/reports/revenue?${params.toString()}`, {
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            }),
+            fetch(`http://localhost:3001/api/v1/reports/occupancy?${params.toString()}`, {
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            })
+          ]);
+
+          const revenue = await revenueRes.json();
+          const occupancy = await occupancyRes.json();
+
+          console.log(`  🏨 Datos de habitación "${itemName}":`, {
+            revenue: revenue.data,
+            occupancy: occupancy.data
+          });
+
+          // Calcular totales con los nombres correctos de las propiedades
+          const totalRevenue = revenue.data?.reduce((sum, r) => sum + (r.totalRevenue || r.totalAmount || 0), 0) || 0;
+          const totalReservations = revenue.data?.reduce((sum, r) => sum + (r.reservationCount || r.count || 0), 0) || 0;
+          const totalGuests = occupancy.data?.reduce((sum, o) => sum + (o.totalGuests || 0), 0) || 0;
+          const avgOccupancy = occupancy.data?.length > 0
+            ? occupancy.data.reduce((sum, o) => sum + (o.occupancyPercentage || o.occupancyRate || 0), 0) / occupancy.data.length
+            : 0;
+
+          console.log(`  💰 Totales calculados:`, {
+            totalRevenue,
+            totalReservations,
+            totalGuests,
+            avgOccupancy
+          });
+
+          itemData = {
+            id: itemId,
+            name: itemName,
+            totalRevenue,
+            avgOccupancy,
+            totalReservations,
+            totalGuests,
+            revenueData: revenue.data || [],
+            occupancyData: occupancy.data || []
+          };
+        }
+
+        // Siempre agregar el item, incluso si no tiene datos
+        if (itemData) {
+          // Marcar como "sin datos" si no tiene ingresos ni reservas
+          if (itemData.totalRevenue === 0 && itemData.totalReservations === 0) {
+            itemData.noData = true;
+          }
+          comparisonResults.push(itemData);
+        }
+      }
+
+      console.log('✅ Comparación completa:', comparisonResults);
+      setComparisonData(comparisonResults);
+    } catch (error) {
+      console.error('❌ Error al generar comparación:', error);
+      alert('Error al generar la comparación');
+    } finally {
+      setIsLoadingComparison(false);
+    }
+  };
+
+  // Manejar cambio rápido de período para Comparaciones
+  const handleComparisonQuickPeriod = (period) => {
+    const today = new Date();
+    let from, to = new Date(today);
+
+    switch (period) {
+      case 'today':
+        from = new Date(today);
+        break;
+      case '7days':
+        from = new Date(today);
+        from.setDate(today.getDate() - 6); // 7 días total incluyendo hoy
+        break;
+      case '14days':
+        from = new Date(today);
+        from.setDate(today.getDate() - 13);
+        break;
+      case '30days':
+        from = new Date(today);
+        from.setDate(today.getDate() - 29);
+        break;
+      case '90days':
+        from = new Date(today);
+        from.setDate(today.getDate() - 89); // 90 días incluyendo hoy
+        break;
+      case '365days':
+        from = new Date(today);
+        from.setDate(today.getDate() - 364); // 365 días incluyendo hoy
+        break;
+      default:
+        from = new Date(today);
+        from.setDate(today.getDate() - 29);
+    }
+
+    setComparisonDateRange({ from, to });
+    setComparisonSelectedPeriod(period);
+  };
+
+  // Exportar comparación a PDF
+  const exportComparisonPDF = () => {
+    if (!comparisonData || comparisonData.length === 0) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Título
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text('Reporte Comparativo', pageWidth / 2, 20, { align: 'center' });
+
+    // Subtítulo
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    doc.text(
+      `${format(comparisonDateRange.from, 'd MMM yyyy', { locale: es })} - ${format(comparisonDateRange.to, 'd MMM yyyy', { locale: es })}`,
+      pageWidth / 2,
+      28,
+      { align: 'center' }
+    );
+
+    // Tipo de comparación
+    const comparisonTypeLabels = {
+      roomTypes: 'Tipos de Habitación',
+      rooms: 'Habitaciones',
+      clients: 'Clientes'
+    };
+    doc.text(
+      `Comparando: ${comparisonTypeLabels[comparisonType]}`,
+      pageWidth / 2,
+      36,
+      { align: 'center' }
+    );
+
+    // Tabla de datos
+    const tableData = comparisonData.map(item => [
+      item.name,
+      formatCurrency(item.totalRevenue),
+      item.totalReservations,
+      comparisonType !== 'clients' ? (item.totalGuests || 0) : 'N/A'
+    ]);
+
+    doc.autoTable({
+      startY: 45,
+      head: [['Nombre', 'Ingresos Totales', 'Reservas', 'Total Personas']],
+      body: tableData,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 3 },
+      headStyles: { fillColor: [6, 182, 212], textColor: 255, fontStyle: 'bold' },
+    });
+
+    // Guardar
+    doc.save(`comparacion_${comparisonType}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
+
+  // Exportar comparación a Excel
+  const exportComparisonExcel = () => {
+    if (!comparisonData || comparisonData.length === 0) return;
+
+    const excelData = comparisonData.map(item => ({
+      'Nombre': item.name,
+      'Ingresos Totales': item.totalRevenue,
+      'Reservas': item.totalReservations,
+      'Personas': comparisonType !== 'clients' ? (item.totalGuests || 0) : 'N/A'
+    }));
+
+    exportToExcel(excelData, `comparacion_${comparisonType}_${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
   // Cargar tipos de habitación
@@ -2558,17 +4371,85 @@ const Reports = () => {
         
         if (response.ok) {
           const data = await response.json();
-          setRoomTypes(data.data || []);
+          console.log('🏨 Tipos de habitación cargados en Dashboard:', data);
+          // El backend puede devolver el array directamente o en { data: [...] }
+          const types = Array.isArray(data) ? data : (data.data || []);
+          console.log('✅ Tipos procesados:', types);
+          setRoomTypes(types);
         } else {
-          console.error('Error al cargar tipos de habitación');
+          console.error('❌ Error al cargar tipos de habitación:', response.status);
         }
       } catch (error) {
-        console.error('Error al cargar tipos de habitación:', error);
+        console.error('❌ Error al cargar tipos de habitación:', error);
       }
     };
 
     loadRoomTypes();
   }, []);
+
+  // Cargar pisos disponibles dinámicamente
+  useEffect(() => {
+    const loadAvailableFloors = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/v1/admin/rooms', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const rooms = Array.isArray(data) ? data : (data.data || []);
+          // Extraer pisos únicos y ordenarlos
+          const floors = [...new Set(rooms.map(room => room.floor))].filter(f => f != null).sort((a, b) => a - b);
+          setAvailableFloors(floors);
+        }
+      } catch (error) {
+        console.error('Error al cargar pisos:', error);
+      }
+    };
+
+    loadAvailableFloors();
+  }, []);
+
+  // ==================== WEBSOCKET PARA ACTUALIZACIÓN EN TIEMPO REAL ====================
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token && !socketService.isConnected()) {
+      socketService.connect(token);
+    }
+
+    // Escuchar eventos de actualización de reportes
+    const handleReportUpdate = (data) => {
+      console.log('🔄 Actualización de reporte recibida:', data);
+      // Recargar datos del dashboard
+      loadDashboardData();
+      loadClientsData();
+      // Si hay un reporte generado, regenerarlo
+      if (reportData) {
+        handleGenerateReport();
+      }
+    };
+
+    // Registrar listener personalizado para reportes
+    if (socketService.socket) {
+      socketService.socket.on('reports:update', handleReportUpdate);
+      socketService.socket.on('reservation:created', handleReportUpdate);
+      socketService.socket.on('reservation:updated', handleReportUpdate);
+      socketService.socket.on('reservation:deleted', handleReportUpdate);
+    }
+
+    return () => {
+      // Limpiar listeners al desmontar
+      if (socketService.socket) {
+        socketService.socket.off('reports:update', handleReportUpdate);
+        socketService.socket.off('reservation:created', handleReportUpdate);
+        socketService.socket.off('reservation:updated', handleReportUpdate);
+        socketService.socket.off('reservation:deleted', handleReportUpdate);
+      }
+    };
+  }, [reportData]);
 
   // Cargar datos de canal (usando datos de ejemplo mientras se implementa el endpoint)
   useEffect(() => {
@@ -2597,7 +4478,7 @@ const Reports = () => {
       </div>
 
       <Tabs defaultValue="custom" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -2610,13 +4491,17 @@ const Reports = () => {
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Reportes Personalizados</span>
           </TabsTrigger>
+          <TabsTrigger value="comparisons" className="gap-2">
+            <ArrowLeftRight className="h-4 w-4" />
+            <span className="hidden sm:inline">Comparaciones</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6 mt-6">
           {/* KPI de Ingresos Totales (Ancho completo) */}
           <Card className="border-green-200 dark:border-green-900">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-bold">Ingresos Totales Pagados</CardTitle>
+              <CardTitle className="text-lg font-bold">Ingresos Totales</CardTitle>
               <DollarSign className="h-6 w-6 text-green-600" />
             </CardHeader>
             <CardContent>
@@ -2625,14 +4510,13 @@ const Reports = () => {
                   dashboardData.totalPaidAmount || 0
                 )}
               </div>
-              <p className="text-sm text-muted-foreground mt-2">Total de pagos efectivamente recibidos (solo reservas completadas)</p>
             </CardContent>
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ingresos del Mes</CardTitle>
+                <CardTitle className="text-sm font-medium">Ingresos Últimos 30 Días</CardTitle>
                 <DollarSign className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
@@ -2642,14 +4526,20 @@ const Reports = () => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'dd/MM')} - {format(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0), 'dd/MM/yyyy')}
+                  {(() => {
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    const monthStart = new Date(yesterday);
+                    monthStart.setDate(yesterday.getDate() - 29);
+                    return `${format(monthStart, 'dd/MM')} - ${format(yesterday, 'dd/MM/yyyy')}`;
+                  })()}
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ingresos Diarios (Promedio)</CardTitle>
+                <CardTitle className="text-sm font-medium">Promedio Ingresos Diarios</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
@@ -2660,31 +4550,47 @@ const Reports = () => {
                       : 0
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Últimos 7 días (promedio por día)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {(() => {
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    const weekStart = new Date(yesterday);
+                    weekStart.setDate(yesterday.getDate() - 6);
+                    return `${format(weekStart, 'dd/MM')} - ${format(yesterday, 'dd/MM/yyyy')}`;
+                  })()}
+                </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Clientes</CardTitle>
+                <CardTitle className="text-sm font-medium">Clientes</CardTitle>
+                <Users className="h-4 w-4 text-cyan-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-cyan-600">
+                  {clientsData.stats?.totalClients || 0}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Clientes Nuevos Últimos 30 Días</CardTitle>
                 <Users className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600">
-                  {clientsData.stats?.totalClients || 0}
+                  {clientsData.stats?.newClients || 0}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Últimos 90 días</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Tipos de Habitación</CardTitle>
-                <FileText className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">7</div>
-                <p className="text-xs text-muted-foreground mt-1">Tipos disponibles</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {(() => {
+                    const today = new Date();
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(today.getDate() - 30);
+                    return `${format(thirtyDaysAgo, "dd/MM/yyyy")} - ${format(today, "dd/MM/yyyy")}`;
+                  })()}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -2741,7 +4647,10 @@ const Reports = () => {
                   <Button
                     variant={selectedPeriod === 'today' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => handleQuickPeriod('today')}
+                    onClick={() => {
+                      handleQuickPeriod('today');
+                      setIsFloorFilterEnabled(true);
+                    }}
                     className="h-8"
                   >
                     Hoy
@@ -2750,7 +4659,10 @@ const Reports = () => {
                   <Button
                     variant={selectedPeriod === '7days' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => handleQuickPeriod('7days')}
+                    onClick={() => {
+                      handleQuickPeriod('7days');
+                      setIsFloorFilterEnabled(true);
+                    }}
                     className="h-8"
                   >
                     7 días
@@ -2759,7 +4671,10 @@ const Reports = () => {
                   <Button
                     variant={selectedPeriod === '14days' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => handleQuickPeriod('14days')}
+                    onClick={() => {
+                      handleQuickPeriod('14days');
+                      setIsFloorFilterEnabled(true);
+                    }}
                     className="h-8"
                   >
                     14 días
@@ -2768,7 +4683,10 @@ const Reports = () => {
                   <Button
                     variant={selectedPeriod === '30days' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => handleQuickPeriod('30days')}
+                    onClick={() => {
+                      handleQuickPeriod('30days');
+                      setIsFloorFilterEnabled(true);
+                    }}
                     className="h-8"
                   >
                     30 días
@@ -2777,7 +4695,10 @@ const Reports = () => {
                   <Button
                     variant={selectedPeriod === '90days' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => handleQuickPeriod('90days')}
+                    onClick={() => {
+                      handleQuickPeriod('90days');
+                      setIsFloorFilterEnabled(true);
+                    }}
                     className="h-8"
                   >
                     Trimestre
@@ -2786,10 +4707,29 @@ const Reports = () => {
                   <Button
                     variant={selectedPeriod === '365days' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => handleQuickPeriod('365days')}
+                    onClick={() => {
+                      handleQuickPeriod('365days');
+                      setIsFloorFilterEnabled(true);
+                    }}
                     className="h-8"
                   >
                     Anual
+                  </Button>
+
+                  <Button
+                    variant={selectedPeriod === 'allTime' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      // Establecer fechas muy antiguas para incluir todo
+                      const allTimeStart = new Date('2000-01-01');
+                      const today = new Date();
+                      setDateRange({ from: allTimeStart, to: today });
+                      setSelectedPeriod('allTime');
+                      setIsFloorFilterEnabled(true);
+                    }}
+                    className="h-8"
+                  >
+                    Desde siempre
                   </Button>
 
                   <div className="border-l h-8 mx-2"></div>
@@ -2811,11 +4751,7 @@ const Reports = () => {
                             const newRange = { ...dateRange, from: date };
                             setDateRange(newRange);
                             setSelectedPeriod('custom');
-                            // Auto-generar reporte con tipo inteligente
-                            if (newRange.to) {
-                              const reportType = getIntelligentReportType(newRange.from, newRange.to);
-                              handleGenerateReport(reportType, 'rolling');
-                            }
+                            setIsFloorFilterEnabled(true);
                           }
                         }}
                         locale={es}
@@ -2840,11 +4776,7 @@ const Reports = () => {
                             const newRange = { ...dateRange, to: date };
                             setDateRange(newRange);
                             setSelectedPeriod('custom');
-                            // Auto-generar reporte con tipo inteligente
-                            if (newRange.from) {
-                              const reportType = getIntelligentReportType(newRange.from, newRange.to);
-                              handleGenerateReport(reportType, 'rolling');
-                            }
+                            setIsFloorFilterEnabled(true);
                           }
                         }}
                         locale={es}
@@ -2854,72 +4786,393 @@ const Reports = () => {
                   </Popover>
                 </div>
 
-                {/* Filtros de Piso y Tipo de Habitación */}
-                <div className="flex flex-col md:flex-row gap-4">
+                {/* Filtros Progresivos con Dropdowns */}
+                <div className="grid gap-4 md:grid-cols-2">
                   {/* Filtro de Piso */}
-                  <div className="flex-1">
-                    <Label className="text-sm font-semibold mb-2">Filtrar por Piso</Label>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        variant={selectedFloor === null ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setSelectedFloor(null)}
-                        className="h-8"
-                      >
-                        Todos
-                      </Button>
-                      {[1, 2, 3, 4].map((floor) => (
-                        <Button
-                          key={floor}
-                          variant={selectedFloor === floor ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setSelectedFloor(floor)}
-                          className="h-8"
-                        >
-                          <Building2 className="mr-1 h-4 w-4" />
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">
+                      Filtrar por Piso
+                      {!isFloorFilterEnabled && (
+                        <span className="ml-2 text-xs text-muted-foreground">(Selecciona primero una fecha)</span>
+                      )}
+                    </Label>
+                    <select
+                      disabled={!isFloorFilterEnabled}
+                      value={selectedFloor || ''}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseInt(e.target.value) : null;
+                        setSelectedFloor(value);
+                        // Habilitar el filtro de tipo incluso cuando se selecciona "Todos los Pisos"
+                        setIsRoomTypeFilterEnabled(true);
+                      }}
+                      className={cn(
+                        "w-full p-3 border rounded-md bg-background text-foreground",
+                        !isFloorFilterEnabled && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <option value="">Todos los Pisos</option>
+                      {availableFloors.map((floor) => (
+                        <option key={floor} value={floor}>
                           Piso {floor}
-                        </Button>
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
 
                   {/* Filtro de Tipo de Habitación */}
-                  <div className="flex-1">
-                    <Label className="text-sm font-semibold mb-2">Tipo de Habitación</Label>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        variant={selectedRoomType === null ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setSelectedRoomType(null)}
-                        className="h-8"
-                      >
-                        Todos los Tipos
-                      </Button>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">
+                      Tipo de Habitación
+                      {!isRoomTypeFilterEnabled && (
+                        <span className="ml-2 text-xs text-muted-foreground">(Selecciona un rango de fecha primero)</span>
+                      )}
+                    </Label>
+                    <select
+                      disabled={!isRoomTypeFilterEnabled}
+                      value={selectedRoomType || ''}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseInt(e.target.value) : null;
+                        setSelectedRoomType(value);
+                      }}
+                      className={cn(
+                        "w-full p-3 border rounded-md bg-background text-foreground",
+                        !isRoomTypeFilterEnabled && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <option value="">Todos los Tipos</option>
                       {roomTypes.map((type) => (
-                        <Button
-                          key={type.id}
-                          variant={selectedRoomType === type.id ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setSelectedRoomType(type.id)}
-                          className="h-8"
-                        >
-                          <Home className="mr-1 h-4 w-4" />
+                        <option key={type.id} value={type.id}>
                           {type.name}
-                        </Button>
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
                 </div>
 
+                {/* Auto-genera reporte al cambiar filtros */}
+
                 {/* Estado de los filtros */}
                 {(selectedFloor || selectedRoomType) && (
-                  <div className="mt-2 text-xs text-muted-foreground space-y-1">
-                    {selectedFloor && (
-                      <p>Mostrando solo habitaciones del piso {selectedFloor}</p>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Filtros activos:</p>
+                    <ul className="mt-1 space-y-1 text-xs text-blue-700 dark:text-blue-200">
+                      {selectedFloor && (
+                        <li>• Piso {selectedFloor}</li>
+                      )}
+                      {selectedRoomType && (
+                        <li>• Tipo: {roomTypes.find(t => t.id === selectedRoomType)?.name}</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                {/* BOTÓN PARA GENERAR REPORTE */}
+                <div className="mt-6">
+                  <Button
+                    onClick={async () => {
+                      setIsGeneratingPreview(true);
+                      setShowReportPreview(true);
+                      try {
+                        // Determinar el tipo de reporte según el rango de fechas
+                        const days = Math.ceil((dateRange.to - dateRange.from) / (1000 * 60 * 60 * 24));
+                        let reportType = 'Mensual'; // Por defecto
+                        
+                        if (days <= 1) reportType = 'Diario';
+                        else if (days <= 7) reportType = 'Semanal';
+                        else if (days <= 31) reportType = 'Mensual';
+                        else if (days <= 90) reportType = 'Trimestral';
+                        else reportType = 'Anual';
+                        
+                        await handleGenerateReport(reportType, 'calendar');
+                      } catch (error) {
+                        console.error('Error al generar reporte:', error);
+                      } finally {
+                        setIsGeneratingPreview(false);
+                      }
+                    }}
+                    disabled={!dateRange.from || !dateRange.to || isGeneratingPreview}
+                    className="w-full"
+                  >
+                    {isGeneratingPreview ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                        Generando Reporte...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Generar Reporte
+                      </>
                     )}
-                    {selectedRoomType && (
-                      <p>Filtrando por tipo: {roomTypes.find(t => t.id === selectedRoomType)?.name}</p>
-                    )}
+                  </Button>
+                </div>
+
+                {/* Preview del Reporte - Visible siempre que haya fechas seleccionadas */}
+                {showReportPreview && (
+                  <div className="mt-6 border-t pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold">Previsualización del Reporte</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {dateRange.from && dateRange.to && 
+                            `${format(dateRange.from, "d 'de' MMM yyyy", { locale: es })} - ${format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}`
+                          }
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCharts(prev => ({ ...prev, bar: !prev.bar }));
+                          }}
+                        >
+                          <BarChart3 className="h-4 w-4 mr-2" />
+                          {selectedCharts.bar ? 'Ocultar' : 'Mostrar'} Barras
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCharts(prev => ({ ...prev, pie: !prev.pie }));
+                          }}
+                        >
+                          <BarChart3 className="h-4 w-4 mr-2" />
+                          {selectedCharts.pie ? 'Ocultar' : 'Mostrar'} Circular
+                        </Button>
+                      </div>
+                    </div>
+
+                    {isGeneratingPreview ? (
+                      <div className="flex items-center justify-center h-[400px] bg-slate-50 dark:bg-slate-900 rounded-lg">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600 mx-auto mb-4"></div>
+                          <p className="text-sm text-muted-foreground">Generando reporte...</p>
+                        </div>
+                      </div>
+                    ) : (previewReportData || reportData) ? (
+                      // Validar si hay datos para mostrar
+                      ((previewReportData || reportData).revenue?.total || 0) === 0 && 
+                      ((previewReportData || reportData).checkIns?.total || 0) === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-yellow-300">
+                          <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                          <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
+                            Sin datos para el período seleccionado
+                          </h3>
+                          <p className="text-sm text-muted-foreground text-center max-w-md">
+                            No se encontraron reservas completadas en el rango de fechas seleccionado.
+                            Intenta seleccionar un período diferente o verifica los filtros aplicados.
+                          </p>
+                        </div>
+                      ) : (
+                      <div className="space-y-6 bg-slate-50 dark:bg-slate-900 p-6 rounded-lg">
+                        {/* KPIs del Reporte */}
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <Card>
+                            <CardContent className="pt-6">
+                              <div className="text-center">
+                                <p className="text-sm text-muted-foreground mb-1">Ingresos Totales</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                  {formatCurrency((previewReportData || reportData).revenue?.total || 0)}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardContent className="pt-6">
+                              <div className="text-center">
+                                <p className="text-sm text-muted-foreground mb-1">Total Reservas</p>
+                                <p className="text-2xl font-bold text-blue-600">
+                                  {(previewReportData || reportData).checkIns?.total || 0}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        {/* Gráficos */}
+                        <div className="grid gap-6 md:grid-cols-2">
+                          {selectedCharts.bar && (
+                            <div>
+                              <h4 className="text-sm font-semibold mb-3">Ingresos por Período</h4>
+                              {(previewReportData || reportData).revenue?.data?.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={300}>
+                                  <BarChart data={(previewReportData || reportData).revenue.data}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                    <XAxis
+                                      dataKey="date"
+                                      angle={-45}
+                                      textAnchor="end"
+                                      height={80}
+                                      tick={{ fontSize: 11 }}
+                                    />
+                                    <YAxis tick={{ fontSize: 11 }} />
+                                    <Tooltip
+                                      formatter={(value) => formatCurrency(value)}
+                                      contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
+                                    />
+                                    <Bar dataKey="total" fill="#10b981" name="Ingresos" radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              ) : (
+                                <div className="flex items-center justify-center h-[300px] bg-white dark:bg-slate-800 rounded-lg border border-dashed">
+                                  <p className="text-muted-foreground">Sin datos disponibles</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {selectedCharts.pie && (
+                            <div>
+                              <h4 className="text-sm font-semibold mb-3">Distribución de Ingresos</h4>
+                              {(previewReportData || reportData).revenue?.data?.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={300}>
+                                  <PieChart>
+                                    <Pie
+                                      data={[
+                                        { name: 'Habitaciones', value: (previewReportData || reportData).revenue.data.reduce((sum, item) => sum + (item.roomRevenue || 0), 0) },
+                                        { name: 'Servicios', value: (previewReportData || reportData).revenue.data.reduce((sum, item) => sum + (item.servicesRevenue || 0), 0) }
+                                      ].filter(item => item.value > 0)}
+                                      cx="50%"
+                                      cy="50%"
+                                      labelLine={false}
+                                      label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
+                                      outerRadius={90}
+                                      fill="#8884d8"
+                                      dataKey="value"
+                                    >
+                                      {[0, 1].map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip
+                                      formatter={(value) => formatCurrency(value)}
+                                      contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
+                                    />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              ) : (
+                                <div className="flex items-center justify-center h-[300px] bg-white dark:bg-slate-800 rounded-lg border border-dashed">
+                                  <p className="text-muted-foreground">Sin datos disponibles</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Botones de Descarga */}
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                const pdf = new jsPDF('p', 'mm', 'a4');
+                                
+                                // Título
+                                pdf.setFontSize(20);
+                                pdf.setTextColor(66, 133, 244);
+                                pdf.text('Reporte Personalizado', 105, 20, { align: 'center' });
+                                
+                                // Período
+                                pdf.setFontSize(12);
+                                pdf.setTextColor(100, 100, 100);
+                                pdf.text(
+                                  `Período: ${format(dateRange.from, "d 'de' MMM yyyy", { locale: es })} - ${format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}`,
+                                  105,
+                                  30,
+                                  { align: 'center' }
+                                );
+                                
+                                let yPos = 45;
+                                
+                                // Filtros
+                                if (selectedFloor || selectedRoomType) {
+                                  pdf.setFontSize(10);
+                                  pdf.setTextColor(0, 0, 0);
+                                  pdf.text('Filtros aplicados:', 20, yPos);
+                                  yPos += 5;
+                                  if (selectedFloor) {
+                                    pdf.text(`- Piso ${selectedFloor}`, 25, yPos);
+                                    yPos += 5;
+                                  }
+                                  if (selectedRoomType) {
+                                    pdf.text(`- Tipo: ${roomTypes.find(t => t.id === selectedRoomType)?.name}`, 25, yPos);
+                                    yPos += 5;
+                                  }
+                                  yPos += 5;
+                                }
+                                
+                                // Resumen
+                                pdf.setFontSize(14);
+                                pdf.text('Resumen', 20, yPos);
+                                yPos += 10;
+                                
+                                pdf.setFontSize(10);
+                                pdf.text(`Ingresos Totales: ${formatCurrency((previewReportData || reportData).revenue?.total || 0)}`, 25, yPos);
+                                yPos += 6;
+                                pdf.text(`Total Reservas: ${(previewReportData || reportData).checkIns?.total || 0}`, 25, yPos);
+                                yPos += 6;
+                                pdf.text(`Total Personas: ${(previewReportData || reportData).totalGuests || 0}`, 25, yPos);
+                                yPos += 10;
+                                
+                                // Tabla de datos
+                                if ((previewReportData || reportData).revenue?.data?.length > 0) {
+                                  autoTable(pdf, {
+                                    startY: yPos,
+                                    head: [['Período', 'Ingresos', 'Reservas', 'Personas']],
+                                    body: (previewReportData || reportData).revenue.data.map((item, idx) => [
+                                      item.date,
+                                      formatCurrency(item.total),
+                                      (previewReportData || reportData).checkIns.data[idx]?.count || 0,
+                                      (previewReportData || reportData).occupancy.data[idx]?.totalGuests || 0
+                                    ]),
+                                    theme: 'grid',
+                                    headStyles: { fillColor: [16, 185, 129] },
+                                    margin: { left: 20, right: 20 },
+                                  });
+                                }
+                                
+                                pdf.save(`Reporte_Personalizado_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+                              } catch (error) {
+                                console.error('Error al generar PDF:', error);
+                                alert('Error al generar el PDF');
+                              }
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Descargar PDF
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              try {
+                                const csvData = (previewReportData || reportData).revenue?.data?.map((item, idx) => ({
+                                  'Período': item.date,
+                                  'Ingresos Totales': item.total,
+                                  'Ingresos Habitaciones': item.roomRevenue || 0,
+                                  'Ingresos Servicios': item.servicesRevenue || 0,
+                                  'Reservas': (previewReportData || reportData).checkIns.data[idx]?.count || 0,
+                                  'Personas': (previewReportData || reportData).occupancy.data[idx]?.totalGuests || 0
+                                })) || [];
+                                
+                                if (csvData.length > 0) {
+                                  exportToExcel(csvData, `Reporte_Personalizado_${format(new Date(), 'yyyy-MM-dd')}`);
+                                } else {
+                                  alert('No hay datos para exportar');
+                                }
+                              } catch (error) {
+                                console.error('Error al generar Excel:', error);
+                                alert('Error al generar el archivo Excel');
+                              }
+                            }}
+                          >
+                            <FileSpreadsheet className="h-4 w-4 mr-2" />
+                            Descargar Excel
+                          </Button>
+                        </div>
+                      </div>
+                      )
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -3032,16 +5285,374 @@ const Reports = () => {
         <TabsContent value="custom" className="mt-6">
           <CustomReportsSection />
         </TabsContent>
-      </Tabs>
 
-      <ReportModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        data={reportData}
-        dateRange={dateRange}
-        reportType={selectedReportType}
-        selectedChartsFromParent={selectedCharts}
-      />
+        <TabsContent value="comparisons" className="mt-6">
+          {/* Nueva Sección de Comparaciones Avanzadas */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <ArrowLeftRight className="h-6 w-6" />
+                    Comparaciones Avanzadas
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Compara tipos de habitación y habitaciones individuales
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-6">
+                  {/* Selector de Tipo de Comparación */}
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Card
+                      className={cn(
+                        "cursor-pointer transition-all hover:shadow-md",
+                        comparisonType === 'roomTypes' ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "hover:border-blue-200"
+                      )}
+                      onClick={() => {
+                        setComparisonType('roomTypes');
+                        setSelectedItemsToCompare([]);
+                        setComparisonData(null);
+                      }}
+                    >
+                      <CardContent className="pt-6 text-center">
+                        <Building2 className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                        <h3 className="font-semibold">Tipos de Habitación</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Compara diferentes tipos</p>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card
+                      className={cn(
+                        "cursor-pointer transition-all hover:shadow-md",
+                        comparisonType === 'rooms' ? "border-green-500 bg-green-50 dark:bg-green-950" : "hover:border-green-200"
+                      )}
+                      onClick={() => {
+                        setComparisonType('rooms');
+                        setSelectedItemsToCompare([]);
+                        setComparisonData(null);
+                      }}
+                    >
+                      <CardContent className="pt-6 text-center">
+                        <Home className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                        <h3 className="font-semibold">Habitaciones</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Compara habitaciones específicas</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Botones de Período Rápido para Comparaciones */}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={comparisonSelectedPeriod === 'today' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleComparisonQuickPeriod('today')}
+                      className="h-8"
+                    >
+                      Hoy
+                    </Button>
+
+                    <Button
+                      variant={comparisonSelectedPeriod === '7days' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleComparisonQuickPeriod('7days')}
+                      className="h-8"
+                    >
+                      7 días
+                    </Button>
+
+                    <Button
+                      variant={comparisonSelectedPeriod === '14days' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleComparisonQuickPeriod('14days')}
+                      className="h-8"
+                    >
+                      14 días
+                    </Button>
+
+                    <Button
+                      variant={comparisonSelectedPeriod === '30days' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleComparisonQuickPeriod('30days')}
+                      className="h-8"
+                    >
+                      30 días
+                    </Button>
+
+                    <Button
+                      variant={comparisonSelectedPeriod === '90days' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleComparisonQuickPeriod('90days')}
+                      className="h-8"
+                    >
+                      Trimestre
+                    </Button>
+
+                    <Button
+                      variant={comparisonSelectedPeriod === '365days' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleComparisonQuickPeriod('365days')}
+                      className="h-8"
+                    >
+                      Anual
+                    </Button>
+                  </div>
+
+                  {/* Rango de Fechas para Comparación */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Fecha Inicio</Label>
+                      <input
+                        type="date"
+                        value={format(comparisonDateRange.from, 'yyyy-MM-dd')}
+                        onChange={(e) => setComparisonDateRange(prev => ({ ...prev, from: new Date(e.target.value) }))}
+                        className="w-full p-3 border rounded-md bg-background text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Fecha Fin</Label>
+                      <input
+                        type="date"
+                        value={format(comparisonDateRange.to, 'yyyy-MM-dd')}
+                        onChange={(e) => setComparisonDateRange(prev => ({ ...prev, to: new Date(e.target.value) }))}
+                        className="w-full p-3 border rounded-md bg-background text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Multi-selector según el tipo */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">
+                      Seleccionar Elementos a Comparar (mínimo 2, máximo 5)
+                    </Label>
+                    <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
+                      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                        {comparisonType === 'roomTypes' && roomTypes.map((type) => (
+                          <label key={type.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedItemsToCompare.includes(type.id.toString())}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  if (selectedItemsToCompare.length < 5) {
+                                    setSelectedItemsToCompare([...selectedItemsToCompare, type.id.toString()]);
+                                  }
+                                } else {
+                                  setSelectedItemsToCompare(selectedItemsToCompare.filter(id => id !== type.id.toString()));
+                                }
+                              }}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">{type.name}</span>
+                          </label>
+                        ))}
+                        
+                        {comparisonType === 'rooms' && rooms && rooms.length > 0 && rooms.slice(0, 20).map((room) => (
+                          <label key={room.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedItemsToCompare.includes(room.id.toString())}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  if (selectedItemsToCompare.length < 5) {
+                                    setSelectedItemsToCompare([...selectedItemsToCompare, room.id.toString()]);
+                                  }
+                                } else {
+                                  setSelectedItemsToCompare(selectedItemsToCompare.filter(id => id !== room.id.toString()));
+                                }
+                              }}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">Habitación {room.roomNumber} ({room.type})</span>
+                          </label>
+                        ))}
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground mt-3">
+                        {selectedItemsToCompare.length} elemento(s) seleccionado(s) {selectedItemsToCompare.length < 2 && '(mínimo 2)'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botón Generar Comparación */}
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={generateComparison}
+                      disabled={selectedItemsToCompare.length < 2 || isLoadingComparison}
+                    >
+                      {isLoadingComparison ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Generando...
+                        </>
+                      ) : (
+                        <>
+                          <BarChart3 className="h-4 w-4 mr-2" />
+                          Generar Comparación
+                        </>
+                      )}
+                    </Button>
+                    
+                    {comparisonData && (
+                      <>
+                        <Button
+                          onClick={exportComparisonPDF}
+                          variant="outline"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Descargar PDF
+                        </Button>
+                        <Button
+                          onClick={exportComparisonExcel}
+                          variant="outline"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Descargar Excel
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Mensaje cuando no hay datos */}
+                  {!isLoadingComparison && comparisonData !== null && comparisonData.length === 0 && (
+                    <div className="mt-6 p-8 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="h-8 w-8 text-yellow-600" />
+                        <div>
+                          <h4 className="font-semibold text-yellow-900 dark:text-yellow-100">No hay datos disponibles</h4>
+                          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                            No se encontraron datos para los elementos seleccionados en el período indicado.
+                            Verifica que las entidades seleccionadas tengan reservas completadas en este rango de fechas.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resultados de la Comparación */}
+                  {comparisonData && comparisonData.length > 0 && (
+                    <div className="space-y-6 mt-6 p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border">
+                      <h3 className="text-xl font-bold flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-purple-600" />
+                        Resultados de la Comparación
+                      </h3>
+
+                      {/* Tabla Comparativa */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="border-b-2 border-purple-200">
+                              <th className="text-left p-3 font-semibold">Nombre</th>
+                              <th className="text-right p-3 font-semibold">Ingresos</th>
+                              <th className="text-right p-3 font-semibold">Reservas</th>
+                              {comparisonType !== 'clients' && (
+                                <th className="text-right p-3 font-semibold">Personas</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {comparisonData.map((item, index) => (
+                              <tr key={item.id} className="border-b hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                                    <span className="font-medium">{item.name}</span>
+                                    {item.noData && (
+                                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Sin datos</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3 text-right font-semibold text-green-600">
+                                  {item.noData ? '-' : formatCurrency(item.totalRevenue)}
+                                </td>
+                                <td className="p-3 text-right">{item.noData ? '-' : item.totalReservations}</td>
+                                {comparisonType !== 'clients' && (
+                                  <td className="p-3 text-right text-blue-600 font-semibold">
+                                    {item.noData ? '-' : (item.totalGuests || 0)}
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Gráficos Comparativos */}
+                      <div className="grid gap-6 md:grid-cols-2">
+                        {/* Gráfico de Ingresos */}
+                        <div>
+                          <h4 className="text-sm font-semibold mb-3">Comparación de Ingresos</h4>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={comparisonData.filter(item => !item.noData)}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={12} />
+                              <YAxis />
+                              <Tooltip formatter={(value) => formatCurrency(value)} />
+                              <Bar dataKey="totalRevenue" name="Ingresos">
+                                {comparisonData.filter(item => !item.noData).map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* Gráfico de Reservas */}
+                        <div>
+                          <h4 className="text-sm font-semibold mb-3">Comparación de Reservas</h4>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={comparisonData.filter(item => !item.noData)}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={12} />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="totalReservations" name="Reservas">
+                                {comparisonData.filter(item => !item.noData).map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Gráfico Circular de Proporción de Ingresos */}
+                      <div className="flex justify-center">
+                        <div className="w-full max-w-md">
+                          <h4 className="text-sm font-semibold mb-3 text-center">Distribución de Ingresos</h4>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={comparisonData.filter(item => !item.noData)}
+                                dataKey="totalRevenue"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={100}
+                                label={(entry) => {
+                                  const filteredData = comparisonData.filter(item => !item.noData);
+                                  const total = filteredData.reduce((sum, item) => sum + item.totalRevenue, 0);
+                                  return `${entry.name}: ${((entry.totalRevenue / total) * 100).toFixed(1)}%`;
+                                }}
+                              >
+                                {comparisonData.filter(item => !item.noData).map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value) => formatCurrency(value)} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
