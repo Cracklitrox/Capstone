@@ -39,6 +39,7 @@ model alerts {
   reservation_id    Int?
   payment_id        Int?
   detail            String?             @db.VarChar(250)
+  full_summary      Json?
   alert_read_status alert_read_status[]
   users             users?              @relation(fields: [origin_user_id], references: [id], onUpdate: NoAction)
   payments          payments?           @relation(fields: [payment_id], references: [id], onUpdate: NoAction)

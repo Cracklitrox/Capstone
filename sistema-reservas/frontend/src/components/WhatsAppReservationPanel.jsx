@@ -205,6 +205,36 @@ export function WhatsAppReservationPanel() {
                   <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
                   <p className="font-medium">{guest.email || 'No proporcionado'}</p>
                 </div>
+                {guest.birthdate && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Fecha de Nacimiento</p>
+                    <p className="font-medium">{guest.birthdate}</p>
+                  </div>
+                )}
+                {guest.gender && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Género</p>
+                    <p className="font-medium">{guest.gender}</p>
+                  </div>
+                )}
+                {guest.country && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">País</p>
+                    <p className="font-medium">{guest.country}</p>
+                  </div>
+                )}
+                {guest.region && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Región</p>
+                    <p className="font-medium">{guest.region}</p>
+                  </div>
+                )}
+                {guest.city && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Ciudad</p>
+                    <p className="font-medium">{guest.city}</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -341,16 +371,13 @@ export function WhatsAppReservationPanel() {
 
             {/* Acciones */}
             <div className="flex gap-2 pt-2">
-              <Button className="flex-1" variant="default" size="sm">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Crear Reserva
-              </Button>
               <Button className="flex-1" variant="outline" size="sm">
                 <Phone className="h-4 w-4 mr-1" />
-                Contactar
+                Contactar Cliente
               </Button>
               <Button variant="destructive" size="sm">
-                <XCircle className="h-4 w-4" />
+                <XCircle className="h-4 w-4 mr-1" />
+                Rechazar
               </Button>
             </div>
           </CardContent>

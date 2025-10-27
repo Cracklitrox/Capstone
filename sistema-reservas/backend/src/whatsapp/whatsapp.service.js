@@ -1,6 +1,5 @@
 const prisma = require('../db/prisma.client');
 const { getIO } = require('../config/socket');
-const { storeAlertSummary } = require('../api/whatsapp/whatsapp.controller');
 
 // Almacenamiento en memoria para sesiones de chat (temporal)
 // TODO: Migrar a Redis para producción
@@ -118,7 +117,12 @@ class WhatsAppService {
           name: data.name || '',
           rut: data.rut || '',
           email: data.email || '',
-          phone: phoneNumber
+          phone: phoneNumber,
+          birthdate: data.birthdate || '',
+          gender: data.gender || '',
+          country: data.country || '',
+          region: data.region || '',
+          city: data.city || ''
         },
         reservation: {
           check_in: data.checkInDateFormatted || data.checkInDate || '',
@@ -161,7 +165,7 @@ class WhatsAppService {
       // Crear mensaje corto para el campo detail (max 250 caracteres)
       const shortDetail = `WhatsApp: ${data.name || 'Cliente'} - ${data.roomTypeName || 'Habitación'} - ${nights}n - $${totalReservation.toLocaleString()}`;
 
-      // Crear alerta en la base de datos
+      // Crear alerta en la base de datos con fullSummary
       const alert = await prisma.alerts.create({
         data: {
           type: 'booking_request',
@@ -169,14 +173,12 @@ class WhatsAppService {
           origin_user_id: null,
           reservation_id: null,
           payment_id: null,
-          detail: shortDetail
+          detail: shortDetail,
+          full_summary: fullSummary
         }
       });
 
       console.log(`✅ Alerta creada con ID: ${alert.id}`);
-
-      // Almacenar el fullSummary en memoria
-      storeAlertSummary(alert.id, fullSummary);
 
       // Notificar a recepcionistas vía Socket.IO con resumen completo
       const io = getIO();

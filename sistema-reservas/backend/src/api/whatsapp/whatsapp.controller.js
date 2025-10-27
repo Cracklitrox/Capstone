@@ -1,16 +1,5 @@
 const prisma = require('../../db/prisma.client');
 
-// Almacenamiento temporal en memoria para los fullSummary de las alertas
-// TODO: Migrar esto a Redis o agregar un campo JSON en la tabla alerts
-const alertSummaries = new Map();
-
-/**
- * Guardar el fullSummary de una alerta
- */
-function storeAlertSummary(alertId, fullSummary) {
-  alertSummaries.set(alertId, fullSummary);
-}
-
 /**
  * Obtener alertas de reservas de WhatsApp con sus summaries completos
  */
@@ -26,14 +15,14 @@ async function getWhatsAppBookingAlerts(req, res) {
       take: 50, // Limitar a las últimas 50 alertas
     });
 
-    // Agregar el fullSummary a cada alerta si está disponible
+    // Devolver las alertas con el fullSummary del campo JSON de la BD
     const alertsWithSummary = alerts.map(alert => ({
       id: alert.id,
       type: alert.type,
       status: alert.status,
       createdAt: alert.created_at,
       shortDetail: alert.detail,
-      fullSummary: alertSummaries.get(alert.id) || null,
+      fullSummary: alert.full_summary || null,
     }));
 
     res.json({
@@ -51,5 +40,4 @@ async function getWhatsAppBookingAlerts(req, res) {
 
 module.exports = {
   getWhatsAppBookingAlerts,
-  storeAlertSummary,
 };
