@@ -318,25 +318,29 @@ export function WhatsAppReservationPanel() {
             )}
 
             {/* Huéspedes Adicionales */}
-            {additionalGuests.length > 0 && (
+            {additionalGuests.filter(guest => !guest.is_child).length > 0 && (
               <div>
                 <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
                   <Users className="h-4 w-4" />
-                  Huéspedes Adicionales ({additionalGuests.length})
+                  Huéspedes Adicionales ({additionalGuests.filter(guest => !guest.is_child).length})
                 </h3>
                 <div className="space-y-2">
-                  {additionalGuests.map((guest, idx) => (
+                  {additionalGuests.filter(guest => !guest.is_child).map((guest, idx) => (
                     <div key={idx} className="bg-gray-50 dark:bg-slate-700/50 p-2 rounded-lg text-sm">
-                      <p className="font-medium flex items-center gap-2">
-                        {guest.name}
-                        {guest.is_child && <Badge variant="secondary" className="text-xs">Niño {'<'}4 años</Badge>}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">RUT: {guest.rut}</p>
-                      {!guest.is_child && (
-                        <>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Email: {guest.email}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Tel: {guest.phone}</p>
-                        </>
+                      <p className="font-medium">{guest.name || 'No proporcionado'}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">RUT: {guest.rut || 'N/A'}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Email: {guest.email || 'N/A'}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Tel: {guest.phone || 'N/A'}</p>
+                      {guest.birthdate && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Nacimiento: {guest.birthdate}</p>
+                      )}
+                      {guest.gender && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Género: {guest.gender}</p>
+                      )}
+                      {(guest.city || guest.region || guest.country) && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Ubicación: {[guest.city, guest.region, guest.country].filter(Boolean).join(', ') || 'N/A'}
+                        </p>
                       )}
                     </div>
                   ))}

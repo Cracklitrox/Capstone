@@ -47,11 +47,16 @@ const STATES = {
   AWAITING_BREAKFAST_PREFERENCE: 'AWAITING_BREAKFAST_PREFERENCE',
   // Paso 5: Huéspedes Adicionales (opcional)
   AWAITING_ADDITIONAL_GUESTS_CHOICE: 'AWAITING_ADDITIONAL_GUESTS_CHOICE',
+  AWAITING_ADDITIONAL_GUEST_CHOICE: 'AWAITING_ADDITIONAL_GUEST_CHOICE',
   AWAITING_ADDITIONAL_GUEST_NAME: 'AWAITING_ADDITIONAL_GUEST_NAME',
   AWAITING_ADDITIONAL_GUEST_RUT: 'AWAITING_ADDITIONAL_GUEST_RUT',
   AWAITING_ADDITIONAL_GUEST_EMAIL: 'AWAITING_ADDITIONAL_GUEST_EMAIL',
   AWAITING_ADDITIONAL_GUEST_PHONE: 'AWAITING_ADDITIONAL_GUEST_PHONE',
-  AWAITING_MORE_GUESTS: 'AWAITING_MORE_GUESTS',
+  AWAITING_ADDITIONAL_GUEST_BIRTHDATE: 'AWAITING_ADDITIONAL_GUEST_BIRTHDATE',
+  AWAITING_ADDITIONAL_GUEST_GENDER: 'AWAITING_ADDITIONAL_GUEST_GENDER',
+  AWAITING_ADDITIONAL_GUEST_COUNTRY: 'AWAITING_ADDITIONAL_GUEST_COUNTRY',
+  AWAITING_ADDITIONAL_GUEST_REGION: 'AWAITING_ADDITIONAL_GUEST_REGION',
+  AWAITING_ADDITIONAL_GUEST_CITY: 'AWAITING_ADDITIONAL_GUEST_CITY',
   // Paso 6: Confirmación
   AWAITING_CONFIRMATION: 'AWAITING_CONFIRMATION'
 };
@@ -196,6 +201,9 @@ async function processMessage(session, messageText, phoneNumber) {
       case STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE:
         return await handleAdditionalGuestsChoiceState(session, messageText, phoneNumber);
       
+      case STATES.AWAITING_ADDITIONAL_GUEST_CHOICE:
+        return await handleAdditionalGuestChoiceState(session, messageText, phoneNumber);
+      
       case STATES.AWAITING_ADDITIONAL_GUEST_NAME:
         return await handleAdditionalGuestNameState(session, messageText, phoneNumber);
       
@@ -208,8 +216,20 @@ async function processMessage(session, messageText, phoneNumber) {
       case STATES.AWAITING_ADDITIONAL_GUEST_PHONE:
         return await handleAdditionalGuestPhoneState(session, messageText, phoneNumber);
       
-      case STATES.AWAITING_MORE_GUESTS:
-        return await handleMoreGuestsState(session, messageText, phoneNumber);
+      case STATES.AWAITING_ADDITIONAL_GUEST_BIRTHDATE:
+        return await handleAdditionalGuestBirthdateState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_GENDER:
+        return await handleAdditionalGuestGenderState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_COUNTRY:
+        return await handleAdditionalGuestCountryState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_REGION:
+        return await handleAdditionalGuestRegionState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_CITY:
+        return await handleAdditionalGuestCityState(session, messageText, phoneNumber);
       
       // Paso 6: Confirmación
       case STATES.AWAITING_CONFIRMATION:
@@ -1289,14 +1309,18 @@ Ingresa un número (ejemplo: 2)`;
   if (additionalGuestsNeeded > 0) {
     return `✅ Servicios registrados
 
-📝 *Paso 5: Huéspedes Adicionales (Opcional)*
+📝 *Paso 5: Huéspedes Adicionales*
 
 Tienes *${totalGuests}* huéspede(s) en total.
 Ya registraste al huésped principal.
 
+💡 *Puedes seguir con las preguntas u omitirlas*
+
 ¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es)?
 
-Responde *SÍ* o *NO*`;
+Responde:
+• *CONTINUAR* - Para registrar sus datos
+• *OMITIR* - Para saltar este paso`;
   } else {
     whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
@@ -1418,8 +1442,8 @@ async function handleBreakfastPreferenceState(session, messageText, phoneNumber)
 Tienes *${totalGuests}* huéspede(s) en total.
 Ya registraste al huésped principal.
 
-⚠️ *IMPORTANTE*: Debes registrar los datos completos de los otros *${additionalGuestsNeeded}* huésped(es).
-
+⚠️ *IMPORTANTE*: Puedes registrar los datos completos de los otros *${additionalGuestsNeeded}* huésped(es).
+O puedes omitir cada uno de ellos si prefieres no proporcionar sus datos. 
 Responde *CONTINUAR* para comenzar.`;
   } else {
     whatsappService.updateSession(phoneNumber, {
@@ -1466,34 +1490,59 @@ async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumb
       session.data.currentAdultGuest = 0;
     }
     
+    const childrenUnder4 = session.data.childrenUnder4 || 0;
+    const adultsNeeded = additionalGuestsNeeded - childrenUnder4;
+    
+    // Si solo hay niños, registrarlos automáticamente sin pedir datos
+    if (adultsNeeded === 0 && childrenUnder4 > 0) {
+      // Registrar todos los niños automáticamente
+      for (let i = 0; i < childrenUnder4; i++) {
+        session.data.additionalGuests.push({
+          name: null,
+          rut: null,
+          isChild: true,
+          email: null,
+          phone: null
+        });
+      }
+      
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_CONFIRMATION,
+        data: session.data
+      });
+      
+      return `✅ ${childrenUnder4} niño(s) registrado(s) automáticamente
+
+${getConfirmationMessage(session.data)}`;
+    }
+    
+    // Si hay niños, registrarlos automáticamente primero
+    if (childrenUnder4 > 0) {
+      for (let i = 0; i < childrenUnder4; i++) {
+        session.data.additionalGuests.push({
+          name: null,
+          rut: null,
+          isChild: true,
+          email: null,
+          phone: null
+        });
+      }
+      session.data.currentChildGuest = childrenUnder4;
+    }
+    
+    // Ahora procesar adultos adicionales
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
+      state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
       data: session.data
     });
     
-    const guestNumber = session.data.additionalGuests.length + 2; // +1 por el principal, +1 por el actual
-    
-    // Determinar si es niño o adulto
-    const childrenUnder4 = session.data.childrenUnder4 || 0;
-    const isChild = session.data.currentChildGuest < childrenUnder4;
-    
-    if (isChild) {
-      return `📝 *Niño ${session.data.currentChildGuest + 1} de ${childrenUnder4}* (menor de 4 años)
+    return `${childrenUnder4 > 0 ? `✅ ${childrenUnder4} niño(s) registrado(s) automáticamente\n\n` : ''}📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
 
-⚠️ *Los datos son opcionales*
-Puedes responder *OMITIR* en cualquier momento para continuar sin proporcionar información.
+¿Deseas registrar los datos de este huésped?
 
-¿Cuál es el *nombre completo* del niño?
-(Escribe OMITIR para saltar)`;
-    } else {
-      return `📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
-
-⚠️ *Los datos son opcionales*
-Puedes responder *OMITIR* en cualquier momento para continuar sin proporcionar información.
-
-¿Cuál es el *nombre completo* de este huésped?
-(Escribe OMITIR para saltar)`;
-    }
+Responde:
+• *REGISTRAR* - Para ingresar sus datos
+• *OMITIR* - Para saltarlo`;
   }
   
   if (normalized === 'omitir' || normalized === 'saltar' || normalized === 'no') {
@@ -1513,40 +1562,45 @@ ${getConfirmationMessage(session.data)}`;
 }
 
 /**
- * Capturar nombre de huésped adicional
+ * Preguntar si desea registrar cada adulto adicional
  */
-async function handleAdditionalGuestNameState(session, messageText, phoneNumber) {
+async function handleAdditionalGuestChoiceState(session, messageText, phoneNumber) {
   const normalized = messageText.toLowerCase().trim();
   
-  // Permitir omitir este huésped
-  if (normalized === 'omitir' || normalized === 'saltar') {
-    const childrenUnder4 = session.data.childrenUnder4 || 0;
-    const isChild = session.data.currentChildGuest < childrenUnder4;
-    
-    if (isChild) {
-      session.data.currentChildGuest++;
-    } else {
-      session.data.currentAdultGuest++;
-    }
-    
+  if (normalized === 'registrar' || normalized === 'si' || normalized === 'sí') {
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_MORE_GUESTS,
+      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
       data: session.data
     });
+    
+    return `📝 ¿Cuál es el *nombre completo* de este huésped?
 
+_Puedes escribir *OMITIR* en cualquier paso para saltar ese dato_`;
+  }
+  
+  if (normalized === 'omitir' || normalized === 'saltar' || normalized === 'no') {
+    // Omitir este adulto
+    session.data.currentAdultGuest++;
+    
     const currentGuestsCount = session.data.additionalGuests.length + 1;
     const totalGuests = session.data.totalGuests || 1;
     const remaining = totalGuests - currentGuestsCount;
-
+    
     if (remaining > 0) {
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
+        data: session.data
+      });
+      
       return `✅ Huésped omitido
 
-📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
-⚠️ Faltan *${remaining}* huésped(es) por registrar
+📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
+
+¿Deseas registrar los datos de este huésped?
 
 Responde:
-• *CONTINUAR* - Registrar siguiente huésped
-• *OMITIR* - Saltar huéspedes restantes`;
+• *REGISTRAR* - Para ingresar sus datos
+• *OMITIR* - Para saltarlo`;
     } else {
       whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_CONFIRMATION,
@@ -1559,6 +1613,37 @@ ${getConfirmationMessage(session.data)}`;
     }
   }
   
+  return `❌ Por favor responde:
+• *REGISTRAR* - Para ingresar los datos
+• *OMITIR* - Para saltarlo`;
+}
+
+/**
+ * Capturar nombre de huésped adicional
+ */
+async function handleAdditionalGuestNameState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir omitir este campo específico
+  if (normalized === 'omitir' || normalized === 'saltar') {
+    session.data.tempAdditionalGuest = {
+      name: null,
+      isChild: false
+    };
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
+      data: session.data
+    });
+    
+    return `✅ Nombre omitido
+
+¿Cuál es su *RUT*?
+
+Formato: 11.111.111-1
+(Escribe OMITIR para saltar)`;
+  }
+  
   const validation = guestValidator.validateName(messageText);
   
   if (!validation.valid) {
@@ -1567,13 +1652,10 @@ ${getConfirmationMessage(session.data)}`;
 _Escribe *OMITIR* si prefieres no proporcionar esta información_`;
   }
 
-  const childrenUnder4 = session.data.childrenUnder4 || 0;
-  const isChild = session.data.currentChildGuest < childrenUnder4;
-  
   // Guardar temporalmente el nombre
   session.data.tempAdditionalGuest = {
     name: validation.name,
-    isChild: isChild
+    isChild: false
   };
   
   whatsappService.updateSession(phoneNumber, {
@@ -1595,55 +1677,21 @@ Formato: 11.111.111-1
 async function handleAdditionalGuestRutState(session, messageText, phoneNumber) {
   const normalized = messageText.toLowerCase().trim();
   
-  // Permitir omitir y guardar con datos parciales
+  // Permitir omitir y continuar con siguiente campo
   if (normalized === 'omitir' || normalized === 'saltar') {
-    const isChild = session.data.tempAdditionalGuest?.isChild || false;
+    session.data.tempAdditionalGuest.rut = null;
     
-    // Agregar huésped con datos parciales
-    session.data.additionalGuests.push({
-      name: session.data.tempAdditionalGuest?.name || 'No proporcionado',
-      rut: null,
-      isChild: isChild,
-      email: null,
-      phone: null
-    });
-
-    if (isChild) {
-      session.data.currentChildGuest++;
-    } else {
-      session.data.currentAdultGuest++;
-    }
-    
-    delete session.data.tempAdditionalGuest;
-
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_MORE_GUESTS,
+      state: STATES.AWAITING_ADDITIONAL_GUEST_EMAIL,
       data: session.data
     });
+    
+    return `✅ RUT omitido
 
-    const currentGuestsCount = session.data.additionalGuests.length + 1;
-    const totalGuests = session.data.totalGuests || 1;
-    const remaining = totalGuests - currentGuestsCount;
+¿Cuál es su *correo electrónico*?
 
-    if (remaining > 0) {
-      return `✅ Huésped registrado con datos parciales
-
-📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
-⚠️ Faltan *${remaining}* huésped(es) por registrar
-
-Responde:
-• *CONTINUAR* - Registrar siguiente huésped
-• *OMITIR* - Saltar huéspedes restantes`;
-    } else {
-      whatsappService.updateSession(phoneNumber, {
-        state: STATES.AWAITING_CONFIRMATION,
-        data: session.data
-      });
-
-      return `✅ ¡Todos los huéspedes registrados! (${currentGuestsCount}/${totalGuests})
-
-${getConfirmationMessage(session.data)}`;
-    }
+Escribe el email (ejemplo: juan@email.com)
+(Escribe OMITIR para saltar)`;
   }
   
   const validation = guestValidator.validateRut(messageText);
@@ -1673,54 +1721,8 @@ Por favor ingresa un RUT diferente o escribe *OMITIR* para saltar.`;
   }
   
   session.data.tempAdditionalGuest.rut = validation.rut;
-
-  const isChild = session.data.tempAdditionalGuest.isChild;
-
-  // Si es niño, solo pedir nombre y RUT, luego guardar
-  if (isChild) {
-    // Agregar niño a la lista con datos básicos
-    session.data.additionalGuests.push({
-      name: session.data.tempAdditionalGuest.name,
-      rut: session.data.tempAdditionalGuest.rut,
-      isChild: true,
-      email: null,
-      phone: null
-    });
-
-    session.data.currentChildGuest++;
-    delete session.data.tempAdditionalGuest;
-
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_MORE_GUESTS,
-      data: session.data
-    });
-
-    const currentGuestsCount = session.data.additionalGuests.length + 1;
-    const totalGuests = session.data.totalGuests || 1;
-    const remaining = totalGuests - currentGuestsCount;
-
-    if (remaining > 0) {
-      return `✅ Niño registrado
-
-📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
-⚠️ Faltan *${remaining}* huésped(es) por registrar
-
-Responde:
-• *CONTINUAR* - Registrar siguiente huésped
-• *OMITIR* - Saltar huéspedes restantes`;
-    } else {
-      whatsappService.updateSession(phoneNumber, {
-        state: STATES.AWAITING_CONFIRMATION,
-        data: session.data
-      });
-
-      return `✅ ¡Todos los huéspedes registrados! (${currentGuestsCount}/${totalGuests})
-
-${getConfirmationMessage(session.data)}`;
-    }
-  }
   
-  // Si es adulto, continuar con email y teléfono
+  // Continuar con email
   whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_EMAIL,
     data: session.data
@@ -1740,48 +1742,21 @@ Escribe el email (ejemplo: juan@email.com)
 async function handleAdditionalGuestEmailState(session, messageText, phoneNumber) {
   const normalized = messageText.toLowerCase().trim();
   
-  // Permitir omitir email y teléfono, guardar con datos parciales
+  // Permitir omitir email
   if (normalized === 'omitir' || normalized === 'saltar') {
-    // Agregar adulto a la lista con datos parciales
-    session.data.additionalGuests.push({
-      name: session.data.tempAdditionalGuest.name,
-      rut: session.data.tempAdditionalGuest.rut,
-      isChild: false,
-      email: null,
-      phone: null
-    });
-
-    session.data.currentAdultGuest++;
-    delete session.data.tempAdditionalGuest;
-
+    session.data.tempAdditionalGuest.email = null;
+    
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_MORE_GUESTS,
+      state: STATES.AWAITING_ADDITIONAL_GUEST_PHONE,
       data: session.data
     });
+    
+    return `✅ Email omitido
 
-    const currentGuestsCount = session.data.additionalGuests.length + 1;
-    const totalGuests = session.data.totalGuests || 1;
-    const remaining = totalGuests - currentGuestsCount;
+¿Cuál es su *número de teléfono*?
 
-    if (remaining > 0) {
-      return `✅ Huésped registrado con datos parciales
-
-📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
-⚠️ Faltan *${remaining}* huésped(es) por registrar
-
-Responde:
-• *CONTINUAR* - Registrar siguiente huésped
-• *OMITIR* - Saltar huéspedes restantes`;
-    } else {
-      whatsappService.updateSession(phoneNumber, {
-        state: STATES.AWAITING_CONFIRMATION,
-        data: session.data
-      });
-
-      return `✅ ¡Todos los huéspedes registrados! (${currentGuestsCount}/${totalGuests})
-
-${getConfirmationMessage(session.data)}`;
-    }
+Formato: +56912345678
+(Escribe OMITIR para saltar)`;
   }
   
   const validation = guestValidator.validateEmail(messageText);
@@ -1815,85 +1790,215 @@ async function handleAdditionalGuestPhoneState(session, messageText, phoneNumber
   
   // Permitir omitir teléfono y guardar con datos parciales
   if (normalized === 'omitir' || normalized === 'saltar') {
-    // Agregar adulto a la lista con datos parciales (sin teléfono)
-    session.data.additionalGuests.push({
-      name: session.data.tempAdditionalGuest.name,
-      rut: session.data.tempAdditionalGuest.rut,
-      email: session.data.tempAdditionalGuest.email || null,
-      phone: null,
-      isChild: false
-    });
-
-    session.data.currentAdultGuest++;
-    delete session.data.tempAdditionalGuest;
-
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_MORE_GUESTS,
-      data: session.data
-    });
-
-    const currentGuestsCount = session.data.additionalGuests.length + 1;
-    const totalGuests = session.data.totalGuests || 1;
-    const remaining = totalGuests - currentGuestsCount;
-
-    if (remaining > 0) {
-      return `✅ Huésped adulto registrado
-
-📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
-⚠️ Faltan *${remaining}* huésped(es) por registrar
-
-Responde:
-• *CONTINUAR* - Registrar siguiente huésped
-• *OMITIR* - Saltar huéspedes restantes`;
-    } else {
-      whatsappService.updateSession(phoneNumber, {
-        state: STATES.AWAITING_CONFIRMATION,
-        data: session.data
-      });
-
-      return `✅ ¡Todos los huéspedes registrados! (${currentGuestsCount}/${totalGuests})
-
-${getConfirmationMessage(session.data)}`;
-    }
-  }
-  
-  const validation = guestValidator.validatePhone(messageText);
-  
-  if (!validation.valid) {
-    return validation.message + `
+    session.data.tempAdditionalGuest.phone = null;
+  } else {
+    const validation = guestValidator.validatePhone(messageText);
+    
+    if (!validation.valid) {
+      return validation.message + `
 
 _Escribe *OMITIR* si prefieres no proporcionar esta información_`;
+    }
+    
+    session.data.tempAdditionalGuest.phone = validation.phone;
   }
   
-  session.data.tempAdditionalGuest.phone = validation.phone;
+  // Continuar con fecha de nacimiento
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_BIRTHDATE,
+    data: session.data
+  });
   
-  // Agregar adulto a la lista con todos los datos
+  return `${session.data.tempAdditionalGuest.phone ? `✅ Teléfono registrado: ${session.data.tempAdditionalGuest.phone}` : '✅ Teléfono omitido'}
+
+¿Cuál es su *fecha de nacimiento*?
+
+Formato: DD/MM/AAAA (ejemplo: 15/03/1990)
+(Escribe OMITIR para saltar)`;
+}
+
+/**
+ * Capturar fecha de nacimiento de huésped adicional (OPCIONAL)
+ */
+async function handleAdditionalGuestBirthdateState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === 'omitir' || normalized === 'saltar') {
+    session.data.tempAdditionalGuest.birthdate = null;
+  } else {
+    const validation = dateValidator.validateBirthdate(messageText);
+    
+    if (!validation.valid) {
+      return validation.message + `
+
+_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
+    }
+    
+    session.data.tempAdditionalGuest.birthdate = validation.birthdate;
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_GENDER,
+    data: session.data
+  });
+  
+  return `${session.data.tempAdditionalGuest.birthdate ? `✅ Fecha de nacimiento registrada: ${session.data.tempAdditionalGuest.birthdate}` : '✅ Fecha de nacimiento omitida'}
+
+¿Cuál es su *género*?
+
+1️⃣ Hombre
+2️⃣ Mujer
+3️⃣ Otro
+
+Responde con el número (o OMITIR para saltar)`;
+}
+
+/**
+ * Capturar género de huésped adicional (OPCIONAL)
+ */
+async function handleAdditionalGuestGenderState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === 'omitir' || normalized === 'saltar') {
+    session.data.tempAdditionalGuest.gender = null;
+  } else {
+    let gender = null;
+    if (messageText.trim() === '1') {
+      gender = 'Hombre';
+    } else if (messageText.trim() === '2') {
+      gender = 'Mujer';
+    } else if (messageText.trim() === '3') {
+      gender = 'Otro';
+    } else {
+      return `❌ Por favor selecciona una opción válida:
+
+1️⃣ Hombre
+2️⃣ Mujer
+3️⃣ Otro
+
+(o escribe OMITIR para saltar)`;
+    }
+    
+    session.data.tempAdditionalGuest.gender = gender;
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_COUNTRY,
+    data: session.data
+  });
+  
+  return `${session.data.tempAdditionalGuest.gender ? `✅ Género registrado: ${session.data.tempAdditionalGuest.gender}` : '✅ Género omitido'}
+
+¿En qué *país* reside?
+
+(Escribe OMITIR para saltar)`;
+}
+
+/**
+ * Capturar país de huésped adicional (OPCIONAL)
+ */
+async function handleAdditionalGuestCountryState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === 'omitir' || normalized === 'saltar') {
+    session.data.tempAdditionalGuest.country = null;
+  } else {
+    if (messageText.trim().length < 2) {
+      return `❌ Por favor ingresa un país válido (o OMITIR para saltar)`;
+    }
+    session.data.tempAdditionalGuest.country = messageText.trim();
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_REGION,
+    data: session.data
+  });
+  
+  return `${session.data.tempAdditionalGuest.country ? `✅ País registrado: ${session.data.tempAdditionalGuest.country}` : '✅ País omitido'}
+
+¿En qué *región* reside?
+
+(Escribe OMITIR para saltar)`;
+}
+
+/**
+ * Capturar región de huésped adicional (OPCIONAL)
+ */
+async function handleAdditionalGuestRegionState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === 'omitir' || normalized === 'saltar') {
+    session.data.tempAdditionalGuest.region = null;
+  } else {
+    if (messageText.trim().length < 2) {
+      return `❌ Por favor ingresa una región válida (o OMITIR para saltar)`;
+    }
+    session.data.tempAdditionalGuest.region = messageText.trim();
+  }
+  
+  whatsappService.updateSession(phoneNumber, {
+    state: STATES.AWAITING_ADDITIONAL_GUEST_CITY,
+    data: session.data
+  });
+  
+  return `${session.data.tempAdditionalGuest.region ? `✅ Región registrada: ${session.data.tempAdditionalGuest.region}` : '✅ Región omitida'}
+
+¿En qué *ciudad* reside?
+
+(Escribe OMITIR para saltar)`;
+}
+
+/**
+ * Capturar ciudad de huésped adicional (OPCIONAL)
+ */
+async function handleAdditionalGuestCityState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === 'omitir' || normalized === 'saltar') {
+    session.data.tempAdditionalGuest.city = null;
+  } else {
+    if (messageText.trim().length < 2) {
+      return `❌ Por favor ingresa una ciudad válida (o OMITIR para saltar)`;
+    }
+    session.data.tempAdditionalGuest.city = messageText.trim();
+  }
+  
+  // Ahora sí guardar el adulto con todos los datos
   session.data.additionalGuests.push({
-    ...session.data.tempAdditionalGuest,
+    name: session.data.tempAdditionalGuest.name,
+    rut: session.data.tempAdditionalGuest.rut,
+    email: session.data.tempAdditionalGuest.email,
+    phone: session.data.tempAdditionalGuest.phone,
+    birthdate: session.data.tempAdditionalGuest.birthdate,
+    gender: session.data.tempAdditionalGuest.gender,
+    country: session.data.tempAdditionalGuest.country,
+    region: session.data.tempAdditionalGuest.region,
+    city: session.data.tempAdditionalGuest.city,
     isChild: false
   });
 
   session.data.currentAdultGuest++;
   delete session.data.tempAdditionalGuest;
   
-  whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_MORE_GUESTS,
-    data: session.data
-  });
-  
   const currentGuestsCount = session.data.additionalGuests.length + 1; // +1 por el principal
   const totalGuests = session.data.totalGuests || 1;
   const remaining = totalGuests - currentGuestsCount;
   
   if (remaining > 0) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
+      data: session.data
+    });
+    
     return `✅ Huésped adulto registrado
 
-📊 Progreso: *${currentGuestsCount}* de *${totalGuests}* huéspedes
-⚠️ Faltan *${remaining}* huésped(es) por registrar
+� *Huésped adulto ${session.data.currentAdultGuest + 1}*
+
+¿Deseas registrar los datos de este huésped?
 
 Responde:
-• *CONTINUAR* - Registrar siguiente huésped
-• *OMITIR* - Saltar huéspedes restantes`;
+• *REGISTRAR* - Para ingresar sus datos
+• *OMITIR* - Para saltarlo`;
   } else {
     // Ya se completaron todos los huéspedes
     whatsappService.updateSession(phoneNumber, {
@@ -1905,74 +2010,6 @@ Responde:
 
 ${getConfirmationMessage(session.data)}`;
   }
-}
-
-/**
- * Continuar agregando huéspedes (OPCIONAL - permite omitir restantes)
- */
-async function handleMoreGuestsState(session, messageText, phoneNumber) {
-  const normalized = messageText.toLowerCase().trim();
-  
-  const currentGuestsCount = session.data.additionalGuests.length + 1;
-  const totalGuests = session.data.totalGuests || 1;
-  const remaining = totalGuests - currentGuestsCount;
-  
-  if (remaining === 0) {
-    // Ya están todos registrados
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_CONFIRMATION,
-      data: session.data
-    });
-    
-    return getConfirmationMessage(session.data);
-  }
-  
-  if (normalized === 'continuar' || normalized === 'si' || normalized === 'sí') {
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
-      data: session.data
-    });
-    
-    const guestNumber = currentGuestsCount + 1;
-
-    // Determinar si el siguiente huésped es niño o adulto
-    const childrenUnder4 = session.data.childrenUnder4 || 0;
-    const isChild = session.data.currentChildGuest < childrenUnder4;
-
-    if (isChild) {
-      return `📝 *Niño ${session.data.currentChildGuest + 1} de ${childrenUnder4}* (menor de 4 años)
-
-⚠️ *Los datos son opcionales*
-Puedes responder *OMITIR* en cualquier momento para continuar sin proporcionar información.
-
-¿Cuál es el *nombre completo* del niño?
-(Escribe OMITIR para saltar)`;
-    } else {
-      return `📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
-
-⚠️ *Los datos son opcionales*
-Puedes responder *OMITIR* en cualquier momento para continuar sin proporcionar información.
-
-¿Cuál es el *nombre completo* de este huésped?
-(Escribe OMITIR para saltar)`;
-    }
-  }
-  
-  if (normalized === 'omitir' || normalized === 'saltar') {
-    // Omitir los huéspedes restantes
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_CONFIRMATION,
-      data: session.data
-    });
-    
-    return `✅ Huéspedes restantes omitidos.
-
-${getConfirmationMessage(session.data)}`;
-  }
-  
-  return `❌ Por favor responde:
-• *CONTINUAR* - Registrar siguiente huésped
-• *OMITIR* - Saltar huéspedes restantes y continuar`;
 }
 
 module.exports = {
