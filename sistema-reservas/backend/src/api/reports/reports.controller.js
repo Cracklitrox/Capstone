@@ -981,7 +981,7 @@ async function getClientsWithReservations(req, res) {
  */
 async function getReportByCountry(req, res) {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, country, floor, roomTypeId } = req.query;
 
     if (!startDate || !endDate) {
       return res.status(400).json({
@@ -990,7 +990,13 @@ async function getReportByCountry(req, res) {
       });
     }
 
-    const report = await reportsService.getReportByCountry(startDate, endDate);
+    const report = await reportsService.getReportByCountry(
+      startDate, 
+      endDate, 
+      country || null,
+      floor ? parseInt(floor) : null,
+      roomTypeId ? parseInt(roomTypeId) : null
+    );
 
     return res.status(200).json({
       success: true,
@@ -1056,7 +1062,7 @@ async function getAvailableCountries(req, res) {
  */
 async function getReportByAge(req, res) {
   try {
-    const { startDate, endDate, ageRange } = req.query;
+    const { startDate, endDate, ageRange, minAge, maxAge } = req.query;
 
     if (!startDate || !endDate) {
       return res.status(400).json({
@@ -1065,7 +1071,13 @@ async function getReportByAge(req, res) {
       });
     }
 
-    const report = await reportsService.getReportByAge(startDate, endDate, ageRange || null);
+    const report = await reportsService.getReportByAge(
+      startDate, 
+      endDate, 
+      ageRange || null,
+      minAge ? parseInt(minAge) : null,
+      maxAge ? parseInt(maxAge) : null
+    );
 
     return res.status(200).json({
       success: true,

@@ -654,6 +654,8 @@ const CustomReportsSection = () => {
 
   // Estados para nuevos reportes
   const [selectedAgeRange, setSelectedAgeRange] = useState(null);
+  const [selectedMinAge, setSelectedMinAge] = useState('');
+  const [selectedMaxAge, setSelectedMaxAge] = useState('');
   const [selectedSpendingRange, setSelectedSpendingRange] = useState(null);
   const [selectedCountry, setSelectedCountry] = useState(null);
   const [selectedRegion, setSelectedRegion] = useState(null);
@@ -729,13 +731,11 @@ const CustomReportsSection = () => {
     }
   }, [reportType]);
 
-  // useEffect para cargar regiones cuando se selecciona un país
-  useEffect(() => {
+  // useEffect para cargar regiones cuando se selecciona un país - YA NO SE USA
+  /* useEffect(() => {
     if (selectedCountry && reportType === 'byLocation') {
       const loadRegions = async () => {
         try {
-          // Aquí deberías crear un endpoint en el backend que devuelva regiones por país
-          // Por ahora, simularemos con los datos que ya existen en la BD
           const response = await fetch(`http://localhost:3001/api/v1/reports/by-country?startDate=2000-01-01&endDate=${format(new Date(), 'yyyy-MM-dd')}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -744,7 +744,6 @@ const CustomReportsSection = () => {
           });
           const result = await response.json();
           if (result.success) {
-            // Extraer regiones únicas del país seleccionado
             const regions = [...new Set(
               result.data
                 .filter(item => item.country === selectedCountry && item.region)
@@ -757,15 +756,14 @@ const CustomReportsSection = () => {
         }
       };
       loadRegions();
-      // NO generar aquí, se genera en el componente Reports
     } else {
       setAvailableRegions([]);
       setSelectedRegion(null);
     }
-  }, [selectedCountry, reportType]);
+  }, [selectedCountry, reportType]); */
 
-  // useEffect para cargar ciudades cuando se selecciona una región
-  useEffect(() => {
+  // useEffect para cargar ciudades cuando se selecciona una región - YA NO SE USA
+  /* useEffect(() => {
     if (selectedRegion && selectedCountry && reportType === 'byLocation') {
       const loadCities = async () => {
         try {
@@ -777,7 +775,6 @@ const CustomReportsSection = () => {
           });
           const result = await response.json();
           if (result.success) {
-            // Extraer ciudades únicas de la región seleccionada
             const cities = [...new Set(
               result.data
                 .filter(item => 
@@ -794,15 +791,11 @@ const CustomReportsSection = () => {
         }
       };
       loadCities();
-      // NO generar aquí, se genera en el componente Reports
     } else {
       setAvailableCities([]);
       setSelectedCity(null);
     }
-  }, [selectedRegion, selectedCountry, reportType]);
-
-  // useEffect para generar reporte cuando cambia la ciudad (REMOVIDO - se maneja en el componente Reports)
-  // Los cambios de ubicación se detectarán cuando el usuario esté en el componente Reports
+  }, [selectedRegion, selectedCountry, reportType]); */
 
   // Función para cargar habitaciones basadas en el piso seleccionado
   const loadRoomsByFloor = async (floor = null) => {
@@ -1249,9 +1242,9 @@ const CustomReportsSection = () => {
             
             if (selectedFloor) countryParams.append('floor', selectedFloor);
             if (selectedRoomType) countryParams.append('roomTypeId', selectedRoomType);
-            if (selectedCountry) countryParams.append('country', selectedCountry);
-            if (selectedRegion) countryParams.append('region', selectedRegion);
-            if (selectedCity) countryParams.append('city', selectedCity);
+            // Asegurarse de enviar el país correctamente
+            if (selectedCountry) countryParams.append('country', selectedCountry.trim());
+            // NO enviar region ni city ya que fueron eliminados
             
             const countryRes = await fetch(`http://localhost:3001/api/v1/reports/by-country?${countryParams}`, {
               headers: {
@@ -1284,7 +1277,19 @@ const CustomReportsSection = () => {
               endDate
             });
             
-            if (selectedAgeRange) ageParams.append('ageRange', selectedAgeRange);
+            // Priorizar rango manual sobre predefinido
+            if (selectedMinAge && selectedMaxAge) {
+              // Validar que sean mayores o iguales a 4
+              const minAge = parseInt(selectedMinAge);
+              const maxAge = parseInt(selectedMaxAge);
+              if (minAge >= 4 && maxAge >= 4 && minAge <= maxAge) {
+                ageParams.append('minAge', minAge);
+                ageParams.append('maxAge', maxAge);
+              }
+            } else if (selectedAgeRange) {
+              ageParams.append('ageRange', selectedAgeRange);
+            }
+            
             if (selectedFloor) ageParams.append('floor', selectedFloor);
             if (selectedRoomType) ageParams.append('roomTypeId', selectedRoomType);
             
@@ -2000,162 +2005,296 @@ const CustomReportsSection = () => {
                 </div>
               </CardContent>
             </Card>
-
-            <Card
-              className={`cursor-pointer transition-all ${reportType === 'bySpending' ? 'ring-2 ring-teal-500' : 'hover:shadow-lg'}`}
-              onClick={() => { 
-                setReportType('bySpending');
-                setSelectedSpendingRange(''); // Todos los rangos
-              }}
-            >
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center text-center">
-                  <DollarSign className="h-12 w-12 mb-2 text-teal-600" />
-                  <h3 className="font-semibold">Por Monto</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Clientes por gasto</p>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Formulario de selección */}
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Filtro de Piso */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Filtrar por Piso</Label>
-              <select
-                value={selectedFloor || ''}
-                onChange={(e) => {
-                  e.preventDefault();
-                  const value = e.target.value ? parseInt(e.target.value) : null;
-                  setSelectedFloor(value);
-                }}
-                className="w-full p-3 border rounded-md bg-background text-foreground"
-              >
-                <option value="">Todos los Pisos</option>
-                {availableFloors.map((floor) => (
-                  <option key={floor} value={floor}>
-                    Piso {floor}
-                  </option>
-                ))}
-              </select>
-              {selectedFloor && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Filtrando por: Piso {selectedFloor}
-                </p>
-              )}
-            </div>
-
-            {/* Filtro de Tipo de Habitación */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Filtrar por Tipo de Habitación</Label>
-              <select
-                value={selectedRoomType || ''}
-                onChange={(e) => {
-                  e.preventDefault();
-                  const value = e.target.value ? parseInt(e.target.value) : null;
-                  setSelectedRoomType(value);
-                }}
-                className="w-full p-3 border rounded-md bg-background text-foreground"
-              >
-                <option value="">Todos los Tipos</option>
-                {roomTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </select>
-              {selectedRoomType && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Filtrando por: {roomTypes.find(t => t.id === selectedRoomType)?.name}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Selección de Entidad */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {reportType !== 'topClients' && (
-              <div className="space-y-2">
-                <Label>
-                  {reportType === 'room' && 'Seleccionar Habitación'}
-                  {reportType === 'roomType' && 'Seleccionar Tipo de Habitación'}
-                </Label>
-                <select
-                  value={selectedEntity}
-                  onChange={(e) => setSelectedEntity(e.target.value)}
-                  className="w-full p-3 border rounded-md bg-background text-foreground"
-                >
-                  <option value="">Todas las Habitaciones</option>
-                  {reportType === 'room' && (
-                    filteredRooms.length > 0 ? filteredRooms.map(r => (
-                      <option key={r.id} value={r.id}>Habitación {r.roomNumber} ({r.type}) - Piso {r.floor}</option>
-                    )) : <option disabled>No hay habitaciones disponibles</option>
-                  )}
-                  {reportType === 'roomType' && (
-                    roomTypes.length > 0 ? roomTypes.map(rt => (
-                      <option key={rt.id} value={rt.id}>{rt.name}</option>
-                    )) : <option disabled>Cargando tipos de habitación...</option>
-                  )}
-                </select>
-                {reportType === 'room' && rooms.length === 0 && (
-                  <p className="text-xs text-yellow-600 mt-1">⚠️ No se encontraron habitaciones. Verifica los permisos.</p>
-                )}
-                {reportType === 'roomType' && roomTypes.length === 0 && (
-                  <p className="text-xs text-yellow-600 mt-1">⚠️ No se encontraron tipos de habitación. Verifica los permisos.</p>
-                )}
-              </div>
-            )}
-
-            {/* Selectores de rangos para nuevos reportes */}
-            {reportType === 'byAge' && (
-              <div className="space-y-2">
-                <Label>Rango de Edad</Label>
-                <select
-                  value={selectedAgeRange || ''}
-                  onChange={(e) => setSelectedAgeRange(e.target.value || null)}
-                  className="w-full p-3 border rounded-md bg-background text-foreground"
-                >
-                  <option value="">Todos los rangos</option>
-                  {AGE_RANGES.map((range) => (
-                    <option key={range.value} value={range.value}>
-                      {range.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {reportType === 'bySpending' && (
-              <div className="space-y-2">
-                <Label>Rango de Monto</Label>
-                <select
-                  value={selectedSpendingRange || ''}
-                  onChange={(e) => setSelectedSpendingRange(e.target.value || null)}
-                  className="w-full p-3 border rounded-md bg-background text-foreground"
-                >
-                  <option value="">Todos los rangos</option>
-                  {SPENDING_RANGES.map((range) => (
-                    <option key={range.value} value={range.value}>
-                      {range.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {reportType === 'byLocation' && (
-              <div className="space-y-4">
+            {/* Filtros para Por Habitación */}
+            {reportType === 'room' && (
+              <>
                 <div className="space-y-2">
-                  <Label>País</Label>
+                  <Label className="text-sm font-semibold">Filtrar por Piso</Label>
+                  <select
+                    value={selectedFloor || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedFloor(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Pisos</option>
+                    {availableFloors.map((floor) => (
+                      <option key={floor} value={floor}>
+                        Piso {floor}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Tipo de Habitación</Label>
+                  <select
+                    value={selectedRoomType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedRoomType(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Tipos</option>
+                    {roomTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Seleccionar Habitación</Label>
+                  <select
+                    value={selectedEntity}
+                    onChange={(e) => setSelectedEntity(e.target.value)}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todas las Habitaciones</option>
+                    {filteredRooms.length > 0 ? filteredRooms.map(r => (
+                      <option key={r.id} value={r.id}>Habitación {r.roomNumber} ({r.type}) - Piso {r.floor}</option>
+                    )) : <option disabled>No hay habitaciones disponibles</option>}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Filtros para Por Tipo de Habitación */}
+            {reportType === 'roomType' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Piso</Label>
+                  <select
+                    value={selectedFloor || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedFloor(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Pisos</option>
+                    {availableFloors.map((floor) => (
+                      <option key={floor} value={floor}>
+                        Piso {floor}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Seleccionar Tipo de Habitación</Label>
+                  <select
+                    value={selectedEntity}
+                    onChange={(e) => setSelectedEntity(e.target.value)}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Tipos</option>
+                    {roomTypes.length > 0 ? roomTypes.map(rt => (
+                      <option key={rt.id} value={rt.id}>{rt.name}</option>
+                    )) : <option disabled>Cargando tipos de habitación...</option>}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Filtros para Top Clientes */}
+            {reportType === 'topClients' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Piso</Label>
+                  <select
+                    value={selectedFloor || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedFloor(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Pisos</option>
+                    {availableFloors.map((floor) => (
+                      <option key={floor} value={floor}>
+                        Piso {floor}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Tipo de Habitación</Label>
+                  <select
+                    value={selectedRoomType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedRoomType(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Tipos</option>
+                    {roomTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Filtros para Por Edad */}
+            {reportType === 'byAge' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Piso</Label>
+                  <select
+                    value={selectedFloor || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedFloor(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Pisos</option>
+                    {availableFloors.map((floor) => (
+                      <option key={floor} value={floor}>
+                        Piso {floor}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Tipo de Habitación</Label>
+                  <select
+                    value={selectedRoomType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedRoomType(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Tipos</option>
+                    {roomTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Rango de Edad Predefinido</Label>
+                  <select
+                    value={selectedAgeRange || ''}
+                    onChange={(e) => {
+                      setSelectedAgeRange(e.target.value || null);
+                      // Limpiar campos manuales al seleccionar predefinido
+                      setSelectedMinAge('');
+                      setSelectedMaxAge('');
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Seleccionar rango predefinido</option>
+                    {AGE_RANGES.map((range) => (
+                      <option key={range.value} value={range.value}>
+                        {range.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Edad Mínima (Manual)</Label>
+                  <input
+                    type="number"
+                    min="4"
+                    max="120"
+                    value={selectedMinAge}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || (parseInt(value) >= 4 && parseInt(value) <= 120)) {
+                        setSelectedMinAge(value);
+                        setSelectedAgeRange(null); // Reset predefined range
+                      }
+                    }}
+                    placeholder="Mínimo 4 años"
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                    disabled={selectedAgeRange !== null && selectedAgeRange !== ''}
+                  />
+                  {selectedMinAge && parseInt(selectedMinAge) < 4 && (
+                    <p className="text-xs text-red-500">La edad mínima debe ser 4 años</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Edad Máxima (Manual)</Label>
+                  <input
+                    type="number"
+                    min="4"
+                    max="120"
+                    value={selectedMaxAge}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || (parseInt(value) >= 4 && parseInt(value) <= 120)) {
+                        setSelectedMaxAge(value);
+                        setSelectedAgeRange(null); // Reset predefined range
+                      }
+                    }}
+                    placeholder="Escriba edad"
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                    disabled={selectedAgeRange !== null && selectedAgeRange !== ''}
+                  />
+                  {selectedMaxAge && selectedMinAge && parseInt(selectedMaxAge) < parseInt(selectedMinAge) && (
+                    <p className="text-xs text-red-500">La edad máxima debe ser mayor a la mínima</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Filtros para Por Ubicación */}
+            {reportType === 'byLocation' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Piso</Label>
+                  <select
+                    value={selectedFloor || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedFloor(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Pisos</option>
+                    {availableFloors.map((floor) => (
+                      <option key={floor} value={floor}>
+                        Piso {floor}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Filtrar por Tipo de Habitación</Label>
+                  <select
+                    value={selectedRoomType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null;
+                      setSelectedRoomType(value);
+                    }}
+                    className="w-full p-3 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Todos los Tipos</option>
+                    {roomTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">País</Label>
                   <select
                     value={selectedCountry || ''}
                     onChange={(e) => {
                       const newCountry = e.target.value || null;
                       setSelectedCountry(newCountry);
-                      // Resetear región y ciudad cuando cambia el país
-                      setSelectedRegion(null);
-                      setSelectedCity(null);
                     }}
                     className="w-full p-3 border rounded-md bg-background text-foreground"
                   >
@@ -2170,59 +2309,12 @@ const CustomReportsSection = () => {
                     <p className="text-xs text-muted-foreground">Cargando países...</p>
                   )}
                 </div>
-
-                {selectedCountry && (
-                  <div className="space-y-2">
-                    <Label>Región</Label>
-                    <select
-                      value={selectedRegion || ''}
-                      onChange={(e) => {
-                        const newRegion = e.target.value || null;
-                        setSelectedRegion(newRegion);
-                        // Resetear ciudad cuando cambia la región
-                        setSelectedCity(null);
-                      }}
-                      className="w-full p-3 border rounded-md bg-background text-foreground"
-                      disabled={availableRegions.length === 0}
-                    >
-                      <option value="">Todas las regiones</option>
-                      {availableRegions.map((region) => (
-                        <option key={region} value={region}>
-                          {region}
-                        </option>
-                      ))}
-                    </select>
-                    {availableRegions.length === 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">No hay regiones disponibles para este país</p>
-                    )}
-                  </div>
-                )}
-
-                {selectedRegion && (
-                  <div className="space-y-2">
-                    <Label>Ciudad</Label>
-                    <select
-                      value={selectedCity || ''}
-                      onChange={(e) => setSelectedCity(e.target.value || null)}
-                      className="w-full p-3 border rounded-md bg-background text-foreground"
-                      disabled={availableCities.length === 0}
-                    >
-                      <option value="">Todas las ciudades</option>
-                      {availableCities.map((city) => (
-                        <option key={city} value={city}>
-                          {city}
-                        </option>
-                      ))}
-                    </select>
-                    {availableCities.length === 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">No hay ciudades disponibles para esta región</p>
-                    )}
-                  </div>
-                )}
-              </div>
+              </>
             )}
+          </div>
 
-            <div className="space-y-2">
+          {/* Período */}
+          <div className="space-y-2">
               <Label>Período</Label>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -2290,7 +2382,6 @@ const CustomReportsSection = () => {
                 )}
               </p>
             </div>
-          </div>
 
           {/* Botón para Generar Reporte */}
           <div className="mt-6">
@@ -2385,10 +2476,10 @@ const CustomReportsSection = () => {
             </div>
 
             {/* Gráficos */}
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2" id="custom-reports-charts">
               {/* Gráfico de Barras - Ingresos */}
               {reportData.revenue.data && reportData.revenue.data.length > 0 && (
-                <Card>
+                <Card id="custom-bar-chart">
                   <CardHeader>
                     <CardTitle>Ingresos por Período</CardTitle>
                   </CardHeader>
@@ -2418,7 +2509,7 @@ const CustomReportsSection = () => {
 
               {/* Gráfico Circular - Distribución de Ingresos */}
               {reportData.revenue.data && reportData.revenue.data.length > 0 && (
-                <Card>
+                <Card id="custom-pie-chart">
                   <CardHeader>
                     <CardTitle>Distribución de Ingresos</CardTitle>
                   </CardHeader>
@@ -2438,9 +2529,9 @@ const CustomReportsSection = () => {
                           ].filter(item => item.value > 0)}
                           cx="50%"
                           cy="50%"
-                          labelLine={false}
-                          label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
-                          outerRadius={90}
+                          labelLine={true}
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
                         >
@@ -2449,12 +2540,167 @@ const CustomReportsSection = () => {
                           ))}
                         </Pie>
                         <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <Legend />
+                        <Tooltip formatter={(value) => formatCurrency(value)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
               )}
             </div>
+
+            {/* Botones de descarga para reportes personalizados */}
+            {reportData.revenue?.data?.length > 0 && (
+              <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const pdf = new jsPDF('p', 'mm', 'a4');
+                      
+                      // Título
+                      pdf.setFontSize(20);
+                      pdf.setTextColor(66, 133, 244);
+                      const reportTitle = reportType === 'room' ? 'Reporte por Habitación' :
+                                        reportType === 'roomType' ? 'Reporte por Tipo de Habitación' :
+                                        reportType === 'topClients' ? 'Top Clientes' :
+                                        reportType === 'byLocation' ? 'Reporte por Ubicación' :
+                                        reportType === 'byAge' ? 'Reporte por Edad' :
+                                        reportType === 'bySpending' ? 'Reporte por Monto' : 'Reporte Personalizado';
+                      pdf.text(reportTitle, 105, 20, { align: 'center' });
+                      
+                      // Período
+                      pdf.setFontSize(12);
+                      pdf.setTextColor(100, 100, 100);
+                      pdf.text(
+                        `Período: ${format(dateRange.from, "d 'de' MMM yyyy", { locale: es })} - ${format(dateRange.to, "d 'de' MMM yyyy", { locale: es })}`,
+                        105,
+                        30,
+                        { align: 'center' }
+                      );
+                      
+                      let yPos = 45;
+                      
+                      // Resumen
+                      pdf.setFontSize(14);
+                      pdf.text('Resumen', 20, yPos);
+                      yPos += 10;
+                      
+                      pdf.setFontSize(10);
+                      pdf.text(`Ingresos Totales: ${formatCurrency(reportData.revenue?.total || 0)}`, 25, yPos);
+                      yPos += 6;
+                      pdf.text(`Total Check-ins: ${reportData.checkIns?.total || 0}`, 25, yPos);
+                      yPos += 10;
+                      
+                      // Capturar gráfico de barras
+                      const barChartElement = document.getElementById('custom-bar-chart');
+                      if (barChartElement) {
+                        try {
+                          const canvas = await html2canvas(barChartElement, { scale: 2, backgroundColor: '#ffffff' });
+                          const imgData = canvas.toDataURL('image/png');
+                          const imgWidth = 170;
+                          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                          
+                          if (yPos + imgHeight > 280) {
+                            pdf.addPage();
+                            yPos = 20;
+                          }
+                          
+                          pdf.addImage(imgData, 'PNG', 20, yPos, imgWidth, imgHeight);
+                          yPos += imgHeight + 10;
+                        } catch (error) {
+                          console.error('Error al capturar gráfico de barras:', error);
+                        }
+                      }
+                      
+                      // Capturar gráfico circular
+                      const pieChartElement = document.getElementById('custom-pie-chart');
+                      if (pieChartElement) {
+                        try {
+                          const canvas = await html2canvas(pieChartElement, { scale: 2, backgroundColor: '#ffffff' });
+                          const imgData = canvas.toDataURL('image/png');
+                          const imgWidth = 170;
+                          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                          
+                          if (yPos + imgHeight > 280) {
+                            pdf.addPage();
+                            yPos = 20;
+                          }
+                          
+                          pdf.addImage(imgData, 'PNG', 20, yPos, imgWidth, imgHeight);
+                          yPos += imgHeight + 10;
+                        } catch (error) {
+                          console.error('Error al capturar gráfico circular:', error);
+                        }
+                      }
+                      
+                      // Verificar si necesitamos nueva página para la tabla
+                      if (yPos > 200) {
+                        pdf.addPage();
+                        yPos = 20;
+                      }
+                      
+                      // Tabla de datos
+                      if (reportData.revenue?.data?.length > 0) {
+                        autoTable(pdf, {
+                          startY: yPos,
+                          head: [['Período', 'Ingresos', 'Check-ins']],
+                          body: reportData.revenue.data.map((item, idx) => [
+                            item.date,
+                            formatCurrency(item.total),
+                            reportData.checkIns.data[idx]?.count || 0
+                          ]),
+                          theme: 'grid',
+                          headStyles: { fillColor: [16, 185, 129] },
+                          margin: { left: 20, right: 20 },
+                        });
+                      }
+                      
+                      pdf.save(`${reportTitle.replace(/ /g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+                    } catch (error) {
+                      console.error('Error al generar PDF:', error);
+                      alert('Error al generar el PDF');
+                    }
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Descargar PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    try {
+                      const reportTitle = reportType === 'room' ? 'Reporte_por_Habitacion' :
+                                        reportType === 'roomType' ? 'Reporte_por_Tipo_Habitacion' :
+                                        reportType === 'topClients' ? 'Top_Clientes' :
+                                        reportType === 'byLocation' ? 'Reporte_por_Ubicacion' :
+                                        reportType === 'byAge' ? 'Reporte_por_Edad' :
+                                        reportType === 'bySpending' ? 'Reporte_por_Monto' : 'Reporte_Personalizado';
+                      
+                      const csvData = reportData.revenue?.data?.map((item, idx) => ({
+                        'Período': item.date,
+                        'Ingresos Totales': item.total,
+                        'Ingresos Habitaciones': item.roomRevenue || 0,
+                        'Ingresos Servicios': item.servicesRevenue || 0,
+                        'Check-ins': reportData.checkIns.data[idx]?.count || 0
+                      })) || [];
+                      
+                      if (csvData.length > 0) {
+                        exportToExcel(csvData, `${reportTitle}_${format(new Date(), 'yyyy-MM-dd')}`);
+                      } else {
+                        alert('No hay datos para exportar');
+                      }
+                    } catch (error) {
+                      console.error('Error al generar Excel:', error);
+                      alert('Error al generar el archivo Excel');
+                    }
+                  }}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Descargar Excel
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -3706,28 +3952,23 @@ const Reports = () => {
           break;
 
         case 'Mensual':
-          // Mes PASADO completo (día 1 a último día del mes anterior)
-          const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-          from = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1, 0, 0, 0);
-          const lastDayOfPrevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-          to = new Date(lastDayOfPrevMonth.getFullYear(), lastDayOfPrevMonth.getMonth(), lastDayOfPrevMonth.getDate(), 23, 59, 59);
+          // Mes ACTUAL (día 1 hasta ayer)
+          from = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0);
+          to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
 
         case 'Trimestral':
-          // Trimestre actual (Q1: Ene-Mar, Q2: Abr-Jun, Q3: Jul-Sep, Q4: Oct-Dic)
+          // Trimestre actual (Q1: Ene-Mar, Q2: Abr-Jun, Q3: Jul-Sep, Q4: Oct-Dic) hasta ayer
           const currentQuarter = Math.floor(today.getMonth() / 3);
           const quarterStartMonth = currentQuarter * 3;
           from = new Date(today.getFullYear(), quarterStartMonth, 1, 0, 0, 0);
-          const quarterEndMonth = quarterStartMonth + 2;
-          const lastDayOfQuarter = new Date(today.getFullYear(), quarterEndMonth + 1, 0);
-          to = new Date(lastDayOfQuarter.getFullYear(), lastDayOfQuarter.getMonth(), lastDayOfQuarter.getDate(), 23, 59, 59);
+          to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
 
         case 'Anual':
-          // Año PASADO completo (1 enero a 31 diciembre del año anterior)
-          const lastYear = today.getFullYear() - 1;
-          from = new Date(lastYear, 0, 1, 0, 0, 0);
-          to = new Date(lastYear, 11, 31, 23, 59, 59);
+          // Año ACTUAL completo (1 enero hasta hoy)
+          from = new Date(today.getFullYear(), 0, 1, 0, 0, 0);
+          to = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
           break;
 
         default:
@@ -4719,13 +4960,17 @@ const Reports = () => {
                   <Button
                     variant={selectedPeriod === 'allTime' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => {
-                      // Establecer fechas muy antiguas para incluir todo
-                      const allTimeStart = new Date('2000-01-01');
-                      const today = new Date();
-                      setDateRange({ from: allTimeStart, to: today });
+                    onClick={async () => {
+                      // Desde la primera reserva completada (1 enero 2025) hasta ayer
+                      const allTimeStart = new Date('2025-01-01');
+                      const yesterday = new Date();
+                      yesterday.setDate(yesterday.getDate() - 1);
+                      setDateRange({ from: allTimeStart, to: yesterday });
                       setSelectedPeriod('allTime');
                       setIsFloorFilterEnabled(true);
+                      
+                      // Generar reporte automáticamente
+                      await handleGenerateReport('Anual', 'rolling');
                     }}
                     className="h-8"
                   >
@@ -4993,7 +5238,7 @@ const Reports = () => {
                         {/* Gráficos */}
                         <div className="grid gap-6 md:grid-cols-2">
                           {selectedCharts.bar && (
-                            <div>
+                            <div id="dashboard-bar-chart">
                               <h4 className="text-sm font-semibold mb-3">Ingresos por Período</h4>
                               {(previewReportData || reportData).revenue?.data?.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={300}>
@@ -5023,7 +5268,7 @@ const Reports = () => {
                           )}
 
                           {selectedCharts.pie && (
-                            <div>
+                            <div id="dashboard-pie-chart">
                               <h4 className="text-sm font-semibold mb-3">Distribución de Ingresos</h4>
                               {(previewReportData || reportData).revenue?.data?.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={300}>
@@ -5035,9 +5280,9 @@ const Reports = () => {
                                       ].filter(item => item.value > 0)}
                                       cx="50%"
                                       cy="50%"
-                                      labelLine={false}
-                                      label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
-                                      outerRadius={90}
+                                      labelLine={true}
+                                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                      outerRadius={80}
                                       fill="#8884d8"
                                       dataKey="value"
                                     >
@@ -5049,6 +5294,7 @@ const Reports = () => {
                                       formatter={(value) => formatCurrency(value)}
                                       contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
                                     />
+                                    <Legend />
                                   </PieChart>
                                 </ResponsiveContainer>
                               ) : (
@@ -5111,20 +5357,62 @@ const Reports = () => {
                                 pdf.text(`Ingresos Totales: ${formatCurrency((previewReportData || reportData).revenue?.total || 0)}`, 25, yPos);
                                 yPos += 6;
                                 pdf.text(`Total Reservas: ${(previewReportData || reportData).checkIns?.total || 0}`, 25, yPos);
-                                yPos += 6;
-                                pdf.text(`Total Personas: ${(previewReportData || reportData).totalGuests || 0}`, 25, yPos);
                                 yPos += 10;
+                                
+                                // Capturar y agregar gráficos seleccionados
+                                if (selectedCharts.bar) {
+                                  const barChartElement = document.getElementById('dashboard-bar-chart');
+                                  if (barChartElement) {
+                                    const canvas = await html2canvas(barChartElement, { scale: 2 });
+                                    const imgData = canvas.toDataURL('image/png');
+                                    const imgWidth = 170;
+                                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                                    
+                                    // Verificar si necesitamos nueva página
+                                    if (yPos + imgHeight > 280) {
+                                      pdf.addPage();
+                                      yPos = 20;
+                                    }
+                                    
+                                    pdf.addImage(imgData, 'PNG', 20, yPos, imgWidth, imgHeight);
+                                    yPos += imgHeight + 10;
+                                  }
+                                }
+                                
+                                if (selectedCharts.pie) {
+                                  const pieChartElement = document.getElementById('dashboard-pie-chart');
+                                  if (pieChartElement) {
+                                    const canvas = await html2canvas(pieChartElement, { scale: 2 });
+                                    const imgData = canvas.toDataURL('image/png');
+                                    const imgWidth = 170;
+                                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                                    
+                                    // Verificar si necesitamos nueva página
+                                    if (yPos + imgHeight > 280) {
+                                      pdf.addPage();
+                                      yPos = 20;
+                                    }
+                                    
+                                    pdf.addImage(imgData, 'PNG', 20, yPos, imgWidth, imgHeight);
+                                    yPos += imgHeight + 10;
+                                  }
+                                }
+                                
+                                // Verificar si necesitamos nueva página para la tabla
+                                if (yPos > 200) {
+                                  pdf.addPage();
+                                  yPos = 20;
+                                }
                                 
                                 // Tabla de datos
                                 if ((previewReportData || reportData).revenue?.data?.length > 0) {
                                   autoTable(pdf, {
                                     startY: yPos,
-                                    head: [['Período', 'Ingresos', 'Reservas', 'Personas']],
+                                    head: [['Período', 'Ingresos', 'Reservas']],
                                     body: (previewReportData || reportData).revenue.data.map((item, idx) => [
                                       item.date,
                                       formatCurrency(item.total),
-                                      (previewReportData || reportData).checkIns.data[idx]?.count || 0,
-                                      (previewReportData || reportData).occupancy.data[idx]?.totalGuests || 0
+                                      (previewReportData || reportData).checkIns.data[idx]?.count || 0
                                     ]),
                                     theme: 'grid',
                                     headStyles: { fillColor: [16, 185, 129] },
@@ -5151,8 +5439,7 @@ const Reports = () => {
                                   'Ingresos Totales': item.total,
                                   'Ingresos Habitaciones': item.roomRevenue || 0,
                                   'Ingresos Servicios': item.servicesRevenue || 0,
-                                  'Reservas': (previewReportData || reportData).checkIns.data[idx]?.count || 0,
-                                  'Personas': (previewReportData || reportData).occupancy.data[idx]?.totalGuests || 0
+                                  'Reservas': (previewReportData || reportData).checkIns.data[idx]?.count || 0
                                 })) || [];
                                 
                                 if (csvData.length > 0) {

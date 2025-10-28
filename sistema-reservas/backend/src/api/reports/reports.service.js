@@ -2127,32 +2127,63 @@ async function getClientsWithReservations(filters) {
 /**
  * Obtiene reporte de reservas agrupado por país
  */
-async function getReportByCountry(startDate, endDate) {
+async function getReportByCountry(startDate, endDate, country = null, floor = null, roomTypeId = null) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
   
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
+  // Construir where clause dinámicamente
+  const whereClause = {
+    deleted_at: null,
+    status: 'completed',
+    OR: [
+      { check_in_date: { gte: start, lte: end } },
+      { check_out_date: { gte: start, lte: end } },
+      {
+        AND: [
+          { check_in_date: { lte: start } },
+          { check_out_date: { gte: end } }
+        ]
+      }
+    ]
+  };
+
+  // Agregar filtro de país si está especificado
+  if (country) {
+    whereClause.users_reservations_main_guest_idTousers = {
+      country: country.trim()
+    };
+  }
+
+  // Agregar filtro de piso si está especificado
+  if (floor !== null) {
+    whereClause.rooms = {
+      floor: parseInt(floor)
+    };
+  }
+
+  // Agregar filtro de tipo de habitación si está especificado
+  if (roomTypeId !== null) {
+    if (!whereClause.rooms) {
+      whereClause.rooms = {};
+    }
+    whereClause.rooms.room_type_id = parseInt(roomTypeId);
+  }
+
   const reservations = await prisma.reservations.findMany({
-    where: {
-      deleted_at: null,
-      status: 'completed',
-      OR: [
-        { check_in_date: { gte: start, lte: end } },
-        { check_out_date: { gte: start, lte: end } },
-        {
-          AND: [
-            { check_in_date: { lte: start } },
-            { check_out_date: { gte: end } }
-          ]
-        }
-      ]
-    },
+    where: whereClause,
     include: {
       users_reservations_main_guest_idTousers: {
         select: {
           country: true
+        }
+      },
+      rooms: {
+        select: {
+          floor: true,
+          room_type_id: true
         }
       },
       payments: {
@@ -2168,18 +2199,18 @@ async function getReportByCountry(startDate, endDate) {
   const countryMap = new Map();
   
   reservations.forEach(reservation => {
-    const country = reservation.users_reservations_main_guest_idTousers?.country || 'Sin especificar';
+    const countryName = reservation.users_reservations_main_guest_idTousers?.country || 'Sin especificar';
     
-    if (!countryMap.has(country)) {
-      countryMap.set(country, {
-        country,
+    if (!countryMap.has(countryName)) {
+      countryMap.set(countryName, {
+        country: countryName,
         reservationCount: 0,
         totalGuests: 0,
         totalRevenue: 0
       });
     }
     
-    const data = countryMap.get(country);
+    const data = countryMap.get(countryName);
     data.reservationCount++;
     data.totalGuests += reservation.guest_count || 0;
     data.totalRevenue += reservation.payments.reduce((sum, p) => sum + p.amount, 0);
@@ -2212,7 +2243,7 @@ async function getAvailableCountries() {
 /**
  * Obtiene reporte de reservas agrupado por rangos de edad
  */
-async function getReportByAge(startDate, endDate, ageRange = null) {
+async function getReportByAge(startDate, endDate, ageRange = null, minAge = null, maxAge = null) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
   
@@ -2249,7 +2280,37 @@ async function getReportByAge(startDate, endDate, ageRange = null) {
     }
   });
 
-  // Agrupar por rango de edad (desde 4 años)
+  // Si se especifica rango manual (minAge y maxAge), crear un solo rango personalizado
+  if (minAge !== null && maxAge !== null) {
+    const customRange = { 
+      min: parseInt(minAge), 
+      max: parseInt(maxAge), 
+      reservationCount: 0, 
+      totalGuests: 0, 
+      totalRevenue: 0 
+    };
+
+    reservations.forEach(reservation => {
+      const birthDate = reservation.users_reservations_main_guest_idTousers?.birth_date;
+      
+      if (birthDate) {
+        const age = Math.floor((new Date() - new Date(birthDate)) / (365.25 * 24 * 60 * 60 * 1000));
+        
+        if (age >= customRange.min && age <= customRange.max) {
+          customRange.reservationCount++;
+          customRange.totalGuests += reservation.guest_count || 0;
+          customRange.totalRevenue += reservation.payments.reduce((sum, p) => sum + p.amount, 0);
+        }
+      }
+    });
+
+    return [{
+      ageRange: `${minAge}-${maxAge}`,
+      ...customRange
+    }];
+  }
+
+  // Agrupar por rango de edad predefinido (desde 4 años)
   const ageRangeMap = new Map([
     ['4-17', { min: 4, max: 17, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
     ['18-25', { min: 18, max: 25, reservationCount: 0, totalGuests: 0, totalRevenue: 0 }],
