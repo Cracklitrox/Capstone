@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
 import { formatDistanceToNow, isAfter, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { io } from 'socket.io-client';
-import { getWhatsAppBookingAlerts } from '../services/whatsapp';
+import { getWhatsAppBookingAlerts, rejectWhatsAppBookingAlert } from '../services/whatsapp';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:3001';
 
@@ -107,6 +107,32 @@ export function WhatsAppReservationPanel() {
     };
   }, []);
 
+  // Handler para rechazar solicitud
+  const handleReject = async (alertId, guestName) => {
+    const confirmed = window.confirm(
+      `¿Está seguro que desea rechazar la solicitud de ${guestName}?\n\nSe enviará una notificación al cliente por WhatsApp.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await rejectWhatsAppBookingAlert(token, alertId);
+
+      // Actualizar el estado local para reflejar el rechazo
+      setReservations((prev) =>
+        prev.map((res) =>
+          res.id === alertId ? { ...res, status: 'ignored' } : res
+        )
+      );
+
+      alert('Solicitud rechazada correctamente. Se ha notificado al cliente.');
+    } catch (error) {
+      console.error('Error al rechazar solicitud:', error);
+      alert('Error al rechazar la solicitud. Intente nuevamente.');
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'pending':
@@ -114,6 +140,7 @@ export function WhatsAppReservationPanel() {
       case 'confirmed':
         return <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Confirmada</Badge>;
       case 'rejected':
+      case 'ignored':
         return <Badge variant="destructive" className="flex items-center gap-1"><XCircle className="h-3 w-3" />Rechazada</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
@@ -379,9 +406,14 @@ export function WhatsAppReservationPanel() {
                 <Phone className="h-4 w-4 mr-1" />
                 Contactar Cliente
               </Button>
-              <Button variant="destructive" size="sm">
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => handleReject(reservation.id, guest.name)}
+                disabled={reservation.status === 'ignored'}
+              >
                 <XCircle className="h-4 w-4 mr-1" />
-                Rechazar
+                {reservation.status === 'ignored' ? 'Rechazada' : 'Rechazar'}
               </Button>
             </div>
           </CardContent>

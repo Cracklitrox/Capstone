@@ -48,3 +48,27 @@ export async function markWhatsAppAlertsAsViewed(token) {
     throw error;
   }
 }
+
+/**
+ * Rechazar una solicitud de reserva de WhatsApp
+ * @param {string} token - Token de autenticación
+ * @param {number} alertId - ID de la alerta a rechazar
+ * @param {string} reason - Razón del rechazo (opcional)
+ */
+export async function rejectWhatsAppBookingAlert(token, alertId, reason = '') {
+  try {
+    const response = await axios.put(
+      `${API_URL}/whatsapp/booking-alerts/${alertId}/reject`,
+      { reason },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error al rechazar solicitud de WhatsApp:', error);
+    throw error;
+  }
+}

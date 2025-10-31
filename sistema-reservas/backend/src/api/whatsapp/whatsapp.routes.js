@@ -27,4 +27,16 @@ router.put(
   whatsappController.markWhatsAppAlertsAsViewed
 );
 
+/**
+ * @route   PUT /api/v1/whatsapp/booking-alerts/:alertId/reject
+ * @desc    Rechazar una solicitud de reserva de WhatsApp
+ * @access  Private (Solo Recepcionistas)
+ */
+router.put(
+  '/booking-alerts/:alertId/reject',
+  authenticate,
+  authorize(['receptionist']),
+  whatsappController.rejectWhatsAppBookingAlert
+);
+
 module.exports = router;
