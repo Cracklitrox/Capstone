@@ -115,6 +115,34 @@ const initializeSocket = (server) => {
       }
     });
 
+    // ⭐ NUEVO: Solicitar conteo de solicitudes WhatsApp pendientes
+    socket.on("whatsapp:requestUpdate", async () => {
+      try {
+        const prisma = require("../db/prisma.client");
+        const pendingCount = await prisma.alerts.count({
+          where: {
+            type: "booking_request",
+            status: "pending",
+            last_viewed_at: null, // Solo contar las no vistas
+          },
+        });
+
+        socket.emit("whatsapp:update", {
+          count: pendingCount,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(
+          `📱 WhatsApp alerts enviados a usuario ${socket.userId}: ${pendingCount} solicitudes no vistas`
+        );
+      } catch (error) {
+        console.error("❌ Error al enviar WhatsApp alerts:", error);
+        socket.emit("whatsapp:error", {
+          message: "Error al obtener solicitudes de WhatsApp",
+        });
+      }
+    });
+
     // Evento: Enviar notificación
     socket.on("notification:send", async (data) => {
       try {
@@ -222,13 +250,9 @@ function emitCheckoutAlerts(count, data) {
     timestamp: new Date().toISOString(),
   };
   
-  // Emitir a recepcionistas
+  // Emitir solo a recepcionistas
   socketIO.to('role:receptionist').emit('checkout:update', payload);
   console.log(`📬 Checkout alerts emitidos a recepcionistas: ${count} checkouts`);
-  
-  // Emitir a administradores
-  socketIO.to('role:administrator').emit('checkout:update', payload);
-  console.log(`📬 Checkout alerts emitidos a administradores: ${count} checkouts`);
 }
 
 module.exports = {

@@ -151,13 +151,13 @@ router.delete(
 /**
  * @route GET /api/v1/notifications/checkout-alerts
  * @desc Obtiene todas las alertas de check-out para el día actual (zona horaria Chile)
- * @access Recepcionista y Administrador
+ * @access Solo Recepcionista
  */
 router.get(
   "/checkout-alerts",
   notificationsLimiter,
   authenticate,
-  authorize(["receptionist", "administrator"]),
+  authorize(["receptionist"]),
   notificationsController.getCheckoutAlerts
 );
 

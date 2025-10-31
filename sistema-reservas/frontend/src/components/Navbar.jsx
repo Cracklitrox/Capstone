@@ -16,9 +16,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { Link } from "react-router-dom";
 
-const Navbar = ({ toggleSidebar, markAsRead }) => {
+const Navbar = ({ toggleSidebar }) => {
   const { logout, user, isDarkMode, toggleTheme } = useAuth();
-  const { checkoutCount, requestUpdate } = useSocketNotifications(); // ⭐ NUEVO: Usar WebSocket
+  const { checkoutCount, whatsappCount, totalCount } = useSocketNotifications(); // ⭐ NUEVO: Usar WebSocket
   const [showPopover, setShowPopover] = useState(false);
 
   // Hook de notificaciones en tiempo real desde el contexto global
@@ -85,12 +85,12 @@ const Navbar = ({ toggleSidebar, markAsRead }) => {
               variant="ghost"
               size="icon"
               className="relative"
-              title="Ver checkouts de hoy"
+              title="Ver alertas"
             >
               <BellAlertIcon className="h-6 w-6" />
-              {checkoutCount > 0 && (
+              {totalCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {checkoutCount > 9 ? "9+" : checkoutCount}
+                  {totalCount > 9 ? "9+" : totalCount}
                 </span>
               )}
             </Button>
@@ -99,8 +99,8 @@ const Navbar = ({ toggleSidebar, markAsRead }) => {
             <CheckoutNotificationPopover
               isOpen={showPopover}
               onClose={() => setShowPopover(false)}
-              onMarkAsRead={markAsRead}
-              onRefetchCount={requestUpdate} // ⭐ Usar requestUpdate en lugar de refetch
+              checkoutCount={checkoutCount}
+              whatsappCount={whatsappCount}
             />
           </>
         )}

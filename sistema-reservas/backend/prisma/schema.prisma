@@ -35,6 +35,7 @@ model alerts {
   type              alert_type_enum
   status            alert_status_enum?  @default(pending)
   created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  last_viewed_at    DateTime?           @db.Timestamp(6)
   origin_user_id    Int?
   reservation_id    Int?
   payment_id        Int?

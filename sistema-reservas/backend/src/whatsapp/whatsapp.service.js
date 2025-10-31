@@ -180,10 +180,10 @@ class WhatsAppService {
 
       console.log(`✅ Alerta creada con ID: ${alert.id}`);
 
-      // Notificar a recepcionistas vía Socket.IO con resumen completo
+      // Notificar a recepcionistas Y administradores vía Socket.IO con resumen completo
       const io = getIO();
       if (io) {
-        io.to('role:receptionist').emit('alert:new', {
+        const alertData = {
           id: alert.id,
           type: 'booking_request',
           status: 'pending',
@@ -204,9 +204,28 @@ class WhatsAppService {
           },
           fullSummary: fullSummary,
           createdAt: alert.created_at
-        });
+        };
+
+        // Emitir a recepcionistas
+        io.to('role:receptionist').emit('alert:new', alertData);
 
         console.log('📢 Notificación enviada a recepcionistas con resumen completo');
+
+        // Obtener el conteo actualizado de solicitudes WhatsApp pendientes NO VISTAS
+        const pendingCount = await prisma.alerts.count({
+          where: {
+            type: 'booking_request',
+            status: 'pending',
+            last_viewed_at: null // Solo contar las no vistas
+          }
+        });
+
+        // Emitir evento de actualización de contador WhatsApp solo a recepcionistas
+        io.to('role:receptionist').emit('whatsapp:update', {
+          count: pendingCount
+        });
+
+        console.log(`📊 Contador WhatsApp actualizado: ${pendingCount} solicitudes NO VISTAS (emitido a receptionist)`);
       }
 
       return alert;

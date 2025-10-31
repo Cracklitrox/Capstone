@@ -1,17 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../../middleware/auth.middleware');
+const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const whatsappController = require('./whatsapp.controller');
 
 /**
  * @route   GET /api/v1/whatsapp/booking-alerts
- * @desc    Obtener alertas de reservas de WhatsApp
- * @access  Private (Recepcionistas y Administradores)
+ * @desc    Obtener alertas de reservas de WhatsApp no vistas
+ * @access  Private (Solo Recepcionistas)
  */
 router.get(
   '/booking-alerts',
   authenticate,
+  authorize(['receptionist']),
   whatsappController.getWhatsAppBookingAlerts
+);
+
+/**
+ * @route   PUT /api/v1/whatsapp/mark-as-viewed
+ * @desc    Marcar todas las alertas de WhatsApp pendientes como vistas
+ * @access  Private (Solo Recepcionistas)
+ */
+router.put(
+  '/mark-as-viewed',
+  authenticate,
+  authorize(['receptionist']),
+  whatsappController.markWhatsAppAlertsAsViewed
 );
 
 module.exports = router;

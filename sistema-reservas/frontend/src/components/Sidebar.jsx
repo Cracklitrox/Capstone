@@ -50,14 +50,14 @@ const navLinks = [
         href: "/notifications/checkouts",
         label: "Check-outs",
         icon: BellAlertIcon,
-        roles: ["administrator", "receptionist"],
+        roles: ["receptionist"], // ⭐ SOLO recepcionista
         showBadge: true,
       },
       {
         href: "/notifications/chatbot",
         label: "Chatbot WhatsApp",
         icon: MessageSquare,
-        roles: ["administrator", "receptionist"],
+        roles: ["receptionist"], // ⭐ SOLO recepcionista
       },
     ],
   },
