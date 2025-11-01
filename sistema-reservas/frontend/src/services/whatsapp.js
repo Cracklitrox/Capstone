@@ -72,3 +72,26 @@ export async function rejectWhatsAppBookingAlert(token, alertId, reason = '') {
     throw error;
   }
 }
+
+/**
+ * Confirmar una solicitud de reserva de WhatsApp
+ * @param {string} token - Token de autenticación
+ * @param {number} alertId - ID de la alerta a confirmar
+ */
+export async function confirmWhatsAppBookingAlert(token, alertId) {
+  try {
+    const response = await axios.put(
+      `${API_URL}/whatsapp/booking-alerts/${alertId}/confirm`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error al confirmar solicitud de WhatsApp:', error);
+    throw error;
+  }
+}

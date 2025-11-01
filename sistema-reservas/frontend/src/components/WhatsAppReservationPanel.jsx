@@ -5,10 +5,12 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Separator } from './ui/Separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
-import { formatDistanceToNow, isAfter, subDays } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { io } from 'socket.io-client';
-import { getWhatsAppBookingAlerts, rejectWhatsAppBookingAlert } from '../services/whatsapp';
+import { getWhatsAppBookingAlerts, rejectWhatsAppBookingAlert, confirmWhatsAppBookingAlert } from '../services/whatsapp';
+import { ConfirmReservationDialog } from './ConfirmReservationDialog';
+import { RejectReservationDialog } from './RejectReservationDialog';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:3001';
 
@@ -19,7 +21,12 @@ export function WhatsAppReservationPanel() {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState(new Set());
-  const [activeTab, setActiveTab] = useState('recent');
+  const [activeTab, setActiveTab] = useState('pending');
+  
+  // Estados para los diálogos
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, alertId: null, guestName: '' });
+  const [rejectDialog, setRejectDialog] = useState({ open: false, alertId: null, guestName: '' });
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Función para alternar expansión de cards
   const toggleCardExpansion = (id) => {
@@ -34,10 +41,10 @@ export function WhatsAppReservationPanel() {
     });
   };
 
-  // Filtrar reservas por fecha (últimas 3 días vs más antiguas)
-  const threeDaysAgo = subDays(new Date(), 3);
-  const recentReservations = reservations.filter(r => isAfter(new Date(r.createdAt), threeDaysAgo));
-  const olderReservations = reservations.filter(r => !isAfter(new Date(r.createdAt), threeDaysAgo));
+  // Filtrar reservas por estado
+  const pendingReservations = reservations.filter(r => r.status === 'pending');
+  const confirmedReservations = reservations.filter(r => r.status === 'resolved');
+  const rejectedReservations = reservations.filter(r => r.status === 'ignored');
 
   useEffect(() => {
     // Obtener token del localStorage
@@ -107,29 +114,61 @@ export function WhatsAppReservationPanel() {
     };
   }, []);
 
-  // Handler para rechazar solicitud
-  const handleReject = async (alertId, guestName) => {
-    const confirmed = window.confirm(
-      `¿Está seguro que desea rechazar la solicitud de ${guestName}?\n\nSe enviará una notificación al cliente por WhatsApp.`
-    );
+  // Abrir diálogo de rechazo
+  const openRejectDialog = (alertId, guestName) => {
+    setRejectDialog({ open: true, alertId, guestName });
+  };
 
-    if (!confirmed) return;
+  // Abrir diálogo de confirmación
+  const openConfirmDialog = (alertId, guestName) => {
+    setConfirmDialog({ open: true, alertId, guestName });
+  };
 
+  // Handler para rechazar solicitud con razón
+  const handleReject = async (reason) => {
+    setActionLoading(true);
     try {
       const token = localStorage.getItem('token');
-      await rejectWhatsAppBookingAlert(token, alertId);
+      await rejectWhatsAppBookingAlert(token, rejectDialog.alertId, reason);
 
       // Actualizar el estado local para reflejar el rechazo
       setReservations((prev) =>
         prev.map((res) =>
-          res.id === alertId ? { ...res, status: 'ignored' } : res
+          res.id === rejectDialog.alertId ? { ...res, status: 'ignored' } : res
         )
       );
 
+      setRejectDialog({ open: false, alertId: null, guestName: '' });
       alert('Solicitud rechazada correctamente. Se ha notificado al cliente.');
     } catch (error) {
       console.error('Error al rechazar solicitud:', error);
       alert('Error al rechazar la solicitud. Intente nuevamente.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handler para confirmar solicitud
+  const handleConfirm = async () => {
+    setActionLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await confirmWhatsAppBookingAlert(token, confirmDialog.alertId);
+
+      // Actualizar el estado local para reflejar la confirmación
+      setReservations((prev) =>
+        prev.map((res) =>
+          res.id === confirmDialog.alertId ? { ...res, status: 'resolved' } : res
+        )
+      );
+
+      setConfirmDialog({ open: false, alertId: null, guestName: '' });
+      alert('Solicitud confirmada correctamente. Se ha notificado al cliente.');
+    } catch (error) {
+      console.error('Error al confirmar solicitud:', error);
+      alert('Error al confirmar la solicitud. Intente nuevamente.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -138,6 +177,7 @@ export function WhatsAppReservationPanel() {
       case 'pending':
         return <Badge variant="warning" className="flex items-center gap-1"><AlertCircle className="h-3 w-3" />Pendiente</Badge>;
       case 'confirmed':
+      case 'resolved':
         return <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Confirmada</Badge>;
       case 'rejected':
       case 'ignored':
@@ -402,15 +442,21 @@ export function WhatsAppReservationPanel() {
 
             {/* Acciones */}
             <div className="flex gap-2 pt-2">
-              <Button className="flex-1" variant="outline" size="sm">
-                <Phone className="h-4 w-4 mr-1" />
-                Contactar Cliente
+              <Button 
+                className="flex-1" 
+                variant="default" 
+                size="sm"
+                onClick={() => openConfirmDialog(reservation.id, guest.name)}
+                disabled={reservation.status === 'resolved' || reservation.status === 'ignored'}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                {reservation.status === 'resolved' ? 'Confirmada' : 'Confirmar'}
               </Button>
               <Button 
                 variant="destructive" 
                 size="sm"
-                onClick={() => handleReject(reservation.id, guest.name)}
-                disabled={reservation.status === 'ignored'}
+                onClick={() => openRejectDialog(reservation.id, guest.name)}
+                disabled={reservation.status === 'ignored' || reservation.status === 'resolved'}
               >
                 <XCircle className="h-4 w-4 mr-1" />
                 {reservation.status === 'ignored' ? 'Rechazada' : 'Rechazar'}
@@ -433,57 +479,101 @@ export function WhatsAppReservationPanel() {
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger value="recent" className="flex items-center gap-2">
-          <Clock className="h-4 w-4" />
-          Recientes
-          {recentReservations.length > 0 && (
-            <Badge variant="secondary" className="ml-1">
-              {recentReservations.length}
+    <>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-4">
+        <TabsTrigger value="pending" className="flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          Pendientes
+          {pendingReservations.length > 0 && (
+            <Badge variant="warning" className="ml-1">
+              {pendingReservations.length}
             </Badge>
           )}
         </TabsTrigger>
-        <TabsTrigger value="older" className="flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          Hace +3 días
-          {olderReservations.length > 0 && (
-            <Badge variant="outline" className="ml-1">
-              {olderReservations.length}
+        <TabsTrigger value="confirmed" className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4" />
+          Confirmadas
+          {confirmedReservations.length > 0 && (
+            <Badge variant="success" className="ml-1">
+              {confirmedReservations.length}
+            </Badge>
+          )}
+        </TabsTrigger>
+        <TabsTrigger value="rejected" className="flex items-center gap-2">
+          <XCircle className="h-4 w-4" />
+          Rechazadas
+          {rejectedReservations.length > 0 && (
+            <Badge variant="destructive" className="ml-1">
+              {rejectedReservations.length}
             </Badge>
           )}
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="recent" className="mt-0">
-        {recentReservations.length === 0 ? (
+      <TabsContent value="pending" className="mt-0">
+        {pendingReservations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-            <MessageSquare className="h-12 w-12 mb-3 opacity-50" />
-            <p className="text-sm">No hay solicitudes recientes</p>
+            <AlertCircle className="h-12 w-12 mb-3 opacity-50" />
+            <p className="text-sm">No hay solicitudes pendientes</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {recentReservations.map((reservation) => (
+            {pendingReservations.map((reservation) => (
               <ReservationCard key={reservation.id} reservation={reservation} />
             ))}
           </div>
         )}
       </TabsContent>
 
-      <TabsContent value="older" className="mt-0">
-        {olderReservations.length === 0 ? (
+      <TabsContent value="confirmed" className="mt-0">
+        {confirmedReservations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-            <Calendar className="h-12 w-12 mb-3 opacity-50" />
-            <p className="text-sm">No hay solicitudes anteriores</p>
+            <CheckCircle2 className="h-12 w-12 mb-3 opacity-50" />
+            <p className="text-sm">No hay solicitudes confirmadas</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {olderReservations.map((reservation) => (
+            {confirmedReservations.map((reservation) => (
+              <ReservationCard key={reservation.id} reservation={reservation} />
+            ))}
+          </div>
+        )}
+      </TabsContent>
+
+      <TabsContent value="rejected" className="mt-0">
+        {rejectedReservations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <XCircle className="h-12 w-12 mb-3 opacity-50" />
+            <p className="text-sm">No hay solicitudes rechazadas</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {rejectedReservations.map((reservation) => (
               <ReservationCard key={reservation.id} reservation={reservation} />
             ))}
           </div>
         )}
       </TabsContent>
     </Tabs>
+    
+    {/* Diálogo de confirmación */}
+    <ConfirmReservationDialog
+      open={confirmDialog.open}
+      onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}
+      guestName={confirmDialog.guestName}
+      onConfirm={handleConfirm}
+      loading={actionLoading}
+    />
+
+    {/* Diálogo de rechazo */}
+    <RejectReservationDialog
+      open={rejectDialog.open}
+      onOpenChange={(open) => setRejectDialog({ ...rejectDialog, open })}
+      guestName={rejectDialog.guestName}
+      onReject={handleReject}
+      loading={actionLoading}
+    />
+    </>
   );
 }
