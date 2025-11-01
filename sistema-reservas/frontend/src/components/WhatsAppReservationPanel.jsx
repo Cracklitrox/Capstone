@@ -139,7 +139,7 @@ export function WhatsAppReservationPanel() {
       );
 
       setRejectDialog({ open: false, alertId: null, guestName: '' });
-      alert('Solicitud rechazada correctamente. Se ha notificado al cliente.');
+      // Solicitud rechazada correctamente. Se ha notificado al cliente.
     } catch (error) {
       console.error('Error al rechazar solicitud:', error);
       alert('Error al rechazar la solicitud. Intente nuevamente.');
@@ -163,7 +163,7 @@ export function WhatsAppReservationPanel() {
       );
 
       setConfirmDialog({ open: false, alertId: null, guestName: '' });
-      alert('Solicitud confirmada correctamente. Se ha notificado al cliente.');
+      // Solicitud confirmada correctamente. Se ha notificado al cliente.
     } catch (error) {
       console.error('Error al confirmar solicitud:', error);
       alert('Error al confirmar la solicitud. Intente nuevamente.');
@@ -202,6 +202,7 @@ export function WhatsAppReservationPanel() {
     const res = summary.reservation;
     const costs = summary.costs;
     const services = summary.services;
+    const payment = summary.payment || {};
     const additionalGuests = summary.additional_guests || [];
     const isExpanded = expandedCards.has(reservation.id);
 
@@ -378,6 +379,47 @@ export function WhatsAppReservationPanel() {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Método de Pago */}
+            {payment && payment.method && (
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
+                  <DollarSign className="h-4 w-4" />
+                  Método de Pago
+                </h3>
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                      {payment.method === 'efectivo' ? '💵 Efectivo (Presencial)' : '🏦 Transferencia Bancaria'}
+                    </span>
+                  </div>
+                  
+                  {payment.method === 'transferencia' && payment.transfer_amount && (
+                    <div className="space-y-1 mt-2 pt-2 border-t border-green-200 dark:border-green-800">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Opción seleccionada:</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {payment.transfer_option === 'total' && 'Pago Total'}
+                          {payment.transfer_option === '50%' && 'Anticipo 50%'}
+                          {payment.transfer_option === 'primera_noche' && 'Primera Noche'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Monto a transferir:</span>
+                        <span className="font-bold text-green-700 dark:text-green-400">
+                          ${payment.transfer_amount.toLocaleString('es-CL')}
+                        </span>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800 text-xs text-gray-600 dark:text-gray-400">
+                        <p className="font-medium mb-1">Datos para transferencia:</p>
+                        <p>Hotel Don Teo • RUT: 77.123.456-7</p>
+                        <p>Banco de Chile • Cta. Cte.: 1234567890</p>
+                      </div>
                     </div>
                   )}
                 </div>

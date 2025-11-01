@@ -159,6 +159,11 @@ class WhatsAppService {
           total_guests: data.totalGuests || 1,
           special_requests: data.specialRequests || ''
         },
+        payment: {
+          method: data.paymentMethod || 'efectivo',
+          transfer_amount: data.transferAmount || null,
+          transfer_option: data.transferOption || null
+        },
         services: {
           laundry: data.services?.laundry || false,
           laundry_quantity: data.services?.laundryQuantity || 0,

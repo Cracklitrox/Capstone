@@ -64,8 +64,10 @@ const STATES = {
   AWAITING_ADDITIONAL_GUEST_COUNTRY: 'AWAITING_ADDITIONAL_GUEST_COUNTRY',
   AWAITING_ADDITIONAL_GUEST_REGION: 'AWAITING_ADDITIONAL_GUEST_REGION',
   AWAITING_ADDITIONAL_GUEST_CITY: 'AWAITING_ADDITIONAL_GUEST_CITY',
-  // Paso 6: Confirmación
-  AWAITING_CONFIRMATION: 'AWAITING_CONFIRMATION'
+  // Paso 6: Confirmación y Método de Pago
+  AWAITING_CONFIRMATION: 'AWAITING_CONFIRMATION',
+  AWAITING_PAYMENT_METHOD: 'AWAITING_PAYMENT_METHOD',
+  AWAITING_TRANSFER_OPTION: 'AWAITING_TRANSFER_OPTION'
 };
 
 /**
@@ -264,9 +266,15 @@ async function processMessage(session, messageText, phoneNumber) {
       case STATES.AWAITING_ADDITIONAL_GUEST_CITY:
         return await handleAdditionalGuestCityState(session, messageText, phoneNumber);
       
-      // Paso 6: Confirmación
+      // Paso 6: Confirmación y Método de Pago
       case STATES.AWAITING_CONFIRMATION:
         return await handleConfirmationState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_PAYMENT_METHOD:
+        return await handlePaymentMethodState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_TRANSFER_OPTION:
+        return await handleTransferOptionState(session, messageText, phoneNumber);
       
       default:
         return menuFlow.getWelcomeMessage();
@@ -577,40 +585,24 @@ async function handleGuestFoundConfirmationState(session, messageText, phoneNumb
   console.log(`[DEBUG] handleGuestFoundConfirmationState - Input: "${normalized}", Current State: ${session.state}`);
   
   if (normalized === '1' || normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
-    // Usar datos autocompletados - Saltar a huéspedes adicionales
-    const totalGuests = session.data.totalGuests || 1;
-    const adults = session.data.adults || 1;
-    const additionalGuestsNeeded = adults - 1; // Solo contar adultos adicionales, no niños
-    
+    // Usar datos autocompletados - Ir a método de pago
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+      state: STATES.AWAITING_PAYMENT_METHOD,
       data: session.data
     });
     
-    console.log(`[DEBUG] Estado actualizado a: AWAITING_ADDITIONAL_GUESTS_CHOICE`);
+    console.log(`[DEBUG] Estado actualizado a: AWAITING_PAYMENT_METHOD`);
     
-    if (additionalGuestsNeeded > 0) {
-      return `✅ *Datos confirmados*
+    return `✅ *Datos confirmados*
 
-📝 *Paso 5: Huéspedes Adicionales (Opcional)*
+� *Método de Pago*
 
-Tienes *${totalGuests}* huéspede(s) en total.
-Ya registraste al huésped principal (tú).
+¿Cómo deseas realizar el pago?
 
-¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es) adulto(s)?
+1️⃣ *EFECTIVO* - Pago presencial en el hotel
+2️⃣ *TRANSFERENCIA* - Pago por transferencia bancaria
 
-Responde:
-• *CONTINUAR* - Para registrar sus datos
-• *OMITIR* - Para saltar este paso`;
-    } else {
-      // Solo hay 1 huésped, ir directo a confirmación
-      whatsappService.updateSession(phoneNumber, {
-        state: STATES.AWAITING_CONFIRMATION,
-        data: session.data
-      });
-      console.log(`[DEBUG] Estado actualizado a: AWAITING_CONFIRMATION`);
-      return getConfirmationMessage(session.data);
-    }
+Responde con el número de tu opción.`;
   } else if (normalized === '2' || normalized === 'no') {
     // Quiere actualizar datos - Ir a captura manual
     // Marcar que está actualizando un usuario existente
@@ -1128,28 +1120,12 @@ Tus datos han sido actualizados. A continuación verás el resumen de tu reserva
 ${getConfirmationMessage(session.data)}`;
   }
   
-  // Si es un nuevo registro (foundGuest es null), verificar si hay huéspedes adicionales
+  // Si es un nuevo registro (foundGuest es null), ir a método de pago
   if (!session.data.foundGuest) {
-    const totalGuests = session.data.totalGuests || 1;
-    console.log('🔍 DEBUG handleCityState - totalGuests:', totalGuests, 'adults:', session.data.adults, 'children:', session.data.childrenUnder4);
+    console.log('🔍 DEBUG handleCityState - totalGuests:', session.data.totalGuests, 'adults:', session.data.adults, 'children:', session.data.childrenUnder4);
     
-    // Si solo viaja 1 persona, ir directo a confirmación
-    if (totalGuests === 1) {
-      whatsappService.updateSession(phoneNumber, {
-        state: STATES.AWAITING_CONFIRMATION,
-        data: session.data
-      });
-
-      return `✅ Ciudad registrada: ${city}
-
-📝 *Datos personales completados*
-
-${getConfirmationMessage(session.data)}`;
-    }
-    
-    // Si hay más de 1 huésped, preguntar por huéspedes adicionales
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+      state: STATES.AWAITING_PAYMENT_METHOD,
       data: session.data
     });
 
@@ -1157,11 +1133,14 @@ ${getConfirmationMessage(session.data)}`;
 
 📝 *Datos personales completados*
 
-👥 ¿Deseas agregar *huéspedes adicionales* a la reserva?
+💳 *Método de Pago*
 
-Responde:
-1️⃣ *SÍ* - Agregar más huéspedes
-2️⃣ *NO* - Continuar solo con mis datos`;
+¿Cómo deseas realizar el pago?
+
+1️⃣ *EFECTIVO* - Pago presencial en el hotel
+2️⃣ *TRANSFERENCIA* - Pago por transferencia bancaria
+
+Responde con el número de tu opción.`;
   }
   
   // Si el huésped ya estaba registrado (foundGuest existe), ir a solicitudes especiales
@@ -1625,7 +1604,8 @@ async function handleConfirmationState(session, messageText, phoneNumber) {
   if (normalized === 'si' || normalized === 'sí' || normalized === 'confirmar' || normalized === '1') {
     // Marcar sesión como completada
     whatsappService.updateSession(phoneNumber, {
-      completed: true
+      completed: true,
+      data: session.data
     });
     
     return null; // El controller enviará el mensaje de confirmación
@@ -1643,6 +1623,192 @@ async function handleConfirmationState(session, messageText, phoneNumber) {
   return `Por favor, responde:
 • *SÍ* o *1* para confirmar
 • *NO* o *2* para cancelar`;
+}
+
+/**
+ * Capturar método de pago
+ */
+async function handlePaymentMethodState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === '1' || normalized === 'efectivo') {
+    // Pago en efectivo
+    session.data.paymentMethod = 'efectivo';
+    
+    // Verificar si hay huéspedes adicionales
+    const totalGuests = session.data.totalGuests || 1;
+    const adults = session.data.adults || 1;
+    
+    if (adults > 1) {
+      // Hay más de 1 adulto, preguntar por huéspedes adicionales
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+        data: session.data
+      });
+      
+      return `✅ *Método de pago: Efectivo (presencial)*
+
+---
+
+👥 ¿Deseas registrar los datos de los *huéspedes adicionales* a tu reserva?
+
+Responde:
+• *CONTINUAR* - Para registrar sus datos
+• *OMITIR* - Para saltar este paso`;
+    } else {
+      // Solo 1 adulto, ir directo a confirmación
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_CONFIRMATION,
+        data: session.data
+      });
+      
+      return `✅ *Método de pago: Efectivo (presencial)*
+
+${getConfirmationMessage(session.data)}`;
+    }
+  }
+  
+  if (normalized === '2' || normalized === 'transferencia') {
+    // Pago por transferencia - Preguntar opción
+    session.data.paymentMethod = 'transferencia';
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_TRANSFER_OPTION,
+      data: session.data
+    });
+    
+    const nights = session.data.nights || 1;
+    const roomPrice = session.data.roomInfo?.price || 0;
+    const roomTotal = roomPrice * nights;
+    
+    let servicesTotal = 0;
+    if (session.data.services && session.data.services.breakfast) {
+      const breakfastQty = session.data.services.breakfastQuantity || 0;
+      const breakfastPrice = 3000;
+      servicesTotal = breakfastPrice * breakfastQty * nights;
+    }
+    
+    const total = roomTotal + servicesTotal;
+    const mitad = Math.round(total * 0.5);
+    const primeraNoche = roomPrice;
+    
+    return `💳 *Transferencia Bancaria*
+
+Selecciona el monto a pagar:
+
+1️⃣ *TOTAL* - $${total.toLocaleString()}
+2️⃣ *50%* - $${mitad.toLocaleString()}
+3️⃣ *PRIMERA NOCHE* - $${primeraNoche.toLocaleString()}
+
+Responde con el número de tu opción.`;
+  }
+  
+  return `❌ Por favor, selecciona una opción válida:
+
+1️⃣ *EFECTIVO*
+2️⃣ *TRANSFERENCIA*`;
+}
+
+/**
+ * Capturar opción de transferencia y mostrar datos bancarios
+ */
+async function handleTransferOptionState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  const nights = session.data.nights || 1;
+  const roomPrice = session.data.roomInfo?.price || 0;
+  const roomTotal = roomPrice * nights;
+  
+  let servicesTotal = 0;
+  if (session.data.services && session.data.services.breakfast) {
+    const breakfastQty = session.data.services.breakfastQuantity || 0;
+    const breakfastPrice = 3000;
+    servicesTotal = breakfastPrice * breakfastQty * nights;
+  }
+  
+  const total = roomTotal + servicesTotal;
+  const mitad = Math.round(total * 0.5);
+  const primeraNoche = roomPrice;
+  
+  let amountToPay = 0;
+  let paymentOption = '';
+  
+  if (normalized === '1' || normalized === 'total') {
+    amountToPay = total;
+    paymentOption = 'Total';
+    session.data.transferAmount = total;
+    session.data.transferOption = 'total';
+  } else if (normalized === '2' || normalized === '50%' || normalized === 'mitad') {
+    amountToPay = mitad;
+    paymentOption = '50%';
+    session.data.transferAmount = mitad;
+    session.data.transferOption = '50%';
+  } else if (normalized === '3' || normalized === 'primera noche') {
+    amountToPay = primeraNoche;
+    paymentOption = 'Primera noche';
+    session.data.transferAmount = primeraNoche;
+    session.data.transferOption = 'primera_noche';
+  } else {
+    return `❌ Por favor, selecciona una opción válida:
+
+1️⃣ *TOTAL* - $${total.toLocaleString()}
+2️⃣ *50%* - $${mitad.toLocaleString()}
+3️⃣ *PRIMERA NOCHE* - $${primeraNoche.toLocaleString()}`;
+  }
+  
+  // Guardar datos bancarios en mensaje para mostrar después
+  const datosBancarios = `✅ *Opción seleccionada: ${paymentOption}*
+💰 *Monto a transferir: $${amountToPay.toLocaleString()}*
+
+---
+
+🏦 *Datos para Transferencia*
+
+📌 *Nombre:* Hotel Don Teo
+📌 *RUT:* 77.123.456-7
+📌 *Banco:* Banco de Chile
+📌 *Tipo de Cuenta:* Cuenta Corriente
+📌 *Número de Cuenta:* 1234567890
+📌 *Email:* pagos@hoteldonteo.cl
+
+⚠️ *IMPORTANTE:*
+• Indica tu nombre completo y número de habitación en el asunto
+• Tu reserva quedará confirmada una vez validemos el pago`;
+
+  session.data.transferBankData = datosBancarios;
+  
+  // Verificar si hay huéspedes adicionales
+  const adults = session.data.adults || 1;
+  
+  if (adults > 1) {
+    // Hay más de 1 adulto, enviar datos bancarios primero y luego preguntar por huéspedes
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+      data: session.data
+    });
+    
+    // Enviar datos bancarios primero (con el sufijo de WhatsApp)
+    await whatsappService.sendMessage(`${phoneNumber}@s.whatsapp.net`, datosBancarios);
+    
+    // Esperar un momento y enviar la pregunta de huéspedes adicionales por separado
+    return `👥 ¿Deseas registrar los datos de los *huéspedes adicionales* a tu reserva?
+
+Responde:
+• *CONTINUAR* - Para registrar sus datos
+• *OMITIR* - Para saltar este paso`;
+  } else {
+    // Solo 1 adulto, ir directo a confirmación
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    
+    return `${datosBancarios}
+
+---
+
+${getConfirmationMessage(session.data)}`;
+  }
 }
 
 /**
@@ -1682,21 +1848,22 @@ function getConfirmationMessage(data) {
     servicesText = '\n   ' + servicesList.join('\n   ');
   }
 
-  // Huéspedes adicionales
+  // Huéspedes adicionales - Solo mostrar adultos
   let additionalGuestsText = '\n   Ninguno';
   if (data.additionalGuests && data.additionalGuests.length > 0) {
-    const guestsList = data.additionalGuests.map((guest, index) => {
-      if (guest.isChild) {
-        return `${index + 2}. ${guest.name} (Niño <4 años)\n     RUT: ${guest.rut}`;
-      } else {
-        return `${index + 2}. ${guest.name}\n     RUT: ${guest.rut}\n     Email: ${guest.email}\n     Teléfono: ${guest.phone}`;
-      }
-    });
-    additionalGuestsText = '\n   ' + guestsList.join('\n   ');
+    // Filtrar solo adultos
+    const adultGuests = data.additionalGuests.filter(guest => !guest.isChild);
+    
+    if (adultGuests.length > 0) {
+      const guestsList = adultGuests.map((guest, index) => {
+        return `${index + 2}. ${guest.name}\n     RUT: ${guest.rut || guest.passport}\n     Email: ${guest.email || 'No proporcionado'}\n     Teléfono: ${guest.phone || 'No proporcionado'}`;
+      });
+      additionalGuestsText = '\n   ' + guestsList.join('\n   ');
+    }
   }
   
   const adultsText = data.adults ? `${data.adults} adulto(s)` : '';
-  const childrenText = data.childrenUnder4 > 0 ? `, ${data.childrenUnder4} niño(s) <4 años` : '';
+  const childrenText = data.childrenUnder4 > 0 ? `, ${data.childrenUnder4} niño(s)` : '';
 
   // Calcular total
   const totalReservation = roomTotal + servicesTotal;
@@ -1705,6 +1872,21 @@ function getConfirmationMessage(data) {
   const floorText = data.selectedFloor !== undefined && data.selectedFloor !== null 
     ? (data.selectedFloor === 0 ? 'Planta baja' : `Piso ${data.selectedFloor}`)
     : 'Por asignar';
+
+  // Información de pago
+  let paymentText = '\n   No especificado';
+  if (data.paymentMethod) {
+    if (data.paymentMethod === 'efectivo') {
+      paymentText = '\n   💵 *Efectivo* (Pago presencial)';
+    } else if (data.paymentMethod === 'transferencia') {
+      const transferOptionText = 
+        data.transferOption === 'total' ? 'Pago Total' :
+        data.transferOption === '50%' ? 'Anticipo 50%' :
+        data.transferOption === 'primera_noche' ? 'Primera Noche' : 'N/A';
+      
+      paymentText = `\n   🏦 *Transferencia Bancaria*\n   • Opción: ${transferOptionText}\n   • Monto a transferir: $${data.transferAmount?.toLocaleString() || 'N/A'}`;
+    }
+  }
 
   return `📋 *Resumen de tu reserva*
 
@@ -1727,6 +1909,8 @@ function getConfirmationMessage(data) {
    • Número de habitación: ${data.roomNumber || 'Por asignar'}
    • Piso: ${floorText}
    • Huéspedes: ${adultsText}${childrenText}
+
+💳 *Método de Pago:*${paymentText}
 
 🛎️ *Servicios adicionales:*${servicesText}
 
@@ -2326,9 +2510,9 @@ async function handleAdditionalGuestFoundConfirmationState(session, messageText,
     session.data.currentAdultGuest++;
     session.data.currentAdditionalGuestFound = null;
     
-    const currentGuestsCount = session.data.additionalGuests.length + 1;
-    const totalGuests = session.data.totalGuests || 1;
-    const remaining = totalGuests - currentGuestsCount;
+    const adults = session.data.adults || 1;
+    const adultsNeeded = adults - 1;
+    const remaining = adultsNeeded - session.data.currentAdultGuest;
     
     if (remaining > 0) {
       whatsappService.updateSession(phoneNumber, {
@@ -2798,13 +2982,18 @@ Responde:
 • *REGISTRAR* - Para ingresar sus datos
 • *OMITIR* - Para saltarlo`;
   } else {
-    // Ya se completaron todos los huéspedes
+    // Ya se completaron todos los adultos adicionales
+    const adults = session.data.adults || 1;
+    const childrenUnder4 = session.data.childrenUnder4 || 0;
+    const totalGuests = adults + childrenUnder4;
+    const adultsRegistered = session.data.currentAdultGuest + 1; // +1 por el huésped principal
+    
     whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
       data: session.data
     });
     
-    return `✅ ¡Todos los huéspedes registrados! (${currentGuestsCount}/${totalGuests})
+    return `✅ ¡Todos los huéspedes adultos registrados! (${adultsRegistered} adultos de ${totalGuests} huéspedes totales)
 
 ${getConfirmationMessage(session.data)}`;
   }
