@@ -41,6 +41,28 @@ class WhatsAppController {
             console.error('Error al actualizar datos personales:', error);
           }
         }
+        // Si es un nuevo huésped (no estaba en la BD), crearlo
+        else if (!session.data.foundGuest && session.data.name) {
+          try {
+            const newGuest = await whatsappService.createNewGuest(session.data);
+            console.log(`✅ Nuevo huésped principal creado en BD con ID: ${newGuest.id}`);
+            
+            // Guardar el ID del nuevo huésped en la sesión para referencia
+            session.data.guestId = newGuest.id;
+          } catch (error) {
+            console.error('Error al crear nuevo huésped principal:', error);
+          }
+        }
+        
+        // Crear o actualizar huéspedes adicionales en la BD
+        if (session.data.additionalGuests && session.data.additionalGuests.length > 0) {
+          try {
+            await whatsappService.createOrUpdateAdditionalGuests(session.data.additionalGuests);
+            console.log(`✅ Huéspedes adicionales procesados en BD`);
+          } catch (error) {
+            console.error('Error al procesar huéspedes adicionales:', error);
+          }
+        }
         
         await whatsappService.createBookingAlert(session);
         

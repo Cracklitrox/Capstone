@@ -52,6 +52,9 @@ const STATES = {
   // Paso 5: Huéspedes Adicionales (opcional)
   AWAITING_ADDITIONAL_GUESTS_CHOICE: 'AWAITING_ADDITIONAL_GUESTS_CHOICE',
   AWAITING_ADDITIONAL_GUEST_CHOICE: 'AWAITING_ADDITIONAL_GUEST_CHOICE',
+  AWAITING_ADDITIONAL_GUEST_IS_CHILEAN: 'AWAITING_ADDITIONAL_GUEST_IS_CHILEAN',
+  AWAITING_ADDITIONAL_GUEST_REGISTRATION_CHECK: 'AWAITING_ADDITIONAL_GUEST_REGISTRATION_CHECK',
+  AWAITING_ADDITIONAL_GUEST_FOUND_CONFIRMATION: 'AWAITING_ADDITIONAL_GUEST_FOUND_CONFIRMATION',
   AWAITING_ADDITIONAL_GUEST_NAME: 'AWAITING_ADDITIONAL_GUEST_NAME',
   AWAITING_ADDITIONAL_GUEST_RUT: 'AWAITING_ADDITIONAL_GUEST_RUT',
   AWAITING_ADDITIONAL_GUEST_EMAIL: 'AWAITING_ADDITIONAL_GUEST_EMAIL',
@@ -224,6 +227,15 @@ async function processMessage(session, messageText, phoneNumber) {
       
       case STATES.AWAITING_ADDITIONAL_GUEST_CHOICE:
         return await handleAdditionalGuestChoiceState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_IS_CHILEAN:
+        return await handleAdditionalGuestIsChileanState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_REGISTRATION_CHECK:
+        return await handleAdditionalGuestRegistrationCheckState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_ADDITIONAL_GUEST_FOUND_CONFIRMATION:
+        return await handleAdditionalGuestFoundConfirmationState(session, messageText, phoneNumber);
       
       case STATES.AWAITING_ADDITIONAL_GUEST_NAME:
         return await handleAdditionalGuestNameState(session, messageText, phoneNumber);
@@ -525,23 +537,34 @@ Responde:
     
     return dataMessage;
   } else {
-    // Cliente NO encontrado - Ir a captura manual
+    // Cliente NO encontrado - Pedir RUT/Pasaporte primero
     session.data.foundGuest = null;
     
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_NAME,
+      state: STATES.AWAITING_RUT,
       data: session.data
     });
     
-    console.log(`[DEBUG] Usuario NO encontrado, estado actualizado a AWAITING_NAME`);
+    console.log(`[DEBUG] Usuario NO encontrado, estado actualizado a AWAITING_RUT para registro completo`);
     
-    return `📝 *No encontramos tu ${idType} en nuestro sistema*
+    // Mensaje diferente según si es chileno o extranjero
+    if (session.data.isChilean) {
+      return `📝 *No encontramos tu RUT en nuestro sistema*
 
-No hay problema, solo necesitamos algunos datos para completar tu reserva.
+No hay problema, vamos a registrarte.
 
-👤 ¿Cuál es tu *nombre completo*?
+🆔 Por favor, ingresa tu *RUT completo* para continuar con el registro:
 
-Ejemplo: Juan Pérez`;
+Ejemplo: 12.345.678-9`;
+    } else {
+      return `📝 *No encontramos tu Pasaporte en nuestro sistema*
+
+No hay problema, vamos a registrarte.
+
+� Por favor, ingresa tu *número de pasaporte completo* para continuar con el registro:
+
+Ejemplo: AB123456`;
+    }
   }
 }
 
@@ -556,7 +579,8 @@ async function handleGuestFoundConfirmationState(session, messageText, phoneNumb
   if (normalized === '1' || normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
     // Usar datos autocompletados - Saltar a huéspedes adicionales
     const totalGuests = session.data.totalGuests || 1;
-    const additionalGuestsNeeded = totalGuests - 1;
+    const adults = session.data.adults || 1;
+    const additionalGuestsNeeded = adults - 1; // Solo contar adultos adicionales, no niños
     
     whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
@@ -573,7 +597,7 @@ async function handleGuestFoundConfirmationState(session, messageText, phoneNumb
 Tienes *${totalGuests}* huéspede(s) en total.
 Ya registraste al huésped principal (tú).
 
-¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es)?
+¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es) adulto(s)?
 
 Responde:
 • *CONTINUAR* - Para registrar sus datos
@@ -666,24 +690,50 @@ ${nextPrompt}`;
 }
 
 /**
- * Capturar RUT
+ * Capturar RUT o Pasaporte (dependiendo si es chileno o extranjero)
  */
 async function handleRutState(session, messageText, phoneNumber) {
-  const validation = guestValidator.validateRut(messageText);
+  const input = messageText.trim();
   
-  if (!validation.valid) {
-    return validation.message;
+  // Si es chileno, validar RUT
+  if (session.data.isChilean) {
+    const validation = guestValidator.validateRut(input);
+    
+    if (!validation.valid) {
+      return validation.message;
+    }
+
+    session.data.rut = validation.rut;
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_NAME,
+      data: session.data
+    });
+
+    return `✅ RUT registrado: ${validation.rut}
+
+� Ahora, ¿cuál es tu *nombre completo*?
+
+Ejemplo: Juan Pérez González`;
+  } else {
+    // Si es extranjero, validar Pasaporte
+    if (input.length < 5 || input.length > 20) {
+      return `❌ El pasaporte debe tener entre 5 y 20 caracteres. Por favor, inténtalo nuevamente.`;
+    }
+    
+    const normalizedPassport = input.toUpperCase();
+    session.data.passport = normalizedPassport;
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_NAME,
+      data: session.data
+    });
+
+    return `✅ Pasaporte registrado: ${normalizedPassport}
+
+� Ahora, ¿cuál es tu *nombre completo*?
+
+Ejemplo: John Smith`;
   }
-
-  session.data.rut = validation.rut;
-  whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_EMAIL,
-    data: session.data
-  });
-
-  return `✅ RUT registrado: ${validation.rut}
-
-📝 ¿Cuál es tu *correo electrónico*?`;
 }
 
 /**
@@ -1078,7 +1128,43 @@ Tus datos han sido actualizados. A continuación verás el resumen de tu reserva
 ${getConfirmationMessage(session.data)}`;
   }
   
-  // Flujo normal: ir a solicitudes especiales
+  // Si es un nuevo registro (foundGuest es null), verificar si hay huéspedes adicionales
+  if (!session.data.foundGuest) {
+    const totalGuests = session.data.totalGuests || 1;
+    console.log('🔍 DEBUG handleCityState - totalGuests:', totalGuests, 'adults:', session.data.adults, 'children:', session.data.childrenUnder4);
+    
+    // Si solo viaja 1 persona, ir directo a confirmación
+    if (totalGuests === 1) {
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_CONFIRMATION,
+        data: session.data
+      });
+
+      return `✅ Ciudad registrada: ${city}
+
+📝 *Datos personales completados*
+
+${getConfirmationMessage(session.data)}`;
+    }
+    
+    // Si hay más de 1 huésped, preguntar por huéspedes adicionales
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+      data: session.data
+    });
+
+    return `✅ Ciudad registrada: ${city}
+
+📝 *Datos personales completados*
+
+👥 ¿Deseas agregar *huéspedes adicionales* a la reserva?
+
+Responde:
+1️⃣ *SÍ* - Agregar más huéspedes
+2️⃣ *NO* - Continuar solo con mis datos`;
+  }
+  
+  // Si el huésped ya estaba registrado (foundGuest existe), ir a solicitudes especiales
   whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_SPECIAL_REQUESTS,
     data: session.data
@@ -1913,9 +1999,10 @@ async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumb
   const normalized = messageText.toLowerCase().trim();
   
   const totalGuests = session.data.totalGuests || 1;
-  const additionalGuestsNeeded = totalGuests - 1;
+  const adults = session.data.adults || 1;
+  const additionalGuestsNeeded = adults - 1; // Solo contar adultos adicionales
   
-  // Si solo hay 1 huésped, ir directo a confirmación
+  // Si solo hay 1 adulto, ir directo a confirmación
   if (additionalGuestsNeeded === 0) {
     whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
@@ -1939,7 +2026,7 @@ async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumb
     }
     
     const childrenUnder4 = session.data.childrenUnder4 || 0;
-    const adultsNeeded = additionalGuestsNeeded - childrenUnder4;
+    const adultsNeeded = additionalGuestsNeeded; // Ya calculado correctamente arriba (adults - 1)
     
     // Si solo hay niños, registrarlos automáticamente sin pedir datos
     if (adultsNeeded === 0 && childrenUnder4 > 0) {
@@ -2016,23 +2103,28 @@ async function handleAdditionalGuestChoiceState(session, messageText, phoneNumbe
   const normalized = messageText.toLowerCase().trim();
   
   if (normalized === 'registrar' || normalized === 'si' || normalized === 'sí') {
+    // Primero preguntar si es chileno o extranjero
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
+      state: STATES.AWAITING_ADDITIONAL_GUEST_IS_CHILEAN,
       data: session.data
     });
     
-    return `📝 ¿Cuál es el *nombre completo* de este huésped?
+    return `📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
 
-_Puedes escribir *OMITIR* en cualquier paso para saltar ese dato_`;
+¿Este huésped es chileno o extranjero?
+
+Responde:
+1️⃣ *Chileno(a)*
+2️⃣ *Extranjero(a)*`;
   }
   
   if (normalized === 'omitir' || normalized === 'saltar' || normalized === 'no') {
     // Omitir este adulto
     session.data.currentAdultGuest++;
     
-    const currentGuestsCount = session.data.additionalGuests.length + 1;
-    const totalGuests = session.data.totalGuests || 1;
-    const remaining = totalGuests - currentGuestsCount;
+    const adults = session.data.adults || 1;
+    const adultsNeeded = adults - 1;
+    const remaining = adultsNeeded - session.data.currentAdultGuest;
     
     if (remaining > 0) {
       whatsappService.updateSession(phoneNumber, {
@@ -2067,115 +2159,238 @@ ${getConfirmationMessage(session.data)}`;
 }
 
 /**
- * Capturar nombre de huésped adicional
+ * Preguntar si el huésped adicional es chileno o extranjero
  */
-async function handleAdditionalGuestNameState(session, messageText, phoneNumber) {
+async function handleAdditionalGuestIsChileanState(session, messageText, phoneNumber) {
   const normalized = messageText.toLowerCase().trim();
   
-  // Permitir omitir este campo específico
-  if (normalized === 'omitir' || normalized === 'saltar') {
-    session.data.tempAdditionalGuest = {
-      name: null,
-      isChild: false
-    };
+  if (normalized === '1' || normalized.includes('chileno')) {
+    session.data.currentAdditionalGuestIsChilean = true;
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_REGISTRATION_CHECK,
+      data: session.data
+    });
+    
+    return `🆔 Por favor, ingresa el *RUT* de este huésped para verificar si está registrado:
+
+Ejemplo: 12.345.678-9 o 12345678-9`;
+  }
+  
+  if (normalized === '2' || normalized.includes('extranjero')) {
+    session.data.currentAdditionalGuestIsChilean = false;
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_REGISTRATION_CHECK,
+      data: session.data
+    });
+    
+    return `🛂 Por favor, ingresa el *Pasaporte* de este huésped para verificar si está registrado:
+
+Ejemplo: AB123456`;
+  }
+  
+  return `❌ Por favor responde:
+1️⃣ *Chileno(a)*
+2️⃣ *Extranjero(a)*`;
+}
+
+/**
+ * Verificar si el huésped adicional está registrado en la BD
+ */
+async function handleAdditionalGuestRegistrationCheckState(session, messageText, phoneNumber) {
+  const input = messageText.trim();
+  
+  let guest = null;
+  let idType = '';
+  
+  if (session.data.currentAdditionalGuestIsChilean) {
+    // Validar RUT
+    const validation = guestValidator.validateRut(input);
+    if (!validation.valid) {
+      return validation.message;
+    }
+    
+    const formattedRut = validation.rut;
+    const normalizedRut = formattedRut.replace(/\./g, '');
+    idType = 'RUT';
+    
+    try {
+      guest = await whatsappService.findGuestByRut(normalizedRut);
+      session.data.currentAdditionalGuestRut = formattedRut;
+    } catch (error) {
+      console.error('Error al buscar huésped adicional por RUT:', error);
+      return `❌ Hubo un error al verificar los datos. Por favor, intenta nuevamente.`;
+    }
+  } else {
+    // Validar Pasaporte
+    if (input.length < 5 || input.length > 20) {
+      return `❌ El pasaporte debe tener entre 5 y 20 caracteres. Por favor, inténtalo nuevamente.`;
+    }
+    
+    const normalizedPassport = input.toUpperCase();
+    idType = 'Pasaporte';
+    
+    try {
+      guest = await whatsappService.findGuestByPassport(normalizedPassport);
+      session.data.currentAdditionalGuestPassport = normalizedPassport;
+    } catch (error) {
+      console.error('Error al buscar huésped adicional por Pasaporte:', error);
+      return `❌ Hubo un error al verificar los datos. Por favor, intenta nuevamente.`;
+    }
+  }
+  
+  if (guest) {
+    // Huésped adicional encontrado - Autocompletar
+    session.data.currentAdditionalGuestFound = guest;
+    
+    const fullName = `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ' ' + guest.maternal_last_name : ''}`;
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_FOUND_CONFIRMATION,
+      data: session.data
+    });
+    
+    let dataMessage = `✅ *¡Huésped encontrado en el sistema!*
+
+🙋 *Datos registrados:*
+• Nombre: *${fullName}*`;
+    
+    if (guest.email) dataMessage += `\n• Email: *${guest.email}*`;
+    if (guest.phone_number) dataMessage += `\n• Teléfono: *${guest.phone_number}*`;
+    if (guest.birth_date) dataMessage += `\n• Fecha de Nacimiento: *${new Date(guest.birth_date).toLocaleDateString('es-CL')}*`;
+    if (guest.gender) dataMessage += `\n• Género: *${guest.gender}*`;
+    if (guest.country) dataMessage += `\n• País: *${guest.country}*`;
+    if (guest.region) dataMessage += `\n• Región: *${guest.region}*`;
+    if (guest.city) dataMessage += `\n• Ciudad: *${guest.city}*`;
+    
+    dataMessage += `\n\n¿Deseas usar estos datos?
+
+Responde:
+1️⃣ *SÍ* - Usar estos datos
+2️⃣ *NO* - Ingresar datos manualmente`;
+    
+    return dataMessage;
+  } else {
+    // Huésped adicional NO encontrado - Pedir RUT/Pasaporte completo primero
+    session.data.currentAdditionalGuestFound = null;
     
     whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
       data: session.data
     });
     
-    return `✅ Nombre omitido
+    const idLabel = session.data.currentAdditionalGuestIsChilean ? 'RUT' : 'Pasaporte';
+    const example = session.data.currentAdditionalGuestIsChilean ? '12.345.678-9' : 'AB123456';
+    
+    return `📝 *No encontramos este ${idType} en el sistema*
 
-¿Cuál es su *RUT*?
+Por favor, ingresa el *${idLabel} completo* de este huésped para el registro:
 
-Formato: 11.111.111-1
-(Escribe OMITIR para saltar)`;
+Ejemplo: ${example}`;
   }
-  
-  const validation = guestValidator.validateName(messageText);
-  
-  if (!validation.valid) {
-    return validation.message + `
-
-_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
-  }
-
-  // Guardar temporalmente el nombre
-  session.data.tempAdditionalGuest = {
-    name: validation.name,
-    isChild: false
-  };
-  
-  whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
-    data: session.data
-  });
-  
-  return `✅ Nombre registrado: ${validation.name}
-
-¿Cuál es su *RUT*?
-
-Formato: 11.111.111-1
-(Escribe OMITIR para saltar)`;
 }
 
 /**
- * Capturar RUT de huésped adicional (con validación de duplicados)
+ * Confirmar uso de datos del huésped adicional encontrado
  */
-async function handleAdditionalGuestRutState(session, messageText, phoneNumber) {
+async function handleAdditionalGuestFoundConfirmationState(session, messageText, phoneNumber) {
   const normalized = messageText.toLowerCase().trim();
   
-  // Permitir omitir y continuar con siguiente campo
-  if (normalized === 'omitir' || normalized === 'saltar') {
-    session.data.tempAdditionalGuest.rut = null;
+  if (normalized === '1' || normalized === 'si' || normalized === 'sí') {
+    // Usar datos autocompletados
+    const guest = session.data.currentAdditionalGuestFound;
+    const fullName = `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ' ' + guest.maternal_last_name : ''}`;
+    
+    const rut = session.data.currentAdditionalGuestIsChilean 
+      ? session.data.currentAdditionalGuestRut
+      : null;
+    const passport = !session.data.currentAdditionalGuestIsChilean
+      ? session.data.currentAdditionalGuestPassport
+      : null;
+    
+    session.data.additionalGuests.push({
+      name: fullName,
+      rut: rut,
+      passport: passport,
+      isChild: false,
+      email: guest.email,
+      phone: guest.phone_number,
+      birthdate: guest.birth_date ? new Date(guest.birth_date).toISOString().split('T')[0] : null,
+      gender: guest.gender,
+      country: guest.country,
+      region: guest.region,
+      city: guest.city
+    });
+    
+    session.data.currentAdultGuest++;
+    session.data.currentAdditionalGuestFound = null;
+    
+    const currentGuestsCount = session.data.additionalGuests.length + 1;
+    const totalGuests = session.data.totalGuests || 1;
+    const remaining = totalGuests - currentGuestsCount;
+    
+    if (remaining > 0) {
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
+        data: session.data
+      });
+      
+      return `✅ Huésped registrado: ${fullName}
+
+📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
+
+¿Deseas registrar los datos de este huésped?
+
+Responde:
+• *REGISTRAR* - Para ingresar sus datos
+• *OMITIR* - Para saltarlo`;
+    } else {
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_CONFIRMATION,
+        data: session.data
+      });
+      
+      return `✅ Todos los huéspedes registrados
+
+${getConfirmationMessage(session.data)}`;
+    }
+  }
+  
+  if (normalized === '2' || normalized === 'no') {
+    // No usar datos - Pedir RUT/Pasaporte primero
+    session.data.currentAdditionalGuestFound = null;
     
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADDITIONAL_GUEST_EMAIL,
+      state: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
       data: session.data
     });
     
-    return `✅ RUT omitido
+    const idLabel = session.data.currentAdditionalGuestIsChilean ? 'RUT' : 'Pasaporte';
+    const example = session.data.currentAdditionalGuestIsChilean ? '12.345.678-9' : 'AB123456';
+    
+    return `📝 Por favor, ingresa el *${idLabel} completo* de este huésped:
 
-¿Cuál es su *correo electrónico*?
-
-Escribe el email (ejemplo: juan@email.com)
-(Escribe OMITIR para saltar)`;
+Ejemplo: ${example}`;
   }
   
-  const validation = guestValidator.validateRut(messageText);
+  return `❌ Por favor responde:
+1️⃣ *SÍ* - Usar los datos encontrados
+2️⃣ *NO* - Ingresar datos manualmente`;
+}
+
+/**
+ * Capturar nombre de huésped adicional
+ */
+async function handleAdditionalGuestNameState(session, messageText, phoneNumber) {
+  const validation = guestValidator.validateName(messageText);
   
   if (!validation.valid) {
-    return validation.message + `
-
-_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
+    return validation.message;
   }
-  
-  // Normalizar RUT para comparación (sin puntos)
-  const normalizedRutInput = validation.rut.replace(/\./g, '');
-  const normalizedMainRut = session.data.rut ? session.data.rut.replace(/\./g, '') : null;
-  
-  // Validar que no sea el mismo RUT del huésped principal
-  if (normalizedRutInput === normalizedMainRut) {
-    return `❌ Este RUT pertenece al huésped principal.
 
-Por favor ingresa un RUT diferente o escribe *OMITIR* para saltar.`;
-  }
-  
-  // Validar que no haya duplicados en huéspedes adicionales
-  const isDuplicate = session.data.additionalGuests?.some(
-    guest => {
-      const guestRut = guest.rut ? guest.rut.replace(/\./g, '') : null;
-      return guestRut === normalizedRutInput;
-    }
-  );
-  
-  if (isDuplicate) {
-    return `❌ Este RUT ya fue registrado para otro huésped.
-
-Por favor ingresa un RUT diferente o escribe *OMITIR* para saltar.`;
-  }
-  
-  session.data.tempAdditionalGuest.rut = validation.rut;
+  // Guardar temporalmente el nombre
+  session.data.tempAdditionalGuest.name = validation.name;
   
   // Continuar con email
   whatsappService.updateSession(phoneNumber, {
@@ -2183,12 +2398,113 @@ Por favor ingresa un RUT diferente o escribe *OMITIR* para saltar.`;
     data: session.data
   });
   
-  return `✅ RUT registrado: ${validation.rut}
+  return `✅ Nombre registrado: ${validation.name}
 
-¿Cuál es su *correo electrónico*?
+📧 ¿Cuál es el *correo electrónico* de este huésped?
 
-Escribe el email (ejemplo: juan@email.com)
-(Escribe OMITIR para saltar)`;
+Ejemplo: correo@ejemplo.com
+(Escribe *OMITIR* para saltar)`;
+}
+
+/**
+ * Capturar RUT de huésped adicional (con validación de duplicados)
+ */
+async function handleAdditionalGuestRutState(session, messageText, phoneNumber) {
+  const input = messageText.trim();
+  
+  // Validar RUT o Pasaporte según corresponda
+  if (session.data.currentAdditionalGuestIsChilean) {
+    // Validar RUT
+    const validation = guestValidator.validateRut(input);
+    
+    if (!validation.valid) {
+      return validation.message;
+    }
+    
+    // Normalizar RUT para comparación (sin puntos)
+    const normalizedRutInput = validation.rut.replace(/\./g, '');
+    const normalizedMainRut = session.data.rut ? session.data.rut.replace(/\./g, '') : null;
+    
+    // Validar que no sea el mismo RUT del huésped principal
+    if (normalizedRutInput === normalizedMainRut) {
+      return `❌ Este RUT pertenece al huésped principal.
+
+Por favor ingresa un RUT diferente.`;
+    }
+    
+    // Validar que no haya duplicados en huéspedes adicionales
+    const isDuplicate = session.data.additionalGuests?.some(
+      guest => {
+        const guestRut = guest.rut ? guest.rut.replace(/\./g, '') : null;
+        return guestRut === normalizedRutInput;
+      }
+    );
+    
+    if (isDuplicate) {
+      return `❌ Este RUT ya fue registrado para otro huésped.
+
+Por favor ingresa un RUT diferente.`;
+    }
+    
+    session.data.tempAdditionalGuest = {
+      rut: validation.rut,
+      passport: null,
+      isChild: false
+    };
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
+      data: session.data
+    });
+    
+    return `✅ RUT registrado: ${validation.rut}
+
+👤 ¿Cuál es el *nombre completo* de este huésped?
+
+Ejemplo: Juan Pérez González`;
+  } else {
+    // Validar Pasaporte
+    if (input.length < 5 || input.length > 20) {
+      return `❌ El pasaporte debe tener entre 5 y 20 caracteres. Por favor, inténtalo nuevamente.`;
+    }
+    
+    const normalizedPassport = input.toUpperCase();
+    
+    // Validar que no sea el mismo pasaporte del huésped principal
+    if (normalizedPassport === session.data.passport) {
+      return `❌ Este Pasaporte pertenece al huésped principal.
+
+Por favor ingresa un Pasaporte diferente.`;
+    }
+    
+    // Validar que no haya duplicados en huéspedes adicionales
+    const isDuplicate = session.data.additionalGuests?.some(
+      guest => guest.passport === normalizedPassport
+    );
+    
+    if (isDuplicate) {
+      return `❌ Este Pasaporte ya fue registrado para otro huésped.
+
+Por favor ingresa un Pasaporte diferente.`;
+    }
+    
+    session.data.tempAdditionalGuest = {
+      rut: null,
+      passport: normalizedPassport,
+      isChild: false
+    };
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
+      data: session.data
+    });
+    
+    return `✅ Pasaporte registrado: ${normalizedPassport}
+
+👤 ¿Cuál es el *nombre completo* de este huésped?
+
+Ejemplo: John Smith`;
+  }
 }
 
 /**
@@ -2281,15 +2597,41 @@ async function handleAdditionalGuestBirthdateState(session, messageText, phoneNu
   if (normalized === 'omitir' || normalized === 'saltar') {
     session.data.tempAdditionalGuest.birthdate = null;
   } else {
-    const validation = dateValidator.validateBirthdate(messageText);
+    const input = messageText.trim();
     
-    if (!validation.valid) {
-      return validation.message + `
-
-_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
+    // Validar formato DD/MM/AAAA
+    const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const match = input.match(dateRegex);
+    
+    if (!match) {
+      return `❌ Formato incorrecto.\n\nPor favor ingresa la fecha de nacimiento en formato DD/MM/AAAA\nEjemplo: 15/08/1990\n\n_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
     }
     
-    session.data.tempAdditionalGuest.birthdate = validation.birthdate;
+    const [, day, month, year] = match;
+    const birthDate = new Date(year, month - 1, day);
+    
+    // Validar que sea una fecha válida
+    if (isNaN(birthDate.getTime())) {
+      return `❌ Fecha inválida.\n\nPor favor ingresa una fecha válida.\nEjemplo: 15/08/1990\n\n_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
+    }
+    
+    // Validar que no sea una fecha futura
+    if (birthDate > new Date()) {
+      return `❌ La fecha de nacimiento no puede ser en el futuro.\n\n_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
+    }
+    
+    // Validar edad mínima (18 años)
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const dayDiff = today.getDate() - birthDate.getDate();
+    const actualAge = monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age;
+    
+    if (actualAge < 18) {
+      return `❌ El huésped debe ser mayor de 18 años.\n\n_Escribe *OMITIR* si prefieres no proporcionar esta información_`;
+    }
+    
+    session.data.tempAdditionalGuest.birthdate = input;
   }
   
   whatsappService.updateSession(phoneNumber, {
@@ -2421,7 +2763,8 @@ async function handleAdditionalGuestCityState(session, messageText, phoneNumber)
   // Ahora sí guardar el adulto con todos los datos
   session.data.additionalGuests.push({
     name: session.data.tempAdditionalGuest.name,
-    rut: session.data.tempAdditionalGuest.rut,
+    rut: session.data.tempAdditionalGuest.rut || null,
+    passport: session.data.tempAdditionalGuest.passport || null,
     email: session.data.tempAdditionalGuest.email,
     phone: session.data.tempAdditionalGuest.phone,
     birthdate: session.data.tempAdditionalGuest.birthdate,
@@ -2435,9 +2778,9 @@ async function handleAdditionalGuestCityState(session, messageText, phoneNumber)
   session.data.currentAdultGuest++;
   delete session.data.tempAdditionalGuest;
   
-  const currentGuestsCount = session.data.additionalGuests.length + 1; // +1 por el principal
-  const totalGuests = session.data.totalGuests || 1;
-  const remaining = totalGuests - currentGuestsCount;
+  const adults = session.data.adults || 1;
+  const adultsNeeded = adults - 1;
+  const remaining = adultsNeeded - session.data.currentAdultGuest;
   
   if (remaining > 0) {
     whatsappService.updateSession(phoneNumber, {
@@ -2447,7 +2790,7 @@ async function handleAdditionalGuestCityState(session, messageText, phoneNumber)
     
     return `✅ Huésped adulto registrado
 
-� *Huésped adulto ${session.data.currentAdultGuest + 1}*
+📝 *Huésped adulto ${session.data.currentAdultGuest + 1}*
 
 ¿Deseas registrar los datos de este huésped?
 

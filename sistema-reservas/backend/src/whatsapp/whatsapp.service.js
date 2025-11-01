@@ -710,6 +710,185 @@ class WhatsAppService {
       throw error;
     }
   }
+
+  /**
+   * Convertir género de texto a enum de la base de datos
+   */
+  mapGenderToEnum(gender) {
+    if (!gender) return null;
+    
+    const normalized = gender.toLowerCase();
+    
+    if (normalized.includes('hombre') || normalized.includes('masculino') || normalized === 'male') {
+      return 'male';
+    } else if (normalized.includes('mujer') || normalized.includes('femenino') || normalized === 'female') {
+      return 'female';
+    } else {
+      return 'other';
+    }
+  }
+
+  /**
+   * Crear un nuevo huésped en la base de datos
+   */
+  async createNewGuest(data) {
+    try {
+      console.log(`[DEBUG] Creando nuevo huésped en la BD`);
+      
+      // Separar nombre completo en partes
+      const nameParts = data.name.trim().split(' ');
+      const firstName = nameParts[0];
+      const paternalLastName = nameParts[1] || '';
+      const maternalLastName = nameParts.slice(2).join(' ') || null;
+      
+      // Determinar el identification_number (RUT o Pasaporte)
+      const identificationNumber = data.isChilean 
+        ? (data.rut ? data.rut.replace(/\./g, '') : null)  // RUT sin puntos
+        : (data.passport || null);  // Pasaporte
+      
+      // Formatear fecha de nacimiento
+      let birthDate = null;
+      if (data.birthdate) {
+        // Si viene en formato DD/MM/YYYY, convertir a Date
+        const parts = data.birthdate.split('/');
+        if (parts.length === 3) {
+          birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        } else {
+          birthDate = new Date(data.birthdate);
+        }
+      }
+      
+      // Crear nuevo usuario
+      const newGuest = await prisma.users.create({
+        data: {
+          identification_number: identificationNumber,
+          first_name: firstName,
+          paternal_last_name: paternalLastName,
+          maternal_last_name: maternalLastName,
+          email: data.email,
+          phone_number: data.phone,
+          birth_date: birthDate,
+          gender: this.mapGenderToEnum(data.gender),
+          country: data.country,
+          region: data.region,
+          city: data.city,
+          password_hash: '', // Los huéspedes creados por WhatsApp no tienen contraseña
+          status: 'active',
+          is_fully_registered: false, // Registrado vía WhatsApp, no desde el sistema
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      });
+      
+      // Asignar rol de huésped (role_id = 3)
+      await prisma.user_roles.create({
+        data: {
+          user_id: newGuest.id,
+          role_id: 3 // ID del rol "guest"
+        }
+      });
+      
+      console.log(`✅ Nuevo huésped creado con ID: ${newGuest.id} - ${firstName} ${paternalLastName}`);
+      return newGuest;
+    } catch (error) {
+      console.error('Error al crear nuevo huésped:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear o actualizar huéspedes adicionales en la base de datos
+   */
+  async createOrUpdateAdditionalGuests(additionalGuests) {
+    try {
+      const savedGuests = [];
+      
+      for (const guest of additionalGuests) {
+        // Saltar niños (no tienen datos completos)
+        if (guest.isChild) {
+          savedGuests.push(null);
+          continue;
+        }
+        
+        // Verificar si ya existe por RUT o Pasaporte
+        let existingGuest = null;
+        if (guest.rut) {
+          const normalizedRut = guest.rut.replace(/\./g, '');
+          existingGuest = await this.findGuestByRut(normalizedRut);
+        } else if (guest.passport) {
+          existingGuest = await this.findGuestByPassport(guest.passport);
+        }
+        
+        if (existingGuest) {
+          // Ya existe, no crear duplicado
+          console.log(`ℹ️ Huésped adicional ya existe: ${existingGuest.first_name} ${existingGuest.paternal_last_name}`);
+          savedGuests.push(existingGuest);
+        } else {
+          // Crear nuevo huésped adicional si tiene datos mínimos
+          if (guest.name && (guest.rut || guest.passport)) {
+            const nameParts = guest.name.trim().split(' ');
+            const firstName = nameParts[0];
+            const paternalLastName = nameParts[1] || '';
+            const maternalLastName = nameParts.slice(2).join(' ') || null;
+            
+            const identificationNumber = guest.rut 
+              ? guest.rut.replace(/\./g, '')
+              : guest.passport;
+            
+            // Formatear fecha de nacimiento si existe
+            let birthDate = null;
+            if (guest.birthdate) {
+              const parts = guest.birthdate.split('/');
+              if (parts.length === 3) {
+                birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+              } else {
+                birthDate = new Date(guest.birthdate);
+              }
+            }
+            
+            const newGuest = await prisma.users.create({
+              data: {
+                identification_number: identificationNumber,
+                first_name: firstName,
+                paternal_last_name: paternalLastName,
+                maternal_last_name: maternalLastName,
+                email: guest.email,
+                phone_number: guest.phone,
+                birth_date: birthDate,
+                gender: this.mapGenderToEnum(guest.gender),
+                country: guest.country,
+                region: guest.region,
+                city: guest.city,
+                password_hash: '', // Los huéspedes creados por WhatsApp no tienen contraseña
+                status: 'active',
+                is_fully_registered: false, // Registrado vía WhatsApp
+                created_at: new Date(),
+                updated_at: new Date()
+              }
+            });
+            
+            // Asignar rol de huésped (role_id = 3)
+            await prisma.user_roles.create({
+              data: {
+                user_id: newGuest.id,
+                role_id: 3 // ID del rol "guest"
+              }
+            });
+            
+            console.log(`✅ Huésped adicional creado: ${firstName} ${paternalLastName}`);
+            savedGuests.push(newGuest);
+          } else {
+            savedGuests.push(null);
+          }
+        }
+      }
+      
+      return savedGuests;
+    } catch (error) {
+      console.error('Error al crear/actualizar huéspedes adicionales:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new WhatsAppService();
