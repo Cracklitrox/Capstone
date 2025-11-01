@@ -29,6 +29,19 @@ class WhatsAppController {
 
       // Si el flujo terminó, crear la alerta para el recepcionista
       if (session.completed) {
+        // Si el usuario estaba actualizando sus datos, guardarlos en BD
+        if (session.data.isUpdatingExistingGuest && session.data.existingGuestId) {
+          try {
+            await whatsappService.updateGuestPersonalData(
+              session.data.existingGuestId,
+              session.data
+            );
+            console.log(`✅ Datos personales actualizados en BD para usuario ID: ${session.data.existingGuestId}`);
+          } catch (error) {
+            console.error('Error al actualizar datos personales:', error);
+          }
+        }
+        
         await whatsappService.createBookingAlert(session);
         
         // Enviar mensaje de confirmación al cliente

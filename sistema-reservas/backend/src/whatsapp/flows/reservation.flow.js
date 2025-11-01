@@ -589,18 +589,27 @@ Responde:
     }
   } else if (normalized === '2' || normalized === 'no') {
     // Quiere actualizar datos - Ir a captura manual
+    // Marcar que está actualizando un usuario existente
+    session.data.isUpdatingExistingGuest = true;
+    session.data.existingGuestId = session.data.foundGuest?.id;
+    
     whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_NAME,
       data: session.data
     });
     
-    console.log(`[DEBUG] Estado actualizado a: AWAITING_NAME`);
+    console.log(`[DEBUG] Estado actualizado a: AWAITING_NAME (Modo actualización)`);
     
     return `📝 *Actualización de Datos Personales*
 
 Perfecto, vamos a actualizar tu información.
 
+Los datos actuales se mostrarán entre paréntesis.
+Puedes escribir el nuevo valor o presionar *SALTAR* para mantener el dato actual.
+
 👤 ¿Cuál es tu *nombre completo*?
+
+Actual: *${session.data.name}*
 
 Ejemplo: Juan Pérez`;
   }
@@ -614,6 +623,25 @@ Ejemplo: Juan Pérez`;
  * Capturar nombre
  */
 async function handleNameState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    // Mantener el nombre actual
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_EMAIL,
+      data: session.data
+    });
+    
+    return `✅ Nombre mantenido: ${session.data.name}
+
+📝 ¿Cuál es tu *correo electrónico*?
+
+Actual: *${session.data.email || 'No registrado'}*
+
+Escribe el nuevo email o *SALTAR* para mantenerlo`;
+  }
+  
   const validation = guestValidator.validateName(messageText);
   
   if (!validation.valid) {
@@ -622,15 +650,19 @@ async function handleNameState(session, messageText, phoneNumber) {
 
   session.data.name = validation.name;
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_RUT,
+    state: STATES.AWAITING_EMAIL,
     data: session.data
   });
 
+  const nextPrompt = session.data.isUpdatingExistingGuest 
+    ? `Actual: *${session.data.email || 'No registrado'}*\n\nEscribe el nuevo email o *SALTAR* para mantenerlo`
+    : '';
+
   return `✅ Perfecto, ${validation.name}
 
-📝 ¿Cuál es tu *RUT*?
+📝 ¿Cuál es tu *correo electrónico*?
 
-Formato: 11.111.111-1`;
+${nextPrompt}`;
 }
 
 /**
@@ -658,6 +690,26 @@ async function handleRutState(session, messageText, phoneNumber) {
  * Capturar email
  */
 async function handleEmailState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    // Mantener el email actual
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_PHONE,
+      data: session.data
+    });
+    
+    return `✅ Email mantenido
+
+📝 ¿Cuál es tu *número de teléfono* de contacto?
+
+Actual: *${session.data.phone || 'No registrado'}*
+
+Formato: +56912345678
+Escribe el nuevo teléfono o *SALTAR* para mantenerlo`;
+  }
+  
   const validation = guestValidator.validateEmail(messageText);
   
   if (!validation.valid) {
@@ -670,17 +722,44 @@ async function handleEmailState(session, messageText, phoneNumber) {
     data: session.data
   });
 
+  const nextPrompt = session.data.isUpdatingExistingGuest
+    ? `Actual: *${session.data.phone || 'No registrado'}*\n\nFormato: +56912345678\nEscribe el nuevo teléfono o *SALTAR* para mantenerlo`
+    : 'Formato: +56912345678';
+
   return `✅ Email registrado
 
 📝 ¿Cuál es tu *número de teléfono* de contacto?
 
-Formato: +56912345678`;
+${nextPrompt}`;
 }
 
 /**
  * Capturar teléfono
  */
 async function handlePhoneState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_BIRTHDATE,
+      data: session.data
+    });
+    
+    const birthdateDisplay = session.data.birthdate 
+      ? session.data.birthdate
+      : 'No registrado';
+    
+    return `✅ Teléfono mantenido
+
+📅 ¿Cuál es tu *fecha de nacimiento*?
+
+Actual: *${birthdateDisplay}*
+
+Formato: DD/MM/AAAA (Ejemplo: 15/08/1990)
+Escribe la nueva fecha o *SALTAR* para mantenerla`;
+  }
+  
   const validation = guestValidator.validatePhone(messageText);
   
   if (!validation.valid) {
@@ -693,18 +772,49 @@ async function handlePhoneState(session, messageText, phoneNumber) {
     data: session.data
   });
 
+  const birthdateDisplay = session.data.birthdate || 'No registrado';
+  
+  const nextPrompt = session.data.isUpdatingExistingGuest
+    ? `Actual: *${birthdateDisplay}*\n\nFormato: DD/MM/AAAA (Ejemplo: 15/08/1990)\nEscribe la nueva fecha o *SALTAR* para mantenerla`
+    : 'Formato: DD/MM/AAAA\nEjemplo: 15/08/1990';
+
   return `✅ Teléfono registrado
 
 📅 ¿Cuál es tu *fecha de nacimiento*?
 
-Formato: DD/MM/AAAA
-Ejemplo: 15/08/1990`;
+${nextPrompt}`;
 }
 
 /**
  * Capturar fecha de nacimiento
  */
 async function handleBirthdateState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_GENDER,
+      data: session.data
+    });
+    
+    const genderDisplay = session.data.gender 
+      ? session.data.gender
+      : 'No registrado';
+    
+    return `✅ Fecha de nacimiento mantenida
+
+👤 ¿Cuál es tu *género*?
+
+Actual: *${genderDisplay}*
+
+1️⃣ Hombre
+2️⃣ Mujer
+3️⃣ Otro
+
+Responde con el número de tu opción o *SALTAR* para mantenerlo`;
+  }
+  
   const input = messageText.trim();
   
   // Validar formato DD/MM/AAAA
@@ -745,21 +855,45 @@ async function handleBirthdateState(session, messageText, phoneNumber) {
     data: session.data
   });
 
+  const genderDisplay = session.data.gender || 'No registrado';
+  
+  const nextPrompt = session.data.isUpdatingExistingGuest
+    ? `Actual: *${genderDisplay}*\n\n1️⃣ Hombre\n2️⃣ Mujer\n3️⃣ Otro\n\nResponde con el número o *SALTAR* para mantenerlo`
+    : '1️⃣ Hombre\n2️⃣ Mujer\n3️⃣ Otro\n\nResponde con el número de tu opción.';
+
   return `✅ Fecha de nacimiento registrada
 
 👤 ¿Cuál es tu *género*?
 
-1️⃣ Hombre
-2️⃣ Mujer
-3️⃣ Otro
-
-Responde con el número de tu opción.`;
+${nextPrompt}`;
 }
 
 /**
  * Capturar género
  */
 async function handleGenderState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_COUNTRY,
+      data: session.data
+    });
+    
+    const countryDisplay = session.data.country 
+      ? session.data.country
+      : 'No registrado';
+    
+    return `✅ Género mantenido
+
+🌎 ¿De qué *país* eres?
+
+Actual: *${countryDisplay}*
+
+Escribe el nombre del país o *SALTAR* para mantenerlo`;
+  }
+  
   const input = messageText.trim().toLowerCase();
   let gender = '';
   
@@ -779,17 +913,45 @@ async function handleGenderState(session, messageText, phoneNumber) {
     data: session.data
   });
 
+  const countryDisplay = session.data.country || 'No registrado';
+  
+  const nextPrompt = session.data.isUpdatingExistingGuest
+    ? `Actual: *${countryDisplay}*\n\nEscribe el nombre del país o *SALTAR* para mantenerlo`
+    : 'Ejemplo: Chile, Argentina, Perú, etc.';
+
   return `✅ Género registrado: ${gender}
 
 🌎 ¿De qué *país* eres?
 
-Ejemplo: Chile, Argentina, Perú, etc.`;
+${nextPrompt}`;
 }
 
 /**
  * Capturar país
  */
 async function handleCountryState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_REGION,
+      data: session.data
+    });
+    
+    const regionDisplay = session.data.region 
+      ? session.data.region
+      : 'No registrado';
+    
+    return `✅ País mantenido
+
+📍 ¿De qué *región* eres?
+
+Actual: *${regionDisplay}*
+
+Escribe el nombre de la región o *SALTAR* para mantenerla`;
+  }
+  
   const country = messageText.trim();
   
   if (country.length < 2) {
@@ -802,17 +964,45 @@ async function handleCountryState(session, messageText, phoneNumber) {
     data: session.data
   });
 
+  const regionDisplay = session.data.region || 'No registrado';
+  
+  const nextPrompt = session.data.isUpdatingExistingGuest
+    ? `Actual: *${regionDisplay}*\n\nEscribe el nombre de la región o *SALTAR* para mantenerla`
+    : 'Ejemplo: Metropolitana, Valparaíso, Biobío, etc.';
+
   return `✅ País registrado: ${country}
 
 📍 ¿De qué *región* eres?
 
-Ejemplo: Metropolitana, Valparaíso, Biobío, etc.`;
+${nextPrompt}`;
 }
 
 /**
  * Capturar región
  */
 async function handleRegionState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CITY,
+      data: session.data
+    });
+    
+    const cityDisplay = session.data.city 
+      ? session.data.city
+      : 'No registrado';
+    
+    return `✅ Región mantenida
+
+🏙️ ¿De qué *ciudad* eres?
+
+Actual: *${cityDisplay}*
+
+Escribe el nombre de la ciudad o *SALTAR* para mantenerla`;
+  }
+  
   const region = messageText.trim();
   
   if (region.length < 2) {
@@ -825,24 +1015,70 @@ async function handleRegionState(session, messageText, phoneNumber) {
     data: session.data
   });
 
+  const cityDisplay = session.data.city || 'No registrado';
+  
+  const nextPrompt = session.data.isUpdatingExistingGuest
+    ? `Actual: *${cityDisplay}*\n\nEscribe el nombre de la ciudad o *SALTAR* para mantenerla`
+    : 'Ejemplo: Santiago, Valparaíso, Concepción, etc.';
+
   return `✅ Región registrada: ${region}
 
 🏙️ ¿De qué *ciudad* eres?
 
-Ejemplo: Santiago, Valparaíso, Concepción, etc.`;
+${nextPrompt}`;
 }
 
 /**
  * Capturar ciudad
  */
 async function handleCityState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  // Permitir saltar si está en modo actualización
+  if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
+    // Mantener ciudad actual y finalizar actualización
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    
+    return `✅ Ciudad mantenida
+
+📋 *Datos personales actualizados*
+
+Tus datos han sido actualizados. A continuación verás el resumen de tu reserva.
+
+${getConfirmationMessage(session.data)}`;
+  }
+  
   const city = messageText.trim();
   
   if (city.length < 2) {
-    return `❌ Por favor ingresa una ciudad válida.`;
+    const hint = session.data.isUpdatingExistingGuest 
+      ? ' o escribe *SALTAR* para mantener el actual' 
+      : '';
+    return `❌ Por favor ingresa una ciudad válida${hint}.`;
   }
 
   session.data.city = city;
+  
+  // Si está actualizando, ir directo a confirmación (sin solicitudes especiales)
+  if (session.data.isUpdatingExistingGuest) {
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_CONFIRMATION,
+      data: session.data
+    });
+    
+    return `✅ Ciudad actualizada: ${city}
+
+📋 *Datos personales actualizados*
+
+Tus datos han sido actualizados. A continuación verás el resumen de tu reserva.
+
+${getConfirmationMessage(session.data)}`;
+  }
+  
+  // Flujo normal: ir a solicitudes especiales
   whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_SPECIAL_REQUESTS,
     data: session.data

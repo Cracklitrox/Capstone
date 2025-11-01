@@ -673,6 +673,43 @@ class WhatsAppService {
       throw error;
     }
   }
+
+  /**
+   * Actualizar datos personales de un huésped existente
+   */
+  async updateGuestPersonalData(guestId, data) {
+    try {
+      console.log(`[DEBUG] Actualizando datos del huésped ID: ${guestId}`);
+      
+      // Separar nombre completo en partes
+      const nameParts = data.name.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ');
+      
+      // Actualizar usuario
+      const updatedGuest = await prisma.users.update({
+        where: { id: guestId },
+        data: {
+          first_name: firstName,
+          paternal_last_name: lastName,
+          email: data.email,
+          phone_number: data.phone,
+          birth_date: data.birthdate ? new Date(data.birthdate) : null,
+          gender: data.gender,
+          country: data.country,
+          region: data.region,
+          city: data.city,
+          updated_at: new Date()
+        }
+      });
+      
+      console.log(`✅ Datos actualizados para huésped ID: ${guestId}`);
+      return updatedGuest;
+    } catch (error) {
+      console.error('Error al actualizar datos del huésped:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new WhatsAppService();
