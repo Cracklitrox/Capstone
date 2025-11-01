@@ -9,11 +9,11 @@ const roomValidator = require('../validators/room.validator');
 const menuFlow = require('./menu.flow');
 
 /**
- * Estados del flujo de reserva (mismo orden que la interfaz)
+ * Estados del flujo de reserva (reorganizado)
  * Paso 1: Fechas y Huéspedes
  * Paso 2: Habitaciones
- * Paso 3: Datos del Huésped Principal
- * Paso 4: Servicios Adicionales (opcional)
+ * Paso 3: Solicitudes Especiales y Servicios Adicionales
+ * Paso 4: Verificación de Registro y Datos del Huésped
  * Paso 5: Huéspedes Adicionales (opcional)
  * Paso 6: Confirmación
  */
@@ -29,7 +29,17 @@ const STATES = {
   // Paso 2: Selección de Habitaciones
   AWAITING_ROOM_TYPE: 'AWAITING_ROOM_TYPE',
   AWAITING_SPECIFIC_ROOM: 'AWAITING_SPECIFIC_ROOM',
-  // Paso 3: Datos del Huésped Principal
+  // Paso 3: Solicitudes Especiales y Servicios (MOVIDO ANTES)
+  AWAITING_SPECIAL_REQUESTS: 'AWAITING_SPECIAL_REQUESTS',
+  AWAITING_SERVICES: 'AWAITING_SERVICES',
+  AWAITING_LAUNDRY: 'AWAITING_LAUNDRY',
+  AWAITING_BREAKFAST: 'AWAITING_BREAKFAST',
+  AWAITING_BREAKFAST_PREFERENCE: 'AWAITING_BREAKFAST_PREFERENCE',
+  // Paso 4: Verificación de Registro y Datos del Huésped Principal
+  AWAITING_IS_CHILEAN: 'AWAITING_IS_CHILEAN',
+  AWAITING_REGISTRATION_CHECK: 'AWAITING_REGISTRATION_CHECK',
+  AWAITING_GUEST_FOUND_CONFIRMATION: 'AWAITING_GUEST_FOUND_CONFIRMATION',
+  AWAITING_RUT_OR_PASSPORT: 'AWAITING_RUT_OR_PASSPORT',
   AWAITING_NAME: 'AWAITING_NAME',
   AWAITING_RUT: 'AWAITING_RUT',
   AWAITING_EMAIL: 'AWAITING_EMAIL',
@@ -39,12 +49,6 @@ const STATES = {
   AWAITING_COUNTRY: 'AWAITING_COUNTRY',
   AWAITING_REGION: 'AWAITING_REGION',
   AWAITING_CITY: 'AWAITING_CITY',
-  AWAITING_SPECIAL_REQUESTS: 'AWAITING_SPECIAL_REQUESTS',
-  // Paso 4: Servicios Adicionales (opcional)
-  AWAITING_SERVICES: 'AWAITING_SERVICES',
-  AWAITING_LAUNDRY: 'AWAITING_LAUNDRY',
-  AWAITING_BREAKFAST: 'AWAITING_BREAKFAST',
-  AWAITING_BREAKFAST_PREFERENCE: 'AWAITING_BREAKFAST_PREFERENCE',
   // Paso 5: Huéspedes Adicionales (opcional)
   AWAITING_ADDITIONAL_GUESTS_CHOICE: 'AWAITING_ADDITIONAL_GUESTS_CHOICE',
   AWAITING_ADDITIONAL_GUEST_CHOICE: 'AWAITING_ADDITIONAL_GUEST_CHOICE',
@@ -72,7 +76,16 @@ const PREVIOUS_STATE = {
   [STATES.AWAITING_FLOOR]: STATES.AWAITING_HAS_CHILDREN,
   [STATES.AWAITING_ROOM_TYPE]: STATES.AWAITING_FLOOR,
   [STATES.AWAITING_SPECIFIC_ROOM]: STATES.AWAITING_ROOM_TYPE,
-  [STATES.AWAITING_NAME]: STATES.AWAITING_SPECIFIC_ROOM,
+  // Servicios y solicitudes ahora van primero
+  [STATES.AWAITING_SPECIAL_REQUESTS]: STATES.AWAITING_SPECIFIC_ROOM,
+  [STATES.AWAITING_SERVICES]: STATES.AWAITING_SPECIAL_REQUESTS,
+  [STATES.AWAITING_LAUNDRY]: STATES.AWAITING_SERVICES,
+  [STATES.AWAITING_BREAKFAST]: STATES.AWAITING_SERVICES,
+  [STATES.AWAITING_BREAKFAST_PREFERENCE]: STATES.AWAITING_BREAKFAST,
+  // Verificación de registro
+  [STATES.AWAITING_IS_CHILEAN]: STATES.AWAITING_SERVICES,
+  [STATES.AWAITING_RUT_OR_PASSPORT]: STATES.AWAITING_IS_CHILEAN,
+  [STATES.AWAITING_NAME]: STATES.AWAITING_RUT_OR_PASSPORT,
   [STATES.AWAITING_RUT]: STATES.AWAITING_NAME,
   [STATES.AWAITING_EMAIL]: STATES.AWAITING_RUT,
   [STATES.AWAITING_PHONE]: STATES.AWAITING_EMAIL,
@@ -81,12 +94,8 @@ const PREVIOUS_STATE = {
   [STATES.AWAITING_COUNTRY]: STATES.AWAITING_GENDER,
   [STATES.AWAITING_REGION]: STATES.AWAITING_COUNTRY,
   [STATES.AWAITING_CITY]: STATES.AWAITING_REGION,
-  [STATES.AWAITING_SPECIAL_REQUESTS]: STATES.AWAITING_CITY,
-  [STATES.AWAITING_SERVICES]: STATES.AWAITING_SPECIAL_REQUESTS,
-  [STATES.AWAITING_LAUNDRY]: STATES.AWAITING_SERVICES,
-  [STATES.AWAITING_BREAKFAST]: STATES.AWAITING_SERVICES,
-  [STATES.AWAITING_BREAKFAST_PREFERENCE]: STATES.AWAITING_BREAKFAST,
-  [STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE]: STATES.AWAITING_SERVICES,
+  // Huéspedes adicionales
+  [STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE]: STATES.AWAITING_CITY,
   [STATES.AWAITING_ADDITIONAL_GUEST_NAME]: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
   [STATES.AWAITING_ADDITIONAL_GUEST_RUT]: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
   [STATES.AWAITING_ADDITIONAL_GUEST_EMAIL]: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
@@ -100,6 +109,8 @@ const PREVIOUS_STATE = {
  */
 async function processMessage(session, messageText, phoneNumber) {
   try {
+    console.log(`[DEBUG] processMessage - Estado: ${session.state}, Mensaje: "${messageText}"`);
+    
     // Verificar comandos globales primero
     const globalCommand = menuFlow.checkGlobalCommands(messageText);
     
@@ -196,6 +207,16 @@ async function processMessage(session, messageText, phoneNumber) {
       
       case STATES.AWAITING_BREAKFAST_PREFERENCE:
         return await handleBreakfastPreferenceState(session, messageText, phoneNumber);
+      
+      // Verificación de Registro
+      case STATES.AWAITING_IS_CHILEAN:
+        return await handleIsChileanState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_REGISTRATION_CHECK:
+        return await handleRegistrationCheckState(session, messageText, phoneNumber);
+      
+      case STATES.AWAITING_GUEST_FOUND_CONFIRMATION:
+        return await handleGuestFoundConfirmationState(session, messageText, phoneNumber);
       
       // Paso 5: Huéspedes Adicionales (opcional)
       case STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE:
@@ -295,9 +316,19 @@ async function getStatePrompt(state, data) {
       }
       return `🏢 *Paso 2: Selección de Piso*\n\nSelecciona el piso donde deseas hospedarte.`;
     case STATES.AWAITING_ROOM_TYPE:
-      return `🏨 *Paso 3: Selección de Tipo de Habitación*\n\n${await roomValidator.getRoomTypesMenu()}`;
+      return `🏨 *Paso 2: Selección de Tipo de Habitación*\n\n${await roomValidator.getRoomTypesMenu()}`;
+    case STATES.AWAITING_SPECIAL_REQUESTS:
+      return `💬 *Paso 3: Solicitudes Especiales*\n\n¿Tienes alguna *solicitud especial*?\n\nEjemplos: Vista al mar, Piso alto/bajo, Cama adicional\n\nEscribe tu solicitud o *NO* si no tienes ninguna.`;
+    case STATES.AWAITING_SERVICES:
+      return `�️ *Paso 3: Servicios Adicionales (Opcional)*\n\n¿Deseas agregar servicios adicionales?\n\n1️⃣ Lavandería\n2️⃣ Desayuno\n3️⃣ Ambos servicios\n4️⃣ NO, continuar sin servicios`;
+    case STATES.AWAITING_IS_CHILEAN:
+      return `🌎 *Paso 4: Datos del Huésped Principal*\n\n¿Eres *chileno/a*?\n\n1️⃣ Sí, soy chileno/a\n2️⃣ No, soy extranjero/a\n\nResponde con el número de tu opción.`;
+    case STATES.AWAITING_RUT_OR_PASSPORT:
+      const docType = data && data.isChilean ? 'RUT' : 'pasaporte';
+      const format = data && data.isChilean ? '\n\nFormato: 11.111.111-1' : '\n\nEjemplo: P123456789';
+      return `📝 ¿Cuál es tu *${docType}*?${format}\n\nSi ya estás registrado en nuestro sistema, autocompletaremos tus datos.`;
     case STATES.AWAITING_NAME:
-      return `📝 *Paso 3: Datos del Huésped Principal*\n\n¿Cuál es tu *nombre completo*?`;
+      return `📝 ¿Cuál es tu *nombre completo*?`;
     case STATES.AWAITING_RUT:
       return `📝 ¿Cuál es tu *RUT*?\n\nFormato: 11.111.111-1`;
     case STATES.AWAITING_EMAIL:
@@ -314,10 +345,6 @@ async function getStatePrompt(state, data) {
       return `📍 ¿De qué *región* eres?\n\nEjemplo: Metropolitana, Valparaíso, Biobío, etc.`;
     case STATES.AWAITING_CITY:
       return `🏙️ ¿De qué *ciudad* eres?\n\nEjemplo: Santiago, Valparaíso, Concepción, etc.`;
-    case STATES.AWAITING_SPECIAL_REQUESTS:
-      return `💬 ¿Tienes alguna *solicitud especial*?\n\nEjemplos: Vista al mar, Piso alto/bajo, Cama adicional\n\nEscribe tu solicitud o *NO* si no tienes ninguna.`;
-    case STATES.AWAITING_SERVICES:
-      return `🛎️ *Paso 4: Servicios Adicionales (Opcional)*\n\n¿Deseas agregar servicios adicionales?\n\n1️⃣ Lavandería\n2️⃣ Desayuno\n3️⃣ Ambos servicios\n4️⃣ NO, continuar sin servicios`;
     default:
       return `Continuemos con tu reserva...`;
   }
@@ -359,6 +386,228 @@ Ejemplo: 25/10/2025
   }
 
   return menuFlow.getWelcomeMessage();
+}
+
+/**
+ * Verificación de Registro - Paso 1: ¿Es chileno?
+ */
+async function handleIsChileanState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  if (normalized === '1' || normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
+    session.data.isChilean = true;
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_REGISTRATION_CHECK,
+      data: session.data
+    });
+    
+    return `📋 *Verificación de Cliente Registrado*
+
+¿Has realizado reservas con nosotros anteriormente?
+
+Por favor, ingresa tu *RUT* para verificar si ya tienes datos registrados.
+
+Formato: 11.111.111-1
+
+💡 Si no has venido antes, igual puedes continuar ingresando tu RUT.`;
+  } else if (normalized === '2' || normalized === 'no') {
+    session.data.isChilean = false;
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_REGISTRATION_CHECK,
+      data: session.data
+    });
+    
+    return `📋 *Verificación de Cliente Registrado*
+
+¿Has realizado reservas con nosotros anteriormente?
+
+Por favor, ingresa tu *número de pasaporte* para verificar si ya tienes datos registrados.
+
+Ejemplo: ABC123456
+
+💡 Si no has venido antes, igual puedes continuar ingresando tu pasaporte.`;
+  }
+  
+  return `❌ Por favor responde:
+1️⃣ *SÍ* - Si eres chileno(a)
+2️⃣ *NO* - Si eres extranjero(a)`;
+}
+
+/**
+ * Verificación de Registro - Paso 2: Buscar en BD por RUT o Pasaporte
+ */
+async function handleRegistrationCheckState(session, messageText, phoneNumber) {
+  const input = messageText.trim();
+  
+  let guest = null;
+  let idType = '';
+  
+  if (session.data.isChilean) {
+    // Validar RUT
+    const validation = guestValidator.validateRut(input);
+    if (!validation.valid) {
+      return validation.message;
+    }
+    
+    const formattedRut = validation.rut; // Con formato: 21.332.187-0
+    const normalizedRut = formattedRut.replace(/\./g, ''); // Sin puntos: 21332187-0
+    idType = 'RUT';
+    
+    // Buscar en BD por RUT normalizado (sin puntos)
+    try {
+      guest = await whatsappService.findGuestByRut(normalizedRut);
+      session.data.rut = formattedRut; // Guardar con formato para mostrar
+    } catch (error) {
+      console.error('Error al buscar huésped por RUT:', error);
+      return `❌ Hubo un error al verificar tus datos. Por favor, intenta nuevamente.`;
+    }
+  } else {
+    // Validar Pasaporte (formato flexible)
+    if (input.length < 5 || input.length > 20) {
+      return `❌ El pasaporte debe tener entre 5 y 20 caracteres. Por favor, inténtalo nuevamente.`;
+    }
+    
+    const normalizedPassport = input.toUpperCase();
+    idType = 'Pasaporte';
+    
+    // Buscar en BD por Pasaporte
+    try {
+      guest = await whatsappService.findGuestByPassport(normalizedPassport);
+      session.data.passport = normalizedPassport; // Guardar pasaporte siempre
+    } catch (error) {
+      console.error('Error al buscar huésped por Pasaporte:', error);
+      return `❌ Hubo un error al verificar tus datos. Por favor, intenta nuevamente.`;
+    }
+  }
+  
+  if (guest) {
+    // Cliente encontrado - Autocompletar datos
+    session.data.foundGuest = guest;
+    
+    // Construir nombre completo
+    const fullName = `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ' ' + guest.maternal_last_name : ''}`;
+    session.data.name = fullName;
+    session.data.email = guest.email;
+    session.data.phone = guest.phone_number;
+    session.data.birthdate = guest.birth_date ? new Date(guest.birth_date).toISOString().split('T')[0] : null;
+    session.data.gender = guest.gender;
+    session.data.country = guest.country;
+    session.data.region = guest.region;
+    session.data.city = guest.city;
+    
+    // Actualizar sesión al nuevo estado - pasar solo lo que cambia
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_GUEST_FOUND_CONFIRMATION,
+      data: session.data
+    });
+    
+    console.log(`[DEBUG] Usuario encontrado, estado actualizado a AWAITING_GUEST_FOUND_CONFIRMATION`);
+    
+    // Construir mensaje con datos opcionales
+    let dataMessage = `✅ *¡Te encontramos en nuestro sistema!*
+
+🙋 *Datos registrados:*
+• Nombre: *${fullName}*`;
+    
+    if (guest.email) dataMessage += `\n• Email: *${guest.email}*`;
+    if (guest.phone_number) dataMessage += `\n• Teléfono: *${guest.phone_number}*`;
+    if (guest.birth_date) dataMessage += `\n• Fecha de Nacimiento: *${new Date(guest.birth_date).toISOString().split('T')[0]}*`;
+    if (guest.gender) dataMessage += `\n• Género: *${guest.gender}*`;
+    if (guest.country) dataMessage += `\n• País: *${guest.country}*`;
+    if (guest.region) dataMessage += `\n• Región: *${guest.region}*`;
+    if (guest.city) dataMessage += `\n• Ciudad: *${guest.city}*`;
+    
+    dataMessage += `\n\n¿Deseas usar estos datos para tu reserva?
+
+Responde:
+1️⃣ *SÍ* - Usar estos datos
+2️⃣ *NO* - Actualizar mis datos`;
+    
+    return dataMessage;
+  } else {
+    // Cliente NO encontrado - Ir a captura manual
+    session.data.foundGuest = null;
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_NAME,
+      data: session.data
+    });
+    
+    console.log(`[DEBUG] Usuario NO encontrado, estado actualizado a AWAITING_NAME`);
+    
+    return `📝 *No encontramos tu ${idType} en nuestro sistema*
+
+No hay problema, solo necesitamos algunos datos para completar tu reserva.
+
+👤 ¿Cuál es tu *nombre completo*?
+
+Ejemplo: Juan Pérez`;
+  }
+}
+
+/**
+ * Verificación de Registro - Paso 3: Confirmar uso de datos encontrados
+ */
+async function handleGuestFoundConfirmationState(session, messageText, phoneNumber) {
+  const normalized = messageText.toLowerCase().trim();
+  
+  console.log(`[DEBUG] handleGuestFoundConfirmationState - Input: "${normalized}", Current State: ${session.state}`);
+  
+  if (normalized === '1' || normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
+    // Usar datos autocompletados - Saltar a huéspedes adicionales
+    const totalGuests = session.data.totalGuests || 1;
+    const additionalGuestsNeeded = totalGuests - 1;
+    
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+      data: session.data
+    });
+    
+    console.log(`[DEBUG] Estado actualizado a: AWAITING_ADDITIONAL_GUESTS_CHOICE`);
+    
+    if (additionalGuestsNeeded > 0) {
+      return `✅ *Datos confirmados*
+
+📝 *Paso 5: Huéspedes Adicionales (Opcional)*
+
+Tienes *${totalGuests}* huéspede(s) en total.
+Ya registraste al huésped principal (tú).
+
+¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es)?
+
+Responde:
+• *CONTINUAR* - Para registrar sus datos
+• *OMITIR* - Para saltar este paso`;
+    } else {
+      // Solo hay 1 huésped, ir directo a confirmación
+      whatsappService.updateSession(phoneNumber, {
+        state: STATES.AWAITING_CONFIRMATION,
+        data: session.data
+      });
+      console.log(`[DEBUG] Estado actualizado a: AWAITING_CONFIRMATION`);
+      return getConfirmationMessage(session.data);
+    }
+  } else if (normalized === '2' || normalized === 'no') {
+    // Quiere actualizar datos - Ir a captura manual
+    whatsappService.updateSession(phoneNumber, {
+      state: STATES.AWAITING_NAME,
+      data: session.data
+    });
+    
+    console.log(`[DEBUG] Estado actualizado a: AWAITING_NAME`);
+    
+    return `📝 *Actualización de Datos Personales*
+
+Perfecto, vamos a actualizar tu información.
+
+👤 ¿Cuál es tu *nombre completo*?
+
+Ejemplo: Juan Pérez`;
+  }
+  
+  return `❌ Por favor responde:
+1️⃣ *SÍ* - Para usar los datos encontrados
+2️⃣ *NO* - Para actualizar tus datos`;
 }
 
 /**
@@ -992,16 +1241,20 @@ async function handleSpecificRoomState(session, messageText, phoneNumber) {
   session.data.roomNumber = selectedRoom.room_number;
   
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_NAME,
+    state: STATES.AWAITING_SPECIAL_REQUESTS,
     data: session.data
   });
 
   return `✅ Habitación seleccionada: *${session.data.roomTypeName}* - Habitación ${session.data.roomNumber}
 📋 Capacidad: ${session.data.roomInfo.base_capacity || session.data.roomInfo.capacity} persona(s)
 
-📝 *Paso 3: Datos del Huésped Principal*
+� *Paso 3: Solicitudes Especiales*
 
-¿Cuál es tu *nombre completo*?`;
+¿Tienes alguna *solicitud especial*?
+
+Ejemplos: Vista al mar, Piso alto/bajo, Cama adicional
+
+Escribe tu solicitud o *NO* si no tienes ninguna.`;
 }
 
 /**
@@ -1192,32 +1445,19 @@ async function handleServicesState(session, messageText, phoneNumber) {
   }
   
   if (normalized === 'no' || normalized === '4' || normalized === 'ninguno') {
-    // No agregar servicios, ir directo a huéspedes adicionales
+    // No agregar servicios, ir a verificación de registro
     whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+      state: STATES.AWAITING_IS_CHILEAN,
       data: session.data
     });
     
-    const totalGuests = session.data.totalGuests || 1;
-    const additionalGuestsNeeded = totalGuests - 1;
-    
-    if (additionalGuestsNeeded > 0) {
-      return `📝 *Paso 5: Huéspedes Adicionales (Opcional)*
+    return `🌎 *Paso 4: Verificación de Registro*
 
-Tienes *${totalGuests}* huéspede(s) en total.
-Ya registraste al huésped principal.
+¿Eres de Chile?
 
-¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es)?
-
-Responde *SÍ* o *NO*`;
-    } else {
-      // Solo hay 1 huésped, ir directo a confirmación
-      whatsappService.updateSession(phoneNumber, {
-        state: STATES.AWAITING_CONFIRMATION,
-        data: session.data
-      });
-      return getConfirmationMessage(session.data);
-    }
+Responde:
+1️⃣ *SÍ* - Soy chileno(a)
+2️⃣ *NO* - Soy extranjero(a)`;
   }
   
   if (normalized === '1' || normalized.includes('lavand')) {
@@ -1297,37 +1537,21 @@ Ahora, ¿cuántos desayunos necesitas por día?
 Ingresa un número (ejemplo: 2)`;
   }
   
-  // Si no hay desayuno, ir a huéspedes adicionales
+  // Si no hay desayuno, ir a verificación de registro
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+    state: STATES.AWAITING_IS_CHILEAN,
     data: session.data
   });
   
-  const totalGuests = session.data.totalGuests || 1;
-  const additionalGuestsNeeded = totalGuests - 1;
-  
-  if (additionalGuestsNeeded > 0) {
-    return `✅ Servicios registrados
+  return `✅ Lavandería: ${quantity} prenda(s) registrada(s)
 
-📝 *Paso 5: Huéspedes Adicionales*
+🌎 *Paso 4: Verificación de Registro*
 
-Tienes *${totalGuests}* huéspede(s) en total.
-Ya registraste al huésped principal.
-
-💡 *Puedes seguir con las preguntas u omitirlas*
-
-¿Deseas registrar los datos de los otros *${additionalGuestsNeeded}* huésped(es)?
+¿Eres de Chile?
 
 Responde:
-• *CONTINUAR* - Para registrar sus datos
-• *OMITIR* - Para saltar este paso`;
-  } else {
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_CONFIRMATION,
-      data: session.data
-    });
-    return getConfirmationMessage(session.data);
-  }
+1️⃣ *SÍ* - Soy chileno(a)
+2️⃣ *NO* - Soy extranjero(a)`;
 }
 
 /**
@@ -1425,33 +1649,21 @@ async function handleBreakfastPreferenceState(session, messageText, phoneNumber)
   }
   
   whatsappService.updateSession(phoneNumber, {
-    state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
+    state: STATES.AWAITING_IS_CHILEAN,
     data: session.data
   });
   
-  const totalGuests = session.data.totalGuests || 1;
-  const additionalGuestsNeeded = totalGuests - 1;
-  
   const preferencesText = session.data.services.breakfastPreferences.join(', ');
   
-  if (additionalGuestsNeeded > 0) {
-    return `✅ Preferencias registradas: ${preferencesText}
+  return `✅ Preferencias de desayuno registradas: ${preferencesText}
 
-📝 *Paso 5: Huéspedes Adicionales*
+🌎 *Paso 4: Verificación de Registro*
 
-Tienes *${totalGuests}* huéspede(s) en total.
-Ya registraste al huésped principal.
+¿Eres de Chile?
 
-⚠️ *IMPORTANTE*: Puedes registrar los datos completos de los otros *${additionalGuestsNeeded}* huésped(es).
-O puedes omitir cada uno de ellos si prefieres no proporcionar sus datos. 
-Responde *CONTINUAR* para comenzar.`;
-  } else {
-    whatsappService.updateSession(phoneNumber, {
-      state: STATES.AWAITING_CONFIRMATION,
-      data: session.data
-    });
-    return getConfirmationMessage(session.data);
-  }
+Responde:
+1️⃣ *SÍ* - Soy chileno(a)
+2️⃣ *NO* - Soy extranjero(a)`;
 }
 
 /**
@@ -1702,8 +1914,12 @@ Escribe el email (ejemplo: juan@email.com)
 _Escribe *OMITIR* si prefieres no proporcionar esta información_`;
   }
   
+  // Normalizar RUT para comparación (sin puntos)
+  const normalizedRutInput = validation.rut.replace(/\./g, '');
+  const normalizedMainRut = session.data.rut ? session.data.rut.replace(/\./g, '') : null;
+  
   // Validar que no sea el mismo RUT del huésped principal
-  if (validation.rut === session.data.rut) {
+  if (normalizedRutInput === normalizedMainRut) {
     return `❌ Este RUT pertenece al huésped principal.
 
 Por favor ingresa un RUT diferente o escribe *OMITIR* para saltar.`;
@@ -1711,7 +1927,10 @@ Por favor ingresa un RUT diferente o escribe *OMITIR* para saltar.`;
   
   // Validar que no haya duplicados en huéspedes adicionales
   const isDuplicate = session.data.additionalGuests?.some(
-    guest => guest.rut === validation.rut
+    guest => {
+      const guestRut = guest.rut ? guest.rut.replace(/\./g, '') : null;
+      return guestRut === normalizedRutInput;
+    }
   );
   
   if (isDuplicate) {

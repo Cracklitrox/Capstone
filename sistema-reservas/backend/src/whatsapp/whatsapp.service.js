@@ -61,8 +61,30 @@ class WhatsAppService {
   updateSession(phoneNumber, updates) {
     const session = chatSessions.get(phoneNumber);
     if (session) {
-      Object.assign(session, updates);
+      console.log(`[DEBUG updateSession] ANTES - Estado: ${session.state}`);
+      console.log(`[DEBUG updateSession] Updates recibidos:`, JSON.stringify({
+        state: updates.state,
+        hasData: !!updates.data
+      }));
+      
+      // Actualizar estado si viene en updates
+      if (updates.state !== undefined) {
+        session.state = updates.state;
+      }
+      
+      // Actualizar data si viene en updates
+      if (updates.data !== undefined) {
+        session.data = updates.data;
+      }
+      
+      // Actualizar otros campos
+      const { state, data, ...otherUpdates } = updates;
+      Object.assign(session, otherUpdates);
+      
       chatSessions.set(phoneNumber, session);
+      console.log(`[DEBUG updateSession] DESPUÉS - Estado: ${session.state}`);
+    } else {
+      console.log(`[DEBUG updateSession] ERROR - No se encontró sesión para ${phoneNumber}`);
     }
   }
 
@@ -610,6 +632,46 @@ class WhatsAppService {
     chatSessions.clear();
     console.log(`🗑️ ${count} sesiones limpiadas`);
     return count;
+  }
+
+  /**
+   * Buscar huésped por RUT
+   */
+  async findGuestByRut(rut) {
+    try {
+      const guest = await prisma.users.findFirst({
+        where: {
+          identification_number: rut
+        },
+        include: {
+          guest_details: true
+        }
+      });
+      return guest;
+    } catch (error) {
+      console.error('Error al buscar huésped por RUT:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar huésped por Pasaporte
+   */
+  async findGuestByPassport(passport) {
+    try {
+      const guest = await prisma.users.findFirst({
+        where: {
+          identification_number: passport
+        },
+        include: {
+          guest_details: true
+        }
+      });
+      return guest;
+    } catch (error) {
+      console.error('Error al buscar huésped por Pasaporte:', error);
+      throw error;
+    }
   }
 }
 
