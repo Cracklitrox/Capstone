@@ -1421,43 +1421,48 @@ async function getTopRooms(startDate, endDate, metric) {
 async function getTopRoomTypes(startDate, endDate, metric) {
   const { start, end } = normalizeDateRange(startDate, endDate);
 
-  // Obtener todos los tipos de habitación
+  // Obtener todos los tipos de habitación activos
   const roomTypes = await prisma.room_types.findMany({
     where: { is_active: true },
     include: {
       rooms: {
-        where: { is_active: true },
-        include: {
-          reservation_rooms: {
-            where: {
-              deleted_at: null,
-              OR: [
-                { start_date: { gte: start, lte: end } },
-                { end_date: { gte: start, lte: end } }
-              ],
-              reservations: {
-                deleted_at: null,
-                status: 'completed'
-              }
-            }
-          }
-        }
+        where: { is_active: true }
       }
     }
   });
 
-  // Calcular estadísticas por tipo (INCLUIR TODOS aunque no tengan reservas)
-  const typeStats = roomTypes.map(type => {
+  // Para cada tipo, obtener las reservas completadas en el rango de fechas
+  const typeStats = await Promise.all(roomTypes.map(async (type) => {
+    // Obtener todas las reservation_rooms de habitaciones de este tipo en el período
+    const reservationRooms = await prisma.reservation_rooms.findMany({
+      where: {
+        deleted_at: null,
+        rooms: {
+          room_type_id: type.id,
+          is_active: true
+        },
+        OR: [
+          { start_date: { gte: start, lte: end } },
+          { end_date: { gte: start, lte: end } }
+        ],
+        reservations: {
+          deleted_at: null,
+          status: 'completed'
+        }
+      },
+      include: {
+        reservations: true
+      }
+    });
+
     let totalRevenue = 0;
     let totalNights = 0;
     const reservations = new Set();
 
-    type.rooms.forEach(room => {
-      room.reservation_rooms.forEach(rr => {
-        totalRevenue += rr.subtotal;
-        totalNights += getDaysBetween(rr.start_date, rr.end_date);
-        reservations.add(rr.reservation_id);
-      });
+    reservationRooms.forEach(rr => {
+      totalRevenue += rr.subtotal;
+      totalNights += getDaysBetween(rr.start_date, rr.end_date);
+      reservations.add(rr.reservation_id);
     });
 
     const totalDays = getDaysBetween(start, end) + 1;
@@ -1475,7 +1480,7 @@ async function getTopRoomTypes(startDate, endDate, metric) {
       adr: Math.round(adr),
       totalNights
     };
-  });
+  }));
 
   // Calcular porcentaje del total
   const totalRevenue = typeStats.reduce((sum, t) => sum + t.totalRevenue, 0);

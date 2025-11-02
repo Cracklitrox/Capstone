@@ -700,7 +700,7 @@ const CustomReportsSection = () => {
     { value: '$500.000 o más', label: '$500.000 o más' },
   ];
 
-  const COLORS = ['#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316'];
+  const COLORS = ['#f97316', '#8b5cf6', '#3b82f6', '#10b981', '#06b6d4', '#ef4444', '#f59e0b', '#14b8a6'];
 
   // Efecto para filtrar habitaciones cuando cambia el piso seleccionado
   useEffect(() => {
@@ -3785,8 +3785,12 @@ const Reports = () => {
         getWeeklyRevenue(startDate, endDate),
         getDailyOccupancy(weekStart, weekEndDate),
         getDailyRevenue(weekStart, weekEndDate),
-        getRoomTypeStats(monthStart, monthEndDate),
-        getMonthlyRevenue(monthStartFor30Days, endDate), // Usar últimos 30 días desde ayer
+        getRoomTypeStats(monthStartFor30Days, endDate).catch(err => {
+          console.warn('⚠️ Error al obtener room types, usando datos alternativos:', err);
+          // Si falla, devolver estructura vacía
+          return { data: [] };
+        }),
+        getMonthlyRevenue(monthStartFor30Days, endDate),
         getTotalPaidAmount(),
       ]);
 
@@ -3847,10 +3851,32 @@ const Reports = () => {
       const last7Days = allDays;
 
       // Procesar distribución de tipos de habitación desde el endpoint real
-      const roomTypeStatsData = roomTypes?.data?.map((item) => ({
+      console.log('📊 Datos crudos de tipos de habitación desde el backend:', roomTypes?.data);
+      
+      let roomTypeStatsData = roomTypes?.data?.map((item) => ({
         name: item.roomTypeName || item.name || 'Sin nombre',
         value: item.reservationCount || item.value || 0,
       })) || [];
+      
+      console.log('📊 Datos procesados de tipos de habitación ANTES de agregar faltantes:', roomTypeStatsData);
+      
+      // FORZAR que existan TODOS los 7 tipos de habitación
+      const allRoomTypes = ['Cuádruple', 'Doble adicional', 'Doble dos camas', 'Matrimonial', 'Suite', 'Suite Junior', 'Triple'];
+      const existingTypes = roomTypeStatsData.map(item => item.name);
+      
+      // Agregar tipos faltantes con valor 0
+      allRoomTypes.forEach(typeName => {
+        if (!existingTypes.includes(typeName)) {
+          console.log(`⚠️ Agregando tipo faltante: ${typeName}`);
+          roomTypeStatsData.push({ name: typeName, value: 0 });
+        }
+      });
+      
+      // Ordenar por cantidad de reservas (descendente) para mostrar los más populares primero
+      roomTypeStatsData.sort((a, b) => b.value - a.value);
+      
+      console.log('📊 Datos FINALES para el gráfico (DEBE HABER 7 TIPOS):', roomTypeStatsData);
+      console.log('📊 Total de tipos:', roomTypeStatsData.length);
 
       // Calcular total de ingresos del mes actual
       const monthlyRevenueTotal = monthlyRev?.data?.reduce((sum, item) => sum + (item.totalRevenue || 0), 0) || 0;
@@ -5705,39 +5731,47 @@ const Reports = () => {
                     <div>
                       <h3 className="text-sm font-semibold mb-3">Tipos de Habitación más Reservadas</h3>
                       {dashboardData.roomTypeStats.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={dashboardData.roomTypeStats}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={(entry) => `${entry.value}`}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {dashboardData.roomTypeStats.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              formatter={(value) => `${value} reservas`}
-                              contentStyle={{
-                                backgroundColor: '#ffffff',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                color: '#1f2937',
-                                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                            <Legend
-                              wrapperStyle={{ fontSize: '12px' }}
-                              verticalAlign="bottom"
-                              height={36}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        <div>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={dashboardData.roomTypeStats} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                              <XAxis type="number" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                              <YAxis 
+                                type="category" 
+                                dataKey="name" 
+                                width={120} 
+                                tick={{ fontSize: 11 }} 
+                                stroke="#9ca3af" 
+                              />
+                              <Tooltip
+                                formatter={(value, name) => {
+                                  const total = dashboardData.roomTypeStats.reduce((sum, item) => sum + item.value, 0);
+                                  const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                  return [`${value} reservas (${percent}%)`];
+                                }}
+                                contentStyle={{
+                                  backgroundColor: '#ffffff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '8px',
+                                  color: '#1f2937',
+                                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                                }}
+                              />
+                              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                                {dashboardData.roomTypeStats.map((entry, index) => (
+                                  <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={COLORS[index % COLORS.length]}
+                                    fillOpacity={entry.value === 0 ? 0.3 : 1}
+                                  />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                          <div className="text-xs text-center text-gray-500 mt-2">
+                            ✅ Mostrando los {dashboardData.roomTypeStats.length} tipos de habitación
+                          </div>
+                        </div>
                       ) : (
                         <div className="flex items-center justify-center h-[300px] bg-gray-50 rounded-lg border border-dashed border-gray-300">
                           <p className="text-gray-500">Sin datos disponibles</p>
