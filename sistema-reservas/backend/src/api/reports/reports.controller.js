@@ -1062,7 +1062,7 @@ async function getAvailableCountries(req, res) {
  */
 async function getReportByAge(req, res) {
   try {
-    const { startDate, endDate, ageRange, minAge, maxAge } = req.query;
+    const { startDate, endDate, ageRange, minAge, maxAge, floor, roomTypeId } = req.query;
 
     if (!startDate || !endDate) {
       return res.status(400).json({
@@ -1076,7 +1076,9 @@ async function getReportByAge(req, res) {
       endDate, 
       ageRange || null,
       minAge ? parseInt(minAge) : null,
-      maxAge ? parseInt(maxAge) : null
+      maxAge ? parseInt(maxAge) : null,
+      floor ? parseInt(floor) : null,
+      roomTypeId ? parseInt(roomTypeId) : null
     );
 
     return res.status(200).json({
@@ -1110,7 +1112,7 @@ async function getReportByAge(req, res) {
  */
 async function getReportBySpending(req, res) {
   try {
-    const { startDate, endDate, spendingRange } = req.query;
+    const { startDate, endDate, spendingRange, floor, roomTypeId } = req.query;
 
     if (!startDate || !endDate) {
       return res.status(400).json({
@@ -1119,7 +1121,13 @@ async function getReportBySpending(req, res) {
       });
     }
 
-    const report = await reportsService.getReportBySpending(startDate, endDate, spendingRange || null);
+    const report = await reportsService.getReportBySpending(
+      startDate, 
+      endDate, 
+      spendingRange || null,
+      floor ? parseInt(floor) : null,
+      roomTypeId ? parseInt(roomTypeId) : null
+    );
 
     return res.status(200).json({
       success: true,

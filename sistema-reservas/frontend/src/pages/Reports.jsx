@@ -440,7 +440,11 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
+                            label={(entry) => {
+                              const total = pieData.reduce((sum, item) => sum + item.value, 0);
+                              const percent = ((entry.value / total) * 100).toFixed(1);
+                              return `${entry.name}: ${formatCurrency(entry.value)}`;
+                            }}
                             outerRadius={90}
                             fill="#8884d8"
                             dataKey="value"
@@ -450,7 +454,11 @@ const ReportModal = ({ isOpen, onClose, data, dateRange, reportType, selectedCha
                             ))}
                           </Pie>
                           <Tooltip 
-                            formatter={(value) => formatCurrency(value)}
+                            formatter={(value, name) => {
+                              const total = pieData.reduce((sum, item) => sum + item.value, 0);
+                              const percent = ((value / total) * 100).toFixed(1);
+                              return [formatCurrency(value), name];
+                            }}
                             contentStyle={{ fontSize: '12px', borderRadius: '6px' }}
                           />
                         </PieChart>
@@ -651,6 +659,8 @@ const CustomReportsSection = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isFromDateOpen, setIsFromDateOpen] = useState(false);
+  const [isToDateOpen, setIsToDateOpen] = useState(false);
 
   // Estados para nuevos reportes
   const [selectedAgeRange, setSelectedAgeRange] = useState(null);
@@ -1075,14 +1085,14 @@ const CustomReportsSection = () => {
       count: revenueArray.length,
     };
 
-    // Calcular totalGuests sumando todos los períodos
-    const totalGuests = occupancyArray.reduce((sum, item) => sum + (item.totalGuests || 0), 0);
+    // ✅ Total de personas = suma de reservationCount (check-ins únicos)
+    const totalGuests = revenueArray.reduce((sum, item) => sum + (item.reservationCount || 0), 0);
 
     return {
       revenue: processedRevenue,
       occupancy: processedOccupancy,
       checkIns: processedCheckIns,
-      totalGuests, // Total de personas en todo el período
+      totalGuests,
     };
   };
 
@@ -1101,17 +1111,16 @@ const CustomReportsSection = () => {
     if (!dateRange.from || !dateRange.to) return;
     
     setIsGeneratingPreview(true);
+    
     try {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
       
-      // Calcular días para determinar el groupBy apropiado
       const days = Math.ceil((dateRange.to - dateRange.from) / (1000 * 60 * 60 * 24));
       let groupBy = 'day';
       if (days > 90) groupBy = 'month';
       else if (days > 31) groupBy = 'week';
       
-      // Construir params con filtros
       const params = new URLSearchParams({
         startDate,
         endDate,
@@ -1121,14 +1130,17 @@ const CustomReportsSection = () => {
       if (selectedFloor) params.append('floor', selectedFloor);
       if (selectedRoomType) params.append('roomTypeId', selectedRoomType);
       
+      const urlRevenue = `http://localhost:3001/api/v1/reports/revenue?${params.toString()}`;
+      const urlOccupancy = `http://localhost:3001/api/v1/reports/occupancy?${params.toString()}`;
+      
       const [revenueRes, occupancyRes] = await Promise.all([
-        fetch(`http://localhost:3001/api/v1/reports/revenue?${params.toString()}`, {
+        fetch(urlRevenue, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
           }
         }),
-        fetch(`http://localhost:3001/api/v1/reports/occupancy?${params.toString()}`, {
+        fetch(urlOccupancy, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
@@ -1144,7 +1156,7 @@ const CustomReportsSection = () => {
         { data: occupancy.data || [] }
       );
       
-      setReportData(processed); // Usar reportData en lugar de previewReportData
+      setReportData(processed);
     } catch (error) {
       console.error('Error al generar preview:', error);
     } finally {
@@ -2365,14 +2377,6 @@ const CustomReportsSection = () => {
                 >
                   Anual
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={quickPeriodCustom === 'all' ? 'default' : 'outline'}
-                  onClick={() => handleQuickPeriodCustom('all')}
-                >
-                  Desde siempre
-                </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {dateRange.from && dateRange.to && (
@@ -2382,6 +2386,89 @@ const CustomReportsSection = () => {
                 )}
               </p>
             </div>
+
+          {/* Selectores de fecha manual */}
+          <div className="space-y-4">
+            <Label className="text-sm font-semibold">O selecciona fechas manualmente:</Label>
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Fecha Desde */}
+              <div className="space-y-2">
+                <Label className="text-sm">Desde</Label>
+                <Popover open={isFromDateOpen} onOpenChange={setIsFromDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange.from && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.from ? (
+                        format(dateRange.from, "d 'de' MMM yyyy", { locale: es })
+                      ) : (
+                        <span>Seleccionar fecha inicio</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.from}
+                      onSelect={(date) => {
+                        if (date) {
+                          setDateRange(prev => ({ ...prev, from: date }));
+                          setQuickPeriodCustom(null);
+                          setIsFromDateOpen(false);
+                        }
+                      }}
+                      initialFocus
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Fecha Hasta */}
+              <div className="space-y-2">
+                <Label className="text-sm">Hasta</Label>
+                <Popover open={isToDateOpen} onOpenChange={setIsToDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange.to && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.to ? (
+                        format(dateRange.to, "d 'de' MMM yyyy", { locale: es })
+                      ) : (
+                        <span>Seleccionar fecha fin</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.to}
+                      onSelect={(date) => {
+                        if (date) {
+                          setDateRange(prev => ({ ...prev, to: date }));
+                          setQuickPeriodCustom(null);
+                          setIsToDateOpen(false);
+                        }
+                      }}
+                      disabled={(date) => dateRange.from ? date < dateRange.from : false}
+                      initialFocus
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
 
           {/* Botón para Generar Reporte */}
           <div className="mt-6">
@@ -2439,6 +2526,20 @@ const CustomReportsSection = () => {
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Validar si hay datos para mostrar */}
+            {(reportData.revenue?.total || 0) === 0 && (reportData.checkIns?.total || 0) === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-yellow-300">
+                <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
+                  Sin datos para el período seleccionado
+                </h3>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  No se encontraron reservas completadas en el rango de fechas seleccionado.
+                  Intenta seleccionar un período diferente o verifica los filtros aplicados.
+                </p>
+              </div>
+            ) : (
+              <>
             {/* Tarjetas de resumen */}
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
@@ -2447,14 +2548,6 @@ const CustomReportsSection = () => {
                     {formatCurrency(reportData.revenue.total || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground">Ingresos Totales</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {(reportData.occupancy.average || 0).toFixed(1)}%
-                  </div>
-                  <p className="text-xs text-muted-foreground">Ocupación Promedio</p>
                 </CardContent>
               </Card>
               <Card>
@@ -2530,7 +2623,7 @@ const CustomReportsSection = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={true}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
@@ -2646,12 +2739,13 @@ const CustomReportsSection = () => {
                           startY: yPos,
                           head: [['Período', 'Ingresos', 'Check-ins']],
                           body: reportData.revenue.data.map((item, idx) => [
-                            item.date,
+                            item.date, // Ya viene formateado del backend con formato legible
                             formatCurrency(item.total),
                             reportData.checkIns.data[idx]?.count || 0
                           ]),
                           theme: 'grid',
-                          headStyles: { fillColor: [16, 185, 129] },
+                          headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
+                          bodyStyles: { textColor: [0, 0, 0] },
                           margin: { left: 20, right: 20 },
                         });
                       }
@@ -2701,6 +2795,8 @@ const CustomReportsSection = () => {
                 </Button>
               </div>
             )}
+            </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -2720,6 +2816,20 @@ const CustomReportsSection = () => {
                   <p className="text-sm text-muted-foreground">Teléfono: {reportData.data.client.phone || 'N/A'}</p>
                 </div>
 
+                {/* Validar si hay reservas */}
+                {!reportData.data.reservations || reportData.data.reservations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[300px] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-yellow-300">
+                    <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
+                      Sin datos para el período seleccionado
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-md">
+                      Este cliente no tiene reservas en el período seleccionado.
+                      Intenta seleccionar un período diferente.
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 <div className="grid gap-4 md:grid-cols-4">
                   <Card>
                     <CardContent className="pt-6">
@@ -2775,6 +2885,8 @@ const CustomReportsSection = () => {
                       </tbody>
                     </table>
                   </div>
+                )}
+                </>
                 )}
               </div>
             )}
@@ -2859,6 +2971,19 @@ const CustomReportsSection = () => {
                   <p className="text-sm text-muted-foreground">Total de clientes en el período: {reportData.data.totalClients}</p>
                 </div>
 
+                {/* Validar si hay datos */}
+                {!reportData.data.topClients || reportData.data.topClients.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[300px] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-yellow-300">
+                    <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
+                      Sin datos para el período seleccionado
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-md">
+                      No se encontraron clientes con reservas en el período seleccionado.
+                      Intenta seleccionar un período diferente.
+                    </p>
+                  </div>
+                ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -2885,6 +3010,7 @@ const CustomReportsSection = () => {
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
             )}
 
@@ -2899,6 +3025,20 @@ const CustomReportsSection = () => {
                   </p>
                 </div>
 
+                {/* Validar si hay datos */}
+                {reportData.data.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-yellow-300">
+                    <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
+                      Sin datos para el período seleccionado
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-md">
+                      No se encontraron reservas para los criterios seleccionados.
+                      Intenta seleccionar un período diferente o verifica los filtros aplicados.
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 {/* Gráficos */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Gráfico de Barras */}
@@ -2973,6 +3113,8 @@ const CustomReportsSection = () => {
                     </tbody>
                   </table>
                 </div>
+                </>
+                )}
               </div>
             )}
 
@@ -2987,6 +3129,20 @@ const CustomReportsSection = () => {
                   </p>
                 </div>
 
+                {/* Validar si hay datos */}
+                {reportData.data.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-yellow-300">
+                    <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
+                      Sin datos para el período seleccionado
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-md">
+                      No se encontraron reservas para los criterios seleccionados.
+                      Intenta seleccionar un período diferente o verifica los filtros aplicados.
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 {/* Gráficos */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Gráfico de Pastel */}
@@ -3062,6 +3218,8 @@ const CustomReportsSection = () => {
                     </tbody>
                   </table>
                 </div>
+                </>
+                )}
               </div>
             )}
 
@@ -3076,6 +3234,20 @@ const CustomReportsSection = () => {
                   </p>
                 </div>
 
+                {/* Validar si hay datos */}
+                {reportData.data.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-yellow-300">
+                    <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
+                      Sin datos para el período seleccionado
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-md">
+                      No se encontraron reservas para los criterios seleccionados.
+                      Intenta seleccionar un período diferente o verifica los filtros aplicados.
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 {/* Gráfico de Barras */}
                 <Card>
                   <CardHeader>
@@ -3126,6 +3298,8 @@ const CustomReportsSection = () => {
                     </tbody>
                   </table>
                 </div>
+                </>
+                )}
               </div>
             )}
           </CardContent>
@@ -3389,12 +3563,6 @@ const ComparisonsSection = () => {
                         {formatCurrency(compareData.period1?.totalRevenue || 0)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Ocupación Promedio</p>
-                      <p className="text-2xl font-bold text-blue-600">
-                        {(compareData.period1?.avgOccupancy || 0).toFixed(1)}%
-                      </p>
-                    </div>
                   </CardContent>
                 </Card>
 
@@ -3407,12 +3575,6 @@ const ComparisonsSection = () => {
                       <p className="text-sm text-muted-foreground">Ingresos Totales</p>
                       <p className="text-2xl font-bold text-green-600">
                         {formatCurrency(compareData.period2?.totalRevenue || 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Ocupación Promedio</p>
-                      <p className="text-2xl font-bold text-blue-600">
-                        {(compareData.period2?.avgOccupancy || 0).toFixed(1)}%
                       </p>
                     </div>
                   </CardContent>
@@ -3532,7 +3694,7 @@ const Reports = () => {
   const [channelData, setChannelData] = useState([]);
   const [filterMode, setFilterMode] = useState('calendar'); // 'calendar' o 'rolling'
   const [availableFloors, setAvailableFloors] = useState([]);
-  const [isFloorFilterEnabled, setIsFloorFilterEnabled] = useState(false);
+  const [isFloorFilterEnabled, setIsFloorFilterEnabled] = useState(true);
   const [isRoomTypeFilterEnabled, setIsRoomTypeFilterEnabled] = useState(true);
   const [showReportPreview, setShowReportPreview] = useState(false);
   const [previewReportData, setPreviewReportData] = useState(null);
@@ -3599,9 +3761,16 @@ const Reports = () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const endDate = format(yesterday, 'yyyy-MM-dd');
+      
+      // Para "Ingresos Últimos 30 Días": REALMENTE últimos 30 días desde ayer
+      const thirtyDaysAgo = new Date(yesterday);
+      thirtyDaysAgo.setDate(yesterday.getDate() - 29); // 30 días total incluyendo ayer
+      const monthStartFor30Days = format(thirtyDaysAgo, 'yyyy-MM-dd');
+
+      // Para el resto: desde hace 28 días (ajuste para gráficos semanales)
       const startDate = format(new Date(new Date().setDate(new Date().getDate() - 28)), 'yyyy-MM-dd');
 
-      // Para "Ingresos del Mes": MES ACTUAL COMPLETO (del día 1 al último día del mes)
+      // Para estadísticas de tipos de habitación: último mes completo
       const today = new Date();
       const monthStart = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
       const monthEndDate = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
@@ -3617,7 +3786,7 @@ const Reports = () => {
         getDailyOccupancy(weekStart, weekEndDate),
         getDailyRevenue(weekStart, weekEndDate),
         getRoomTypeStats(monthStart, monthEndDate),
-        getMonthlyRevenue(monthStart, monthEndDate),
+        getMonthlyRevenue(monthStartFor30Days, endDate), // Usar últimos 30 días desde ayer
         getTotalPaidAmount(),
       ]);
 
@@ -3637,9 +3806,15 @@ const Reports = () => {
           const endDate = new Date(startDate);
           endDate.setDate(startDate.getDate() + 6);
           
-          label = `Semana ${weekNum}\n${format(startDate, "d 'de' MMM", { locale: es })} - ${format(endDate, "d 'de' MMM", { locale: es })}`;
+          label = `${format(startDate, 'd MMM', { locale: es })} - ${format(endDate, 'd MMM', { locale: es })}`;
         } else {
-          label = item.periodLabel || `Semana ${index + 1}`;
+          // Intentar parsear el periodLabel si existe
+          const periodLabel = item.periodLabel || '';
+          if (periodLabel) {
+            label = periodLabel;
+          } else {
+            label = `Período ${index + 1}`;
+          }
         }
         
         return {
@@ -3716,17 +3891,23 @@ const Reports = () => {
 
   const loadClientsData = async () => {
     try {
-      console.log('Iniciando carga de datos de clientes...');
-      // Usar AYER como fecha final (últimos 30 días desde ayer)
-      const today = new Date();
-      // Usar mes actual completo (primer día del mes hasta último día del mes)
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      const startDate = format(monthStart, 'yyyy-MM-dd');
-      const endDate = format(monthEnd, 'yyyy-MM-dd');
+      console.log('📊 Iniciando carga de datos de clientes...');
+      
+      // Usar últimos 30 días REALES desde ayer
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const thirtyDaysAgo = new Date(yesterday);
+      thirtyDaysAgo.setDate(yesterday.getDate() - 29); // 30 días total
+      
+      const startDate = format(thirtyDaysAgo, 'yyyy-MM-dd');
+      const endDate = format(yesterday, 'yyyy-MM-dd');
+      
+      console.log(`📅 Rango de fechas para clientes: ${startDate} a ${endDate}`);
 
       // Cargar top 5 clientes desde el endpoint real
       const topClientsResponse = await getTopClients(startDate, endDate, 5);
+      console.log('🔍 Respuesta de top clientes:', topClientsResponse);
       const topClientsRaw = topClientsResponse?.data?.ranking || [];
 
       // Transformar formato del backend al formato esperado por el frontend
@@ -3737,9 +3918,12 @@ const Reports = () => {
         email: client.email || '',
         userId: client.userId || 0,
       })) : [];
+      
+      console.log(`✅ Top ${topClients.length} clientes procesados:`, topClients);
 
       // Cargar estadísticas de clientes desde el endpoint real
       const statsResponse = await getClientStats(startDate, endDate);
+      console.log('📈 Respuesta de estadísticas:', statsResponse);
       const statsRaw = statsResponse?.data || {};
 
       const stats = {
@@ -3748,13 +3932,15 @@ const Reports = () => {
         recurringClients: statsRaw.recurringClients || 0,
         segmentation: statsRaw.segmentation || [],
       };
+      
+      console.log('✅ Estadísticas procesadas:', stats);
 
       setClientsData({
         topClients,
         stats,
       });
     } catch (error) {
-      console.error('Error al cargar datos de clientes:', error);
+      console.error('❌ Error al cargar datos de clientes:', error);
       // Establecer datos vacíos en caso de error
       setClientsData({
         topClients: [],
@@ -4957,26 +5143,6 @@ const Reports = () => {
                     Anual
                   </Button>
 
-                  <Button
-                    variant={selectedPeriod === 'allTime' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={async () => {
-                      // Desde la primera reserva completada (1 enero 2025) hasta ayer
-                      const allTimeStart = new Date('2025-01-01');
-                      const yesterday = new Date();
-                      yesterday.setDate(yesterday.getDate() - 1);
-                      setDateRange({ from: allTimeStart, to: yesterday });
-                      setSelectedPeriod('allTime');
-                      setIsFloorFilterEnabled(true);
-                      
-                      // Generar reporte automáticamente
-                      await handleGenerateReport('Anual', 'rolling');
-                    }}
-                    className="h-8"
-                  >
-                    Desde siempre
-                  </Button>
-
                   <div className="border-l h-8 mx-2"></div>
 
                   {/* Calendarios de Fecha */}
@@ -4991,12 +5157,23 @@ const Reports = () => {
                       <Calendar
                         mode="single"
                         selected={dateRange.from}
-                        onSelect={(date) => {
+                        onSelect={async (date) => {
                           if (date) {
                             const newRange = { ...dateRange, from: date };
                             setDateRange(newRange);
                             setSelectedPeriod('custom');
                             setIsFloorFilterEnabled(true);
+                            // Generar reporte automáticamente si ambas fechas están seleccionadas
+                            if (newRange.to) {
+                              const days = Math.ceil((newRange.to - date) / (1000 * 60 * 60 * 24));
+                              let reportType = 'Mensual';
+                              if (days <= 1) reportType = 'Diario';
+                              else if (days <= 7) reportType = 'Semanal';
+                              else if (days <= 31) reportType = 'Mensual';
+                              else if (days <= 90) reportType = 'Trimestral';
+                              else reportType = 'Anual';
+                              await handleGenerateReport(reportType, 'calendar');
+                            }
                           }
                         }}
                         locale={es}
@@ -5016,12 +5193,23 @@ const Reports = () => {
                       <Calendar
                         mode="single"
                         selected={dateRange.to}
-                        onSelect={(date) => {
+                        onSelect={async (date) => {
                           if (date) {
                             const newRange = { ...dateRange, to: date };
                             setDateRange(newRange);
                             setSelectedPeriod('custom');
                             setIsFloorFilterEnabled(true);
+                            // Generar reporte automáticamente si ambas fechas están seleccionadas
+                            if (newRange.from) {
+                              const days = Math.ceil((date - newRange.from) / (1000 * 60 * 60 * 24));
+                              let reportType = 'Mensual';
+                              if (days <= 1) reportType = 'Diario';
+                              else if (days <= 7) reportType = 'Semanal';
+                              else if (days <= 31) reportType = 'Mensual';
+                              else if (days <= 90) reportType = 'Trimestral';
+                              else reportType = 'Anual';
+                              await handleGenerateReport(reportType, 'calendar');
+                            }
                           }
                         }}
                         locale={es}
@@ -5281,7 +5469,7 @@ const Reports = () => {
                                       cx="50%"
                                       cy="50%"
                                       labelLine={true}
-                                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                      label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
                                       outerRadius={80}
                                       fill="#8884d8"
                                       dataKey="value"
@@ -5410,12 +5598,13 @@ const Reports = () => {
                                     startY: yPos,
                                     head: [['Período', 'Ingresos', 'Reservas']],
                                     body: (previewReportData || reportData).revenue.data.map((item, idx) => [
-                                      item.date,
+                                      item.date, // Ya viene formateado del backend con el formato legible (ej: "29 sep - 5 oct")
                                       formatCurrency(item.total),
                                       (previewReportData || reportData).checkIns.data[idx]?.count || 0
                                     ]),
                                     theme: 'grid',
-                                    headStyles: { fillColor: [16, 185, 129] },
+                                    headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
+                                    bodyStyles: { textColor: [0, 0, 0] },
                                     margin: { left: 20, right: 20 },
                                   });
                                 }
@@ -5918,11 +6107,7 @@ const Reports = () => {
                                 cx="50%"
                                 cy="50%"
                                 outerRadius={100}
-                                label={(entry) => {
-                                  const filteredData = comparisonData.filter(item => !item.noData);
-                                  const total = filteredData.reduce((sum, item) => sum + item.totalRevenue, 0);
-                                  return `${entry.name}: ${((entry.totalRevenue / total) * 100).toFixed(1)}%`;
-                                }}
+                                label={(entry) => `${entry.name}: ${formatCurrency(entry.totalRevenue)}`}
                               >
                                 {comparisonData.filter(item => !item.noData).map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

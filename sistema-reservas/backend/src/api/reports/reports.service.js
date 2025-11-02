@@ -2243,28 +2243,44 @@ async function getAvailableCountries() {
 /**
  * Obtiene reporte de reservas agrupado por rangos de edad
  */
-async function getReportByAge(startDate, endDate, ageRange = null, minAge = null, maxAge = null) {
+async function getReportByAge(startDate, endDate, ageRange = null, minAge = null, maxAge = null, floor = null, roomTypeId = null) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
   
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
-  const reservations = await prisma.reservations.findMany({
-    where: {
-      deleted_at: null,
-      status: 'completed',
-      OR: [
-        { check_in_date: { gte: start, lte: end } },
-        { check_out_date: { gte: start, lte: end } },
-        {
-          AND: [
-            { check_in_date: { lte: start } },
-            { check_out_date: { gte: end } }
-          ]
+  // Construir where clause con filtros opcionales
+  const whereClause = {
+    deleted_at: null,
+    status: 'completed',
+    OR: [
+      { check_in_date: { gte: start, lte: end } },
+      { check_out_date: { gte: start, lte: end } },
+      {
+        AND: [
+          { check_in_date: { lte: start } },
+          { check_out_date: { gte: end } }
+        ]
+      }
+    ]
+  };
+
+  // Agregar filtros de piso y tipo de habitación si existen
+  if (floor !== null || roomTypeId !== null) {
+    whereClause.reservation_rooms = {
+      some: {
+        deleted_at: null,
+        rooms: {
+          ...(floor !== null && { floor: parseInt(floor) }),
+          ...(roomTypeId !== null && { room_type_id: parseInt(roomTypeId) })
         }
-      ]
-    },
+      }
+    };
+  }
+
+  const reservations = await prisma.reservations.findMany({
+    where: whereClause,
     include: {
       users_reservations_main_guest_idTousers: {
         select: {
@@ -2358,28 +2374,44 @@ async function getReportByAge(startDate, endDate, ageRange = null, minAge = null
 /**
  * Obtiene reporte de reservas agrupado por rangos de monto
  */
-async function getReportBySpending(startDate, endDate, spendingRange = null) {
+async function getReportBySpending(startDate, endDate, spendingRange = null, floor = null, roomTypeId = null) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
   
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
-  const reservations = await prisma.reservations.findMany({
-    where: {
-      deleted_at: null,
-      status: 'completed',
-      OR: [
-        { check_in_date: { gte: start, lte: end } },
-        { check_out_date: { gte: start, lte: end } },
-        {
-          AND: [
-            { check_in_date: { lte: start } },
-            { check_out_date: { gte: end } }
-          ]
+  // Construir where clause con filtros opcionales
+  const whereClause = {
+    deleted_at: null,
+    status: 'completed',
+    OR: [
+      { check_in_date: { gte: start, lte: end } },
+      { check_out_date: { gte: start, lte: end } },
+      {
+        AND: [
+          { check_in_date: { lte: start } },
+          { check_out_date: { gte: end } }
+        ]
+      }
+    ]
+  };
+
+  // Agregar filtros de piso y tipo de habitación si existen
+  if (floor !== null || roomTypeId !== null) {
+    whereClause.reservation_rooms = {
+      some: {
+        deleted_at: null,
+        rooms: {
+          ...(floor !== null && { floor: parseInt(floor) }),
+          ...(roomTypeId !== null && { room_type_id: parseInt(roomTypeId) })
         }
-      ]
-    },
+      }
+    };
+  }
+
+  const reservations = await prisma.reservations.findMany({
+    where: whereClause,
     include: {
       payments: {
         where: {
