@@ -1,9 +1,6 @@
 const prisma = require('../db/prisma.client');
 const { getIO } = require('../config/socket');
-
-// Almacenamiento en memoria para sesiones de chat (temporal)
-// TODO: Migrar a Redis para producción
-const chatSessions = new Map();
+const redisSessionService = require('./redis.session.service');
 
 // Estadísticas del bot
 const stats = {
@@ -28,9 +25,11 @@ class WhatsAppService {
    * Obtener o crear sesión de conversación
    */
   async getOrCreateSession(phoneNumber) {
-    if (!chatSessions.has(phoneNumber)) {
+    let session = await redisSessionService.getSession(phoneNumber);
+
+    if (!session) {
       // Crear nueva sesión
-      const session = {
+      session = {
         phoneNumber,
         state: 'INITIAL',
         data: {},
@@ -39,49 +38,49 @@ class WhatsAppService {
         messageCount: 0,
         completed: false
       };
-      
-      chatSessions.set(phoneNumber, session);
+
+      await redisSessionService.setSession(phoneNumber, session);
       stats.totalConversations++;
-      
+
       console.log(`✨ Nueva sesión creada para ${phoneNumber}`);
     } else {
       // Actualizar última actividad
-      const session = chatSessions.get(phoneNumber);
       session.lastActivity = new Date();
       session.messageCount++;
+      await redisSessionService.setSession(phoneNumber, session);
     }
 
     stats.messagesProcessed++;
-    return chatSessions.get(phoneNumber);
+    return session;
   }
 
   /**
    * Actualizar estado de la sesión
    */
-  updateSession(phoneNumber, updates) {
-    const session = chatSessions.get(phoneNumber);
+  async updateSession(phoneNumber, updates) {
+    const session = await redisSessionService.getSession(phoneNumber);
     if (session) {
       console.log(`[DEBUG updateSession] ANTES - Estado: ${session.state}`);
       console.log(`[DEBUG updateSession] Updates recibidos:`, JSON.stringify({
         state: updates.state,
         hasData: !!updates.data
       }));
-      
+
       // Actualizar estado si viene en updates
       if (updates.state !== undefined) {
         session.state = updates.state;
       }
-      
+
       // Actualizar data si viene en updates
       if (updates.data !== undefined) {
         session.data = updates.data;
       }
-      
+
       // Actualizar otros campos
       const { state, data, ...otherUpdates } = updates;
       Object.assign(session, otherUpdates);
-      
-      chatSessions.set(phoneNumber, session);
+
+      await redisSessionService.setSession(phoneNumber, session);
       console.log(`[DEBUG updateSession] DESPUÉS - Estado: ${session.state}`);
     } else {
       console.log(`[DEBUG updateSession] ERROR - No se encontró sesión para ${phoneNumber}`);
@@ -92,12 +91,12 @@ class WhatsAppService {
    * Limpiar sesión completada
    */
   async clearSession(phoneNumber) {
-    const session = chatSessions.get(phoneNumber);
+    const session = await redisSessionService.getSession(phoneNumber);
     if (session?.completed) {
       stats.completedReservations++;
     }
-    
-    chatSessions.delete(phoneNumber);
+
+    await redisSessionService.deleteSession(phoneNumber);
     console.log(`🗑️ Sesión limpiada para ${phoneNumber}`);
   }
 
@@ -119,6 +118,30 @@ class WhatsAppService {
     try {
       const { phoneNumber, data } = session;
 
+      // Verificar si ya existe una solicitud pendiente reciente (últimas 24 horas) y no vista
+      const yesterday = new Date();
+      yesterday.setHours(yesterday.getHours() - 24);
+
+      const existingAlert = await prisma.alerts.findFirst({
+        where: {
+          type: 'booking_request',
+          status: 'pending',
+          last_viewed_at: null, // Solo prevenir si no ha sido vista
+          created_at: {
+            gte: yesterday // Solo en las últimas 24 horas
+          },
+          full_summary: {
+            path: ['guest_principal', 'phone'],
+            equals: phoneNumber
+          }
+        }
+      });
+
+      if (existingAlert) {
+        console.log(`⚠️ Ya existe una solicitud pendiente reciente para ${phoneNumber} (ID: ${existingAlert.id})`);
+        throw new Error('DUPLICATE_REQUEST');
+      }
+
       // Calcular costos para el resumen
       const nights = data.nights || 1;
       const roomPrice = data.roomInfo?.price || 0;
@@ -126,8 +149,22 @@ class WhatsAppService {
 
       let breakfastTotal = 0;
       if (data.services?.breakfast) {
+        // Obtener precio del desayuno desde la base de datos
+        const breakfastService = await prisma.services.findFirst({
+          where: {
+            name: {
+              contains: 'Desayuno',
+              mode: 'insensitive'
+            },
+            is_active: true
+          },
+          select: {
+            price: true
+          }
+        });
+
         const breakfastQty = data.services.breakfastQuantity || 0;
-        const breakfastPrice = 3000; // $3,000 por persona por noche
+        const breakfastPrice = breakfastService?.price || 3000; // Fallback a $3,000 si no se encuentra
         breakfastTotal = breakfastPrice * breakfastQty * nights;
       }
 
@@ -605,26 +642,14 @@ class WhatsAppService {
    * Obtener estadísticas del bot
    */
   async getStats() {
-    // Limpiar sesiones inactivas (más de 30 minutos sin actividad)
     const now = new Date();
-    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
-    
-    let inactiveSessions = 0;
-    for (const [phoneNumber, session] of chatSessions.entries()) {
-      if (session.lastActivity < thirtyMinutesAgo) {
-        chatSessions.delete(phoneNumber);
-        inactiveSessions++;
-        stats.abandonedConversations++;
-      }
-    }
 
-    if (inactiveSessions > 0) {
-      console.log(`🧹 Limpiadas ${inactiveSessions} sesiones inactivas`);
-    }
+    // Contar sesiones activas desde Redis
+    const activeSessions = await redisSessionService.countActiveSessions();
 
     return {
       ...stats,
-      activeSessions: chatSessions.size,
+      activeSessions,
       uptime: Math.floor((now - stats.startTime) / 1000), // segundos
     };
   }
@@ -632,9 +657,9 @@ class WhatsAppService {
   /**
    * Limpiar todas las sesiones (para reinicio)
    */
-  clearAllSessions() {
-    const count = chatSessions.size;
-    chatSessions.clear();
+  async clearAllSessions() {
+    const count = await redisSessionService.countActiveSessions();
+    await redisSessionService.clearAllSessions();
     console.log(`🗑️ ${count} sesiones limpiadas`);
     return count;
   }
@@ -763,36 +788,41 @@ class WhatsAppService {
         }
       }
       
-      // Crear nuevo usuario
-      const newGuest = await prisma.users.create({
-        data: {
-          identification_number: identificationNumber,
-          first_name: firstName,
-          paternal_last_name: paternalLastName,
-          maternal_last_name: maternalLastName,
-          email: data.email,
-          phone_number: data.phone,
-          birth_date: birthDate,
-          gender: this.mapGenderToEnum(data.gender),
-          country: data.country,
-          region: data.region,
-          city: data.city,
-          password_hash: '', // Los huéspedes creados por WhatsApp no tienen contraseña
-          status: 'active',
-          is_fully_registered: false, // Registrado vía WhatsApp, no desde el sistema
-          created_at: new Date(),
-          updated_at: new Date()
-        }
+      // Crear nuevo usuario y asignar rol en una transacción
+      const newGuest = await prisma.$transaction(async (tx) => {
+        const user = await tx.users.create({
+          data: {
+            identification_number: identificationNumber,
+            first_name: firstName,
+            paternal_last_name: paternalLastName,
+            maternal_last_name: maternalLastName,
+            email: data.email,
+            phone_number: data.phone,
+            birth_date: birthDate,
+            gender: this.mapGenderToEnum(data.gender),
+            country: data.country,
+            region: data.region,
+            city: data.city,
+            password_hash: null, // NULL - no tiene contraseña
+            can_login: false, // No puede iniciar sesión en el sistema
+            status: 'active',
+            is_fully_registered: false, // Registrado vía WhatsApp, no desde el sistema
+            created_at: new Date(),
+            updated_at: new Date()
+          }
+        });
+
+        // Asignar rol de huésped (role_id = 3)
+        await tx.user_roles.create({
+          data: {
+            user_id: user.id,
+            role_id: 3 // ID del rol "guest"
+          }
+        });
+
+        return user;
       });
-      
-      // Asignar rol de huésped (role_id = 3)
-      await prisma.user_roles.create({
-        data: {
-          user_id: newGuest.id,
-          role_id: 3 // ID del rol "guest"
-        }
-      });
-      
+
       console.log(`✅ Nuevo huésped creado con ID: ${newGuest.id} - ${firstName} ${paternalLastName}`);
       return newGuest;
     } catch (error) {
@@ -806,88 +836,98 @@ class WhatsAppService {
    */
   async createOrUpdateAdditionalGuests(additionalGuests) {
     try {
-      const savedGuests = [];
-      
-      for (const guest of additionalGuests) {
-        // Saltar niños (no tienen datos completos)
-        if (guest.isChild) {
-          savedGuests.push(null);
-          continue;
-        }
-        
-        // Verificar si ya existe por RUT o Pasaporte
-        let existingGuest = null;
-        if (guest.rut) {
-          const normalizedRut = guest.rut.replace(/\./g, '');
-          existingGuest = await this.findGuestByRut(normalizedRut);
-        } else if (guest.passport) {
-          existingGuest = await this.findGuestByPassport(guest.passport);
-        }
-        
-        if (existingGuest) {
-          // Ya existe, no crear duplicado
-          console.log(`ℹ️ Huésped adicional ya existe: ${existingGuest.first_name} ${existingGuest.paternal_last_name}`);
-          savedGuests.push(existingGuest);
-        } else {
-          // Crear nuevo huésped adicional si tiene datos mínimos
-          if (guest.name && (guest.rut || guest.passport)) {
-            const nameParts = guest.name.trim().split(' ');
-            const firstName = nameParts[0];
-            const paternalLastName = nameParts[1] || '';
-            const maternalLastName = nameParts.slice(2).join(' ') || null;
-            
-            const identificationNumber = guest.rut 
-              ? guest.rut.replace(/\./g, '')
-              : guest.passport;
-            
-            // Formatear fecha de nacimiento si existe
-            let birthDate = null;
-            if (guest.birthdate) {
-              const parts = guest.birthdate.split('/');
-              if (parts.length === 3) {
-                birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-              } else {
-                birthDate = new Date(guest.birthdate);
-              }
-            }
-            
-            const newGuest = await prisma.users.create({
-              data: {
-                identification_number: identificationNumber,
-                first_name: firstName,
-                paternal_last_name: paternalLastName,
-                maternal_last_name: maternalLastName,
-                email: guest.email,
-                phone_number: guest.phone,
-                birth_date: birthDate,
-                gender: this.mapGenderToEnum(guest.gender),
-                country: guest.country,
-                region: guest.region,
-                city: guest.city,
-                password_hash: '', // Los huéspedes creados por WhatsApp no tienen contraseña
-                status: 'active',
-                is_fully_registered: false, // Registrado vía WhatsApp
-                created_at: new Date(),
-                updated_at: new Date()
-              }
+      // Envolver todas las operaciones en una transacción
+      const savedGuests = await prisma.$transaction(async (tx) => {
+        const guests = [];
+
+        for (const guest of additionalGuests) {
+          // Saltar niños (no tienen datos completos)
+          if (guest.isChild) {
+            guests.push(null);
+            continue;
+          }
+
+          // Verificar si ya existe por RUT o Pasaporte
+          let existingGuest = null;
+          if (guest.rut) {
+            const normalizedRut = guest.rut.replace(/\./g, '');
+            existingGuest = await tx.users.findFirst({
+              where: { identification_number: normalizedRut }
             });
-            
-            // Asignar rol de huésped (role_id = 3)
-            await prisma.user_roles.create({
-              data: {
-                user_id: newGuest.id,
-                role_id: 3 // ID del rol "guest"
-              }
+          } else if (guest.passport) {
+            existingGuest = await tx.users.findFirst({
+              where: { identification_number: guest.passport }
             });
-            
-            console.log(`✅ Huésped adicional creado: ${firstName} ${paternalLastName}`);
-            savedGuests.push(newGuest);
+          }
+
+          if (existingGuest) {
+            // Ya existe, no crear duplicado
+            console.log(`ℹ️ Huésped adicional ya existe: ${existingGuest.first_name} ${existingGuest.paternal_last_name}`);
+            guests.push(existingGuest);
           } else {
-            savedGuests.push(null);
+            // Crear nuevo huésped adicional si tiene datos mínimos
+            if (guest.name && (guest.rut || guest.passport)) {
+              const nameParts = guest.name.trim().split(' ');
+              const firstName = nameParts[0];
+              const paternalLastName = nameParts[1] || '';
+              const maternalLastName = nameParts.slice(2).join(' ') || null;
+
+              const identificationNumber = guest.rut
+                ? guest.rut.replace(/\./g, '')
+                : guest.passport;
+
+              // Formatear fecha de nacimiento si existe
+              let birthDate = null;
+              if (guest.birthdate) {
+                const parts = guest.birthdate.split('/');
+                if (parts.length === 3) {
+                  birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                } else {
+                  birthDate = new Date(guest.birthdate);
+                }
+              }
+
+              const newGuest = await tx.users.create({
+                data: {
+                  identification_number: identificationNumber,
+                  first_name: firstName,
+                  paternal_last_name: paternalLastName,
+                  maternal_last_name: maternalLastName,
+                  email: guest.email,
+                  phone_number: guest.phone,
+                  birth_date: birthDate,
+                  gender: this.mapGenderToEnum(guest.gender),
+                  country: guest.country,
+                  region: guest.region,
+                  city: guest.city,
+                  password_hash: null, // NULL - no tiene contraseña
+                  can_login: false, // No puede iniciar sesión en el sistema
+                  status: 'active',
+                  is_fully_registered: false, // Registrado vía WhatsApp
+                  created_at: new Date(),
+                  updated_at: new Date()
+                }
+              });
+
+              // Asignar rol de huésped (role_id = 3)
+              await tx.user_roles.create({
+                data: {
+                  user_id: newGuest.id,
+                  role_id: 3 // ID del rol "guest"
+                }
+              });
+
+              console.log(`✅ Huésped adicional creado: ${firstName} ${paternalLastName}`);
+              guests.push(newGuest);
+            } else {
+              guests.push(null);
+            }
           }
         }
-      }
-      
+
+        return guests;
+      });
+
       return savedGuests;
     } catch (error) {
       console.error('Error al crear/actualizar huéspedes adicionales:', error);

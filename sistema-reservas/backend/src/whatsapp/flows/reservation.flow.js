@@ -120,12 +120,12 @@ async function processMessage(session, messageText, phoneNumber) {
     const globalCommand = menuFlow.checkGlobalCommands(messageText);
     
     if (globalCommand === 'menu') {
-      whatsappService.updateSession(phoneNumber, { state: STATES.INITIAL });
+      await whatsappService.updateSession(phoneNumber, { state: STATES.INITIAL });
       return menuFlow.getWelcomeMessage();
     }
     
     if (globalCommand === 'cancel') {
-      whatsappService.updateSession(phoneNumber, { 
+      await whatsappService.updateSession(phoneNumber, { 
         state: STATES.INITIAL,
         data: {}
       });
@@ -297,7 +297,7 @@ async function handleGoBack(session, phoneNumber) {
 Escribe *MENU* para volver al inicio o *CANCELAR* para reiniciar.`;
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: previousState,
     data: session.data
   });
@@ -389,7 +389,7 @@ async function handleInitialState(session, messageText, phoneNumber) {
   }
 
   if (menuOption.option === 'reservation') {
-    whatsappService.updateSession(phoneNumber, { 
+    await whatsappService.updateSession(phoneNumber, { 
       state: STATES.AWAITING_CHECK_IN 
     });
     
@@ -416,7 +416,7 @@ async function handleIsChileanState(session, messageText, phoneNumber) {
   
   if (normalized === '1' || normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
     session.data.isChilean = true;
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_REGISTRATION_CHECK,
       data: session.data
     });
@@ -432,7 +432,7 @@ Formato: 11.111.111-1
 💡 Si no has venido antes, igual puedes continuar ingresando tu RUT.`;
   } else if (normalized === '2' || normalized === 'no') {
     session.data.isChilean = false;
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_REGISTRATION_CHECK,
       data: session.data
     });
@@ -516,7 +516,7 @@ async function handleRegistrationCheckState(session, messageText, phoneNumber) {
     session.data.city = guest.city;
     
     // Actualizar sesión al nuevo estado - pasar solo lo que cambia
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_GUEST_FOUND_CONFIRMATION,
       data: session.data
     });
@@ -548,7 +548,7 @@ Responde:
     // Cliente NO encontrado - Pedir RUT/Pasaporte primero
     session.data.foundGuest = null;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_RUT,
       data: session.data
     });
@@ -586,7 +586,7 @@ async function handleGuestFoundConfirmationState(session, messageText, phoneNumb
   
   if (normalized === '1' || normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
     // Usar datos autocompletados - Ir a método de pago
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_PAYMENT_METHOD,
       data: session.data
     });
@@ -609,7 +609,7 @@ Responde con el número de tu opción.`;
     session.data.isUpdatingExistingGuest = true;
     session.data.existingGuestId = session.data.foundGuest?.id;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_NAME,
       data: session.data
     });
@@ -644,7 +644,7 @@ async function handleNameState(session, messageText, phoneNumber) {
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
     // Mantener el nombre actual
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_EMAIL,
       data: session.data
     });
@@ -665,7 +665,7 @@ Escribe el nuevo email o *SALTAR* para mantenerlo`;
   }
 
   session.data.name = validation.name;
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_EMAIL,
     data: session.data
   });
@@ -696,7 +696,7 @@ async function handleRutState(session, messageText, phoneNumber) {
     }
 
     session.data.rut = validation.rut;
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_NAME,
       data: session.data
     });
@@ -715,7 +715,7 @@ Ejemplo: Juan Pérez González`;
     const normalizedPassport = input.toUpperCase();
     session.data.passport = normalizedPassport;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_NAME,
       data: session.data
     });
@@ -737,7 +737,7 @@ async function handleEmailState(session, messageText, phoneNumber) {
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
     // Mantener el email actual
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_PHONE,
       data: session.data
     });
@@ -759,7 +759,7 @@ Escribe el nuevo teléfono o *SALTAR* para mantenerlo`;
   }
 
   session.data.email = validation.email;
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_PHONE,
     data: session.data
   });
@@ -783,7 +783,7 @@ async function handlePhoneState(session, messageText, phoneNumber) {
   
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_BIRTHDATE,
       data: session.data
     });
@@ -809,7 +809,7 @@ Escribe la nueva fecha o *SALTAR* para mantenerla`;
   }
 
   session.data.phone = validation.phone;
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_BIRTHDATE,
     data: session.data
   });
@@ -835,7 +835,7 @@ async function handleBirthdateState(session, messageText, phoneNumber) {
   
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_GENDER,
       data: session.data
     });
@@ -892,7 +892,7 @@ Responde con el número de tu opción o *SALTAR* para mantenerlo`;
   }
 
   session.data.birthdate = input;
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_GENDER,
     data: session.data
   });
@@ -918,7 +918,7 @@ async function handleGenderState(session, messageText, phoneNumber) {
   
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_COUNTRY,
       data: session.data
     });
@@ -950,7 +950,7 @@ Escribe el nombre del país o *SALTAR* para mantenerlo`;
   }
 
   session.data.gender = gender;
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_COUNTRY,
     data: session.data
   });
@@ -976,7 +976,7 @@ async function handleCountryState(session, messageText, phoneNumber) {
   
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_REGION,
       data: session.data
     });
@@ -1001,7 +1001,7 @@ Escribe el nombre de la región o *SALTAR* para mantenerla`;
   }
 
   session.data.country = country;
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_REGION,
     data: session.data
   });
@@ -1027,7 +1027,7 @@ async function handleRegionState(session, messageText, phoneNumber) {
   
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CITY,
       data: session.data
     });
@@ -1052,7 +1052,7 @@ Escribe el nombre de la ciudad o *SALTAR* para mantenerla`;
   }
 
   session.data.region = region;
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_CITY,
     data: session.data
   });
@@ -1079,7 +1079,7 @@ async function handleCityState(session, messageText, phoneNumber) {
   // Permitir saltar si está en modo actualización
   if (session.data.isUpdatingExistingGuest && (normalized === 'saltar' || normalized === 'omitir')) {
     // Mantener ciudad actual y finalizar actualización
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
       data: session.data
     });
@@ -1106,25 +1106,27 @@ ${getConfirmationMessage(session.data)}`;
   
   // Si está actualizando, ir directo a confirmación (sin solicitudes especiales)
   if (session.data.isUpdatingExistingGuest) {
-    whatsappService.updateSession(phoneNumber, {
+    const confirmationMsg = getConfirmationMessage(session.data);
+
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
       data: session.data
     });
-    
+
     return `✅ Ciudad actualizada: ${city}
 
 📋 *Datos personales actualizados*
 
 Tus datos han sido actualizados. A continuación verás el resumen de tu reserva.
 
-${getConfirmationMessage(session.data)}`;
+${confirmationMsg}`;
   }
   
   // Si es un nuevo registro (foundGuest es null), ir a método de pago
   if (!session.data.foundGuest) {
     console.log('🔍 DEBUG handleCityState - totalGuests:', session.data.totalGuests, 'adults:', session.data.adults, 'children:', session.data.childrenUnder4);
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_PAYMENT_METHOD,
       data: session.data
     });
@@ -1144,7 +1146,7 @@ Responde con el número de tu opción.`;
   }
   
   // Si el huésped ya estaba registrado (foundGuest existe), ir a solicitudes especiales
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_SPECIAL_REQUESTS,
     data: session.data
   });
@@ -1177,7 +1179,7 @@ async function handleCheckInState(session, messageText, phoneNumber) {
   session.data.checkInDate = dateValidator.formatDateForDB(validation.date);
   session.data.checkInDateFormatted = validation.formatted;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_CHECK_OUT,
     data: session.data
   });
@@ -1204,7 +1206,7 @@ async function handleCheckOutState(session, messageText, phoneNumber) {
   session.data.checkOutDateFormatted = validation.formatted;
   session.data.nights = validation.nights;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADULTS,
     data: session.data
   });
@@ -1230,7 +1232,7 @@ async function handleAdultsState(session, messageText, phoneNumber) {
 
   session.data.adults = adults;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_HAS_CHILDREN,
     data: session.data
   });
@@ -1250,7 +1252,7 @@ async function handleHasChildrenState(session, messageText, phoneNumber) {
   const normalized = messageText.toLowerCase().trim();
   
   if (normalized === 'si' || normalized === 'sí' || normalized === 'yes') {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CHILDREN,
       data: session.data
     });
@@ -1275,7 +1277,7 @@ Ingresa un número (1-5)`;
 Por favor, escribe *VOLVER* para cambiar las fechas.`;
     }
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_FLOOR,
       data: session.data
     });
@@ -1324,7 +1326,7 @@ async function handleChildrenState(session, messageText, phoneNumber) {
 Por favor, escribe *VOLVER* para cambiar las fechas.`;
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_FLOOR,
     data: session.data
   });
@@ -1424,7 +1426,7 @@ Por favor, escribe *VOLVER* para seleccionar otro piso o cambiar el número de h
   // Guardar tipos disponibles en sesión
   session.data.availableRoomTypes = suitableTypes;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ROOM_TYPE,
     data: session.data
   });
@@ -1512,7 +1514,7 @@ ${await roomValidator.getAvailableRoomTypesMenu(session.data.checkInDate, sessio
   // Guardar habitaciones disponibles en sesión
   session.data.availableRooms = availableRooms;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_SPECIFIC_ROOM,
     data: session.data
   });
@@ -1541,7 +1543,7 @@ async function handleSpecificRoomState(session, messageText, phoneNumber) {
   session.data.roomId = selectedRoom.room_id;
   session.data.roomNumber = selectedRoom.room_number;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_SPECIAL_REQUESTS,
     data: session.data
   });
@@ -1576,7 +1578,7 @@ async function handleSpecialRequestsState(session, messageText, phoneNumber) {
     session.data.specialRequests = validation.requests;
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_SERVICES,
     data: session.data
   });
@@ -1599,27 +1601,33 @@ Responde con el *número* o *NO* para omitir.`;
  * Confirmar datos
  */
 async function handleConfirmationState(session, messageText, phoneNumber) {
+  // Si la sesión ya fue completada, evitar procesar de nuevo
+  if (session.completed) {
+    return null; // Ya fue procesada, esperar a que se limpie
+  }
+
   const normalized = messageText.toLowerCase().trim();
-  
+
   if (normalized === 'si' || normalized === 'sí' || normalized === 'confirmar' || normalized === '1') {
-    // Marcar sesión como completada
-    whatsappService.updateSession(phoneNumber, {
+    // Marcar sesión como completada y cambiar estado para evitar re-procesamiento
+    await whatsappService.updateSession(phoneNumber, {
+      state: 'COMPLETED', // Cambiar estado para evitar re-entrada
       completed: true,
       data: session.data
     });
-    
+
     return null; // El controller enviará el mensaje de confirmación
   }
-  
+
   if (normalized === 'no' || normalized === 'cancelar' || normalized === '2') {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.INITIAL,
       data: {}
     });
-    
+
     return menuFlow.getCancelMessage();
   }
-  
+
   return `Por favor, responde:
 • *SÍ* o *1* para confirmar
 • *NO* o *2* para cancelar`;
@@ -1641,7 +1649,7 @@ async function handlePaymentMethodState(session, messageText, phoneNumber) {
     
     if (adults > 1) {
       // Hay más de 1 adulto, preguntar por huéspedes adicionales
-      whatsappService.updateSession(phoneNumber, {
+      await whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
         data: session.data
       });
@@ -1657,14 +1665,17 @@ Responde:
 • *OMITIR* - Para saltar este paso`;
     } else {
       // Solo 1 adulto, ir directo a confirmación
-      whatsappService.updateSession(phoneNumber, {
+      // Generar mensaje ANTES de actualizar sesión
+      const confirmationMsg = getConfirmationMessage(session.data);
+
+      await whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_CONFIRMATION,
         data: session.data
       });
-      
+
       return `✅ *Método de pago: Efectivo (presencial)*
 
-${getConfirmationMessage(session.data)}`;
+${confirmationMsg}`;
     }
   }
   
@@ -1672,7 +1683,7 @@ ${getConfirmationMessage(session.data)}`;
     // Pago por transferencia - Preguntar opción
     session.data.paymentMethod = 'transferencia';
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_TRANSFER_OPTION,
       data: session.data
     });
@@ -1782,7 +1793,7 @@ async function handleTransferOptionState(session, messageText, phoneNumber) {
   
   if (adults > 1) {
     // Hay más de 1 adulto, enviar datos bancarios primero y luego preguntar por huéspedes
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUESTS_CHOICE,
       data: session.data
     });
@@ -1798,16 +1809,19 @@ Responde:
 • *OMITIR* - Para saltar este paso`;
   } else {
     // Solo 1 adulto, ir directo a confirmación
-    whatsappService.updateSession(phoneNumber, {
+    // Generar mensaje ANTES de actualizar sesión
+    const confirmationMsg = getConfirmationMessage(session.data);
+
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
       data: session.data
     });
-    
+
     return `${datosBancarios}
 
 ---
 
-${getConfirmationMessage(session.data)}`;
+${confirmationMsg}`;
   }
 }
 
@@ -1952,7 +1966,7 @@ async function handleServicesState(session, messageText, phoneNumber) {
   
   if (normalized === 'no' || normalized === '4' || normalized === 'ninguno') {
     // No agregar servicios, ir a verificación de registro
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_IS_CHILEAN,
       data: session.data
     });
@@ -1969,7 +1983,7 @@ Responde:
   if (normalized === '1' || normalized.includes('lavand')) {
     // Solo lavandería
     session.data.services.laundry = true;
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_LAUNDRY,
       data: session.data
     });
@@ -1983,7 +1997,7 @@ Ingresa un número (ejemplo: 5)`;
   if (normalized === '2' || normalized.includes('desayun')) {
     // Solo desayuno
     session.data.services.breakfast = true;
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_BREAKFAST,
       data: session.data
     });
@@ -1998,7 +2012,7 @@ Ingresa un número (ejemplo: 2)`;
     // Ambos servicios
     session.data.services.laundry = true;
     session.data.services.breakfast = true;
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_LAUNDRY,
       data: session.data
     });
@@ -2032,7 +2046,7 @@ async function handleLaundryState(session, messageText, phoneNumber) {
   
   // Si también seleccionó desayuno, preguntar por desayuno
   if (session.data.services.breakfast) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_BREAKFAST,
       data: session.data
     });
@@ -2044,7 +2058,7 @@ Ingresa un número (ejemplo: 2)`;
   }
   
   // Si no hay desayuno, ir a verificación de registro
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_IS_CHILEAN,
     data: session.data
   });
@@ -2083,7 +2097,7 @@ async function handleBreakfastState(session, messageText, phoneNumber) {
   // Guardar items en sesión para validación posterior
   session.data.breakfastItems = breakfastItems;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_BREAKFAST_PREFERENCE,
     data: session.data
   });
@@ -2154,7 +2168,7 @@ async function handleBreakfastPreferenceState(session, messageText, phoneNumber)
     session.data.services.breakfastPreferences = selections.map(n => breakfastItems[n - 1].name);
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_IS_CHILEAN,
     data: session.data
   });
@@ -2188,7 +2202,7 @@ async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumb
   
   // Si solo hay 1 adulto, ir directo a confirmación
   if (additionalGuestsNeeded === 0) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
       data: session.data
     });
@@ -2225,7 +2239,7 @@ async function handleAdditionalGuestsChoiceState(session, messageText, phoneNumb
         });
       }
       
-      whatsappService.updateSession(phoneNumber, {
+      await whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_CONFIRMATION,
         data: session.data
       });
@@ -2250,7 +2264,7 @@ ${getConfirmationMessage(session.data)}`;
     }
     
     // Ahora procesar adultos adicionales
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
       data: session.data
     });
@@ -2266,7 +2280,7 @@ Responde:
   
   if (normalized === 'omitir' || normalized === 'saltar' || normalized === 'no') {
     // Omitir todos los huéspedes adicionales
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
       data: session.data
     });
@@ -2288,7 +2302,7 @@ async function handleAdditionalGuestChoiceState(session, messageText, phoneNumbe
   
   if (normalized === 'registrar' || normalized === 'si' || normalized === 'sí') {
     // Primero preguntar si es chileno o extranjero
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_IS_CHILEAN,
       data: session.data
     });
@@ -2311,7 +2325,7 @@ Responde:
     const remaining = adultsNeeded - session.data.currentAdultGuest;
     
     if (remaining > 0) {
-      whatsappService.updateSession(phoneNumber, {
+      await whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
         data: session.data
       });
@@ -2326,7 +2340,7 @@ Responde:
 • *REGISTRAR* - Para ingresar sus datos
 • *OMITIR* - Para saltarlo`;
     } else {
-      whatsappService.updateSession(phoneNumber, {
+      await whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_CONFIRMATION,
         data: session.data
       });
@@ -2351,7 +2365,7 @@ async function handleAdditionalGuestIsChileanState(session, messageText, phoneNu
   if (normalized === '1' || normalized.includes('chileno')) {
     session.data.currentAdditionalGuestIsChilean = true;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_REGISTRATION_CHECK,
       data: session.data
     });
@@ -2364,7 +2378,7 @@ Ejemplo: 12.345.678-9 o 12345678-9`;
   if (normalized === '2' || normalized.includes('extranjero')) {
     session.data.currentAdditionalGuestIsChilean = false;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_REGISTRATION_CHECK,
       data: session.data
     });
@@ -2430,7 +2444,7 @@ async function handleAdditionalGuestRegistrationCheckState(session, messageText,
     
     const fullName = `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ' ' + guest.maternal_last_name : ''}`;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_FOUND_CONFIRMATION,
       data: session.data
     });
@@ -2459,7 +2473,7 @@ Responde:
     // Huésped adicional NO encontrado - Pedir RUT/Pasaporte completo primero
     session.data.currentAdditionalGuestFound = null;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
       data: session.data
     });
@@ -2515,7 +2529,7 @@ async function handleAdditionalGuestFoundConfirmationState(session, messageText,
     const remaining = adultsNeeded - session.data.currentAdultGuest;
     
     if (remaining > 0) {
-      whatsappService.updateSession(phoneNumber, {
+      await whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
         data: session.data
       });
@@ -2530,7 +2544,7 @@ Responde:
 • *REGISTRAR* - Para ingresar sus datos
 • *OMITIR* - Para saltarlo`;
     } else {
-      whatsappService.updateSession(phoneNumber, {
+      await whatsappService.updateSession(phoneNumber, {
         state: STATES.AWAITING_CONFIRMATION,
         data: session.data
       });
@@ -2545,7 +2559,7 @@ ${getConfirmationMessage(session.data)}`;
     // No usar datos - Pedir RUT/Pasaporte primero
     session.data.currentAdditionalGuestFound = null;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_RUT,
       data: session.data
     });
@@ -2577,7 +2591,7 @@ async function handleAdditionalGuestNameState(session, messageText, phoneNumber)
   session.data.tempAdditionalGuest.name = validation.name;
   
   // Continuar con email
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_EMAIL,
     data: session.data
   });
@@ -2636,7 +2650,7 @@ Por favor ingresa un RUT diferente.`;
       isChild: false
     };
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
       data: session.data
     });
@@ -2678,7 +2692,7 @@ Por favor ingresa un Pasaporte diferente.`;
       isChild: false
     };
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_NAME,
       data: session.data
     });
@@ -2701,7 +2715,7 @@ async function handleAdditionalGuestEmailState(session, messageText, phoneNumber
   if (normalized === 'omitir' || normalized === 'saltar') {
     session.data.tempAdditionalGuest.email = null;
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_PHONE,
       data: session.data
     });
@@ -2724,7 +2738,7 @@ _Escribe *OMITIR* si prefieres no proporcionar esta información_`;
   
   session.data.tempAdditionalGuest.email = validation.email;
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_PHONE,
     data: session.data
   });
@@ -2759,7 +2773,7 @@ _Escribe *OMITIR* si prefieres no proporcionar esta información_`;
   }
   
   // Continuar con fecha de nacimiento
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_BIRTHDATE,
     data: session.data
   });
@@ -2818,7 +2832,7 @@ async function handleAdditionalGuestBirthdateState(session, messageText, phoneNu
     session.data.tempAdditionalGuest.birthdate = input;
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_GENDER,
     data: session.data
   });
@@ -2863,7 +2877,7 @@ async function handleAdditionalGuestGenderState(session, messageText, phoneNumbe
     session.data.tempAdditionalGuest.gender = gender;
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_COUNTRY,
     data: session.data
   });
@@ -2890,7 +2904,7 @@ async function handleAdditionalGuestCountryState(session, messageText, phoneNumb
     session.data.tempAdditionalGuest.country = messageText.trim();
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_REGION,
     data: session.data
   });
@@ -2917,7 +2931,7 @@ async function handleAdditionalGuestRegionState(session, messageText, phoneNumbe
     session.data.tempAdditionalGuest.region = messageText.trim();
   }
   
-  whatsappService.updateSession(phoneNumber, {
+  await whatsappService.updateSession(phoneNumber, {
     state: STATES.AWAITING_ADDITIONAL_GUEST_CITY,
     data: session.data
   });
@@ -2967,7 +2981,7 @@ async function handleAdditionalGuestCityState(session, messageText, phoneNumber)
   const remaining = adultsNeeded - session.data.currentAdultGuest;
   
   if (remaining > 0) {
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_ADDITIONAL_GUEST_CHOICE,
       data: session.data
     });
@@ -2988,7 +3002,7 @@ Responde:
     const totalGuests = adults + childrenUnder4;
     const adultsRegistered = session.data.currentAdultGuest + 1; // +1 por el huésped principal
     
-    whatsappService.updateSession(phoneNumber, {
+    await whatsappService.updateSession(phoneNumber, {
       state: STATES.AWAITING_CONFIRMATION,
       data: session.data
     });

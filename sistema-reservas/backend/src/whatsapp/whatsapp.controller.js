@@ -1,5 +1,6 @@
 const whatsappService = require('./whatsapp.service');
 const reservationFlow = require('./flows/reservation.flow');
+const rateLimiter = require('./rate-limiter.service');
 
 class WhatsAppController {
   /**
@@ -9,8 +10,24 @@ class WhatsAppController {
     try {
       // Normalizar número de teléfono
       const phoneNumber = from.replace('@s.whatsapp.net', '');
-      
+
       console.log(`🔄 Procesando mensaje de ${phoneNumber}: "${messageText}"`);
+
+      // Verificar rate limit (30 mensajes por minuto)
+      const rateCheck = await rateLimiter.checkLimit(phoneNumber);
+
+      if (!rateCheck.allowed) {
+        console.log(`🚫 Rate limit excedido para ${phoneNumber}. Mensajes: ${rateCheck.current}/${rateLimiter.maxMessages}`);
+
+        const rateLimitMessage =
+          '⏸️ *Demasiados mensajes*\n\n' +
+          'Has enviado demasiados mensajes en poco tiempo.\n\n' +
+          'Por favor espera un momento antes de continuar.\n\n' +
+          'Si necesitas ayuda urgente, puedes llamarnos directamente.';
+
+        await whatsappService.sendMessage(from, rateLimitMessage);
+        return;
+      }
 
       // Obtener o crear sesión del usuario
       const session = await whatsappService.getOrCreateSession(phoneNumber);
@@ -27,56 +44,76 @@ class WhatsAppController {
         await whatsappService.sendMessage(from, response);
       }
 
+      // Volver a obtener la sesión actualizada para verificar si se completó
+      const updatedSession = await whatsappService.getOrCreateSession(phoneNumber);
+
       // Si el flujo terminó, crear la alerta para el recepcionista
-      if (session.completed) {
+      if (updatedSession.completed) {
         // Si el usuario estaba actualizando sus datos, guardarlos en BD
-        if (session.data.isUpdatingExistingGuest && session.data.existingGuestId) {
+        if (updatedSession.data.isUpdatingExistingGuest && updatedSession.data.existingGuestId) {
           try {
             await whatsappService.updateGuestPersonalData(
-              session.data.existingGuestId,
-              session.data
+              updatedSession.data.existingGuestId,
+              updatedSession.data
             );
-            console.log(`✅ Datos personales actualizados en BD para usuario ID: ${session.data.existingGuestId}`);
+            console.log(`✅ Datos personales actualizados en BD para usuario ID: ${updatedSession.data.existingGuestId}`);
           } catch (error) {
             console.error('Error al actualizar datos personales:', error);
           }
         }
         // Si es un nuevo huésped (no estaba en la BD), crearlo
-        else if (!session.data.foundGuest && session.data.name) {
+        else if (!updatedSession.data.foundGuest && updatedSession.data.name) {
           try {
-            const newGuest = await whatsappService.createNewGuest(session.data);
+            const newGuest = await whatsappService.createNewGuest(updatedSession.data);
             console.log(`✅ Nuevo huésped principal creado en BD con ID: ${newGuest.id}`);
-            
+
             // Guardar el ID del nuevo huésped en la sesión para referencia
-            session.data.guestId = newGuest.id;
+            updatedSession.data.guestId = newGuest.id;
           } catch (error) {
             console.error('Error al crear nuevo huésped principal:', error);
           }
         }
-        
+
         // Crear o actualizar huéspedes adicionales en la BD
-        if (session.data.additionalGuests && session.data.additionalGuests.length > 0) {
+        if (updatedSession.data.additionalGuests && updatedSession.data.additionalGuests.length > 0) {
           try {
-            await whatsappService.createOrUpdateAdditionalGuests(session.data.additionalGuests);
+            await whatsappService.createOrUpdateAdditionalGuests(updatedSession.data.additionalGuests);
             console.log(`✅ Huéspedes adicionales procesados en BD`);
           } catch (error) {
             console.error('Error al procesar huéspedes adicionales:', error);
           }
         }
-        
-        await whatsappService.createBookingAlert(session);
-        
-        // Enviar mensaje de confirmación al cliente
-        const confirmationMessage = 
-          '✅ *¡Solicitud enviada!*\n\n' +
-          'Tu solicitud de reserva ha sido enviada a nuestro equipo.\n\n' +
-          'Un recepcionista la revisará y se contactará contigo pronto.\n\n' +
-          '¡Gracias por elegir Hotel Don Teo! 🏨';
-        
-        await whatsappService.sendMessage(from, confirmationMessage);
-        
-        // Limpiar sesión después de completar
-        await whatsappService.clearSession(phoneNumber);
+
+        try {
+          await whatsappService.createBookingAlert(updatedSession);
+
+          // Enviar mensaje de confirmación al cliente
+          const confirmationMessage =
+            '✅ *¡Solicitud enviada!*\n\n' +
+            'Tu solicitud de reserva ha sido enviada a nuestro equipo.\n\n' +
+            'Un recepcionista la revisará y se contactará contigo pronto.\n\n' +
+            '¡Gracias por elegir Hotel Don Teo! 🏨';
+
+          await whatsappService.sendMessage(from, confirmationMessage);
+
+          // Limpiar sesión después de completar
+          await whatsappService.clearSession(phoneNumber);
+        } catch (alertError) {
+          if (alertError.message === 'DUPLICATE_REQUEST') {
+            // Ya existe una solicitud pendiente
+            const duplicateMessage =
+              '⚠️ *Solicitud Pendiente*\n\n' +
+              'Ya tienes una solicitud de reserva pendiente.\n\n' +
+              'Un recepcionista la revisará pronto y se contactará contigo.\n\n' +
+              'Por favor espera su respuesta antes de crear una nueva solicitud.';
+
+            await whatsappService.sendMessage(from, duplicateMessage);
+            await whatsappService.clearSession(phoneNumber);
+          } else {
+            // Otro error al crear la alerta
+            throw alertError;
+          }
+        }
       }
 
     } catch (error) {
