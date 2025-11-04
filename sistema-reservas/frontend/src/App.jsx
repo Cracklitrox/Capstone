@@ -19,6 +19,7 @@ import GuestHistory from "./pages/Receptionist/GuestHistory.jsx";
 import NewReservation from "./pages/Reservations/NewReservation.jsx";
 import NotificationsPage from "./pages/NotificationsPage.jsx";
 import ChatbotPage from "./pages/ChatbotPage.jsx";
+import Reports from "./pages/Reports.jsx";
 
 import "./index.css";
 
@@ -79,6 +80,7 @@ const AppRoutes = () => {
           <Route path="profile" element={<Profile />} />
           <Route path="admin/rooms-crud" element={<RoomsCrud />} />
           <Route path="admin/room-types-crud" element={<RoomTypesCrud />} />
+          <Route path="reports" element={<Reports />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

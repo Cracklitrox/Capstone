@@ -15,6 +15,7 @@ const reservationsRoutes = require("./reservations/reservations.routes");
 const systemRoutes = require("./system/system.routes");
 const notificationsRoutes = require('./notifications/notifications.routes');
 const whatsappRoutes = require('./whatsapp/whatsapp.routes');
+const reportsRoutes = require('./reports/reports.routes');
 
 const { authenticate } = require("../middleware/auth.middleware");
 
@@ -26,7 +27,7 @@ const cummonLimiter = rateLimit({
   legacyHeaders: false,
   skipFailedRequests: false,
   skipSuccessfulRequests: false,
-  
+
   // ⭐ Usar ID de usuario si está autenticado, sino dejar que express-rate-limit maneje la IP
   keyGenerator: (req, res) => {
     if (req.user && req.user.id) {
@@ -35,7 +36,7 @@ const cummonLimiter = rateLimit({
     // Retornar undefined permite que express-rate-limit use su lógica por defecto para IPs
     return undefined;
   },
-  
+
   handler: (req, res) => {
     res.status(429).json({
       message: 'Demasiadas peticiones. Por favor, espera un momento e intenta de nuevo.',
@@ -62,5 +63,6 @@ router.use("/guests", authenticate, cummonLimiter, guestsRoutes);
 router.use("/reservations", authenticate, cummonLimiter, reservationsRoutes);
 router.use("/system", authenticate, cummonLimiter, systemRoutes);
 router.use("/whatsapp", authenticate, cummonLimiter, whatsappRoutes);
+router.use("/reports", authenticate, cummonLimiter, reportsRoutes);
 
 module.exports = router;
