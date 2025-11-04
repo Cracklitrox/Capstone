@@ -2,7 +2,7 @@
 CREATE TYPE "public"."alert_status_enum" AS ENUM ('pending', 'resolved', 'ignored');
 
 -- CreateEnum
-CREATE TYPE "public"."alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest');
+CREATE TYPE "public"."alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest', 'booking_request');
 
 -- CreateEnum
 CREATE TYPE "public"."error_severity_enum" AS ENUM ('low', 'medium', 'high', 'critical');
@@ -89,10 +89,12 @@ CREATE TABLE "public"."alerts" (
     "type" "public"."alert_type_enum" NOT NULL,
     "status" "public"."alert_status_enum" DEFAULT 'pending',
     "created_at" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
+    "last_viewed_at" TIMESTAMP(6),
     "origin_user_id" INTEGER,
     "reservation_id" INTEGER,
     "payment_id" INTEGER,
     "detail" VARCHAR(250),
+    "full_summary" JSONB,
 
     CONSTRAINT "alerts_pkey" PRIMARY KEY ("id")
 );
@@ -368,7 +370,8 @@ CREATE TABLE "public"."users" (
     "country" VARCHAR(100),
     "region" VARCHAR(100),
     "city" VARCHAR(100),
-    "password_hash" VARCHAR(255) NOT NULL,
+    "password_hash" VARCHAR(255),
+    "can_login" BOOLEAN DEFAULT true,
     "status" "public"."user_status_enum" DEFAULT 'active',
     "is_fully_registered" BOOLEAN DEFAULT true,
     "last_login_at" TIMESTAMP(6),
