@@ -1,0 +1,458 @@
+{
+  "info": {
+    "name": "05 - Validaciones y Casos de Error - NUEVO MODELO",
+    "description": "Prueba todas las validaciones implementadas en el sistema de reservas.\n\n**✨ NUEVO MODELO:**\n- Incluye `roomGuestAssignments` para asignar huéspedes a habitaciones (en requests válidos)\n\n**Validaciones probadas:**\n1. Reservas de 1 día deben ser paymentType 'full'\n2. paymentType es campo requerido\n3. paymentType debe ser válido (full, half_upfront, daily)\n4. Campos requeridos (mainGuestId, roomIds, fechas, etc.)\n5. Capacidad de habitaciones vs número de huéspedes\n6. Transiciones de estado inválidas\n\n**Resultado esperado:**\nTodos los requests deben FALLAR con errores 400 (Bad Request), demostrando que las validaciones funcionan correctamente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Setup - Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Token recibido\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.environment.set(\"token\", jsonData.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{receptionistEmail}}\",\n  \"password\": \"{{receptionistPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "0. Setup - Crear Huésped",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Huésped creado\", function () {",
+              "    pm.response.to.have.status(201);",
+              "    const jsonData = pm.response.json();",
+              "    pm.environment.set(\"guestId\", jsonData.guest.id);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identificationNumber\": \"20789012-3\",\n  \"firstName\": \"Validation\",\n  \"paternalLastName\": \"Test\",\n  \"maternalLastName\": \"User\",\n  \"email\": \"validation.test@test.com\",\n  \"phoneNumber\": \"+56912345099\",\n  \"birthDate\": \"1990-01-01\",\n  \"gender\": \"other\",\n  \"password\": \"Test1234!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/guests",
+          "host": ["{{baseUrl}}"],
+          "path": ["guests"]
+        }
+      }
+    },
+    {
+      "name": "0. Setup - Buscar Habitación",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Habitación encontrada\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.environment.set(\"roomId1\", jsonData.availableRooms[0].id);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": {
+          "raw": "{{baseUrl}}/reservations/search-availability?checkInDate=2025-12-01T15:00:00.000Z&checkOutDate=2025-12-02T11:00:00.000Z&guests=1",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "search-availability"],
+          "query": [
+            {"key": "checkInDate", "value": "2025-12-01T15:00:00.000Z"},
+            {"key": "checkOutDate", "value": "2025-12-02T11:00:00.000Z"},
+            {"key": "guests", "value": "1"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "ERROR 1: Reserva 1 día con paymentType 'daily'",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - Reserva 1 día debe ser 'full'\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('1 día');",
+              "    pm.expect(jsonData.message).to.include('full');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"daily\",\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{guestId}}]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 2: Reserva 1 día con paymentType 'half_upfront'",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - Reserva 1 día debe ser 'full'\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('1 día');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 17500,\n  \"paymentType\": \"half_upfront\",\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{guestId}}]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 3: Sin paymentType",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - paymentType requerido\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('Tipo de pago');",
+              "    pm.expect(jsonData.message).to.include('requerido');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{guestId}}]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 4: paymentType inválido",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - paymentType inválido\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('inválido');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"weekly\",\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{guestId}}]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 5: Sin mainGuestId",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - mainGuestId requerido\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('huésped');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"full\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 6: Sin roomIds",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - roomIds requerido\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('habitación');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"full\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 7: Sin fechas",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - Fechas requeridas\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('Fechas');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"full\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 8: Sin paymentMethod",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - paymentMethod requerido\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('pago');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"full\",\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{guestId}}]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "ERROR 9: guestCount inválido (0)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ ERROR 400 - guestCount inválido\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('huéspedes');",
+              "    console.log('Error correcto:', jsonData.message);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 0,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"full\",\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{guestId}}]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "SUCCESS: Reserva 1 día con paymentType 'full'",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ SUCCESS 201 - Reserva 1 día válida\", function () {",
+              "    pm.response.to.have.status(201);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.status).to.equal('confirmed');",
+              "    console.log('Reserva creada correctamente con paymentType full');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{guestId}},\n  \"roomIds\": [{{roomId1}}],\n  \"checkInDate\": \"2025-12-01T15:00:00.000Z\",\n  \"checkOutDate\": \"2025-12-02T11:00:00.000Z\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"cash\",\n  \"paymentAmount\": 35000,\n  \"paymentType\": \"full\",\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{guestId}}]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    }
+  ]
+}

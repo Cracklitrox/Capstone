@@ -1,0 +1,614 @@
+{
+  "info": {
+    "name": "02 - Pago Transferencia Bancaria (NUEVO MODELO)",
+    "description": "Prueba el flujo completo con pago 100% por transferencia bancaria usando el NUEVO MODELO DE DATOS.\n\n**Cambios en este modelo:**\n- Creación individual de huéspedes (POST /guests)\n- roomGuestAssignments: Asignación explícita de huéspedes a habitaciones\n- roomServiceAssignments: Servicios por habitación con fechas específicas\n\n**Flujo:**\n1. Login\n2. Crear huésped principal\n3. Buscar habitaciones disponibles\n4. Calcular precio\n5. Crear reserva (transfer 100%) → Status PENDING\n6. Ver pagos (transfer pending)\n7. Confirmar transferencia\n8. Cambiar a confirmed\n9. Ready for check-in\n10. Check-in\n11. Pending checkout\n12. Check-out\n13. Ver historial\n\n**Escenario:**\n- 1 huésped (María González)\n- 1 habitación Doble\n- Check-in: +5 días | Check-out: +8 días (3 noches)\n- Pago: 100% transferencia bancaria\n- Sin servicios adicionales\n\n**Validaciones Clave:**\n- Reserva inicia con status = 'pending' (transfer no confirmada)\n- paid_amount = 0 inicialmente\n- Después de confirmar: paid_amount = total_amount, status = 'confirmed'",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Login Recepcionista",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Token recibido\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.token).to.exist;",
+              "    pm.environment.set(\"token\", jsonData.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{receptionistEmail}}\",\n  \"password\": \"{{receptionistPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. Crear Huésped Principal",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Huésped creado exitosamente\", function () {",
+              "    pm.response.to.have.status(201);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.guest).to.exist;",
+              "    pm.expect(jsonData.guest.id).to.exist;",
+              "    pm.environment.set(\"mainGuestId\", jsonData.guest.id);",
+              "    console.log('✅ Huésped principal creado con ID:', jsonData.guest.id);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identificationNumber\": \"16345678-9\",\n  \"firstName\": \"María\",\n  \"paternalLastName\": \"González\",\n  \"maternalLastName\": \"López\",\n  \"email\": \"maria.gonzalez.transfer@test.com\",\n  \"phoneNumber\": \"+56912345002\",\n  \"birthDate\": \"1990-08-20\",\n  \"gender\": \"female\",\n  \"password\": \"Test1234!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/guests",
+          "host": ["{{baseUrl}}"],
+          "path": ["guests"]
+        }
+      }
+    },
+    {
+      "name": "3. Buscar Habitaciones Disponibles",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Habitaciones disponibles encontradas\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.availableRooms).to.be.an('array');",
+              "    pm.expect(jsonData.availableRooms.length).to.be.greaterThan(0);",
+              "    ",
+              "    // Buscar habitación Doble",
+              "    const dobleRoom = jsonData.availableRooms.find(r => r.type === 'doble');",
+              "    pm.expect(dobleRoom).to.exist;",
+              "    ",
+              "    pm.environment.set(\"roomId1\", dobleRoom.id);",
+              "    console.log('✅ Habitación Doble encontrada, ID:', dobleRoom.id, 'Número:', dobleRoom.number);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Fechas dinámicas",
+              "const today = new Date();",
+              "const checkIn = new Date(today);",
+              "checkIn.setDate(today.getDate() + 5);",
+              "",
+              "const checkOut = new Date(checkIn);",
+              "checkOut.setDate(checkIn.getDate() + 3);",
+              "",
+              "pm.environment.set('checkInDate', checkIn.toISOString().split('T')[0]);",
+              "pm.environment.set('checkOutDate', checkOut.toISOString().split('T')[0]);",
+              "",
+              "console.log('Check-in:', pm.environment.get('checkInDate'));",
+              "console.log('Check-out:', pm.environment.get('checkOutDate'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations/search-availability?checkInDate={{checkInDate}}&checkOutDate={{checkOutDate}}&guests=1",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "search-availability"],
+          "query": [
+            {
+              "key": "checkInDate",
+              "value": "{{checkInDate}}"
+            },
+            {
+              "key": "checkOutDate",
+              "value": "{{checkOutDate}}"
+            },
+            {
+              "key": "guests",
+              "value": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Calcular Precio",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Precio calculado correctamente\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.total).to.exist;",
+              "    pm.expect(jsonData.total).to.be.greaterThan(0);",
+              "    ",
+              "    pm.environment.set(\"calculatedTotal\", jsonData.total);",
+              "    console.log('✅ Total a pagar:', jsonData.total);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"roomIds\": [{{roomId1}}],\n  \"services\": [],\n  \"checkInDate\": \"{{checkInDate}}\",\n  \"checkOutDate\": \"{{checkOutDate}}\",\n  \"guests\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations/calculate-price",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "calculate-price"]
+        }
+      }
+    },
+    {
+      "name": "5. Crear Reserva (Transfer 100%)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ Reserva creada exitosamente\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"✅ CRÍTICO: Status debe ser 'pending' (transfer no confirmada)\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.status).to.equal('pending');",
+              "    console.log('✅ Status correcto: pending');",
+              "});",
+              "",
+              "pm.test(\"✅ CRÍTICO: paid_amount debe ser 0 (transfer no confirmada)\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.paidAmount).to.equal(0);",
+              "    console.log('✅ paid_amount correcto: 0');",
+              "});",
+              "",
+              "pm.test(\"Guardar IDs\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.environment.set(\"reservationId\", jsonData.reservation.id);",
+              "    pm.environment.set(\"reservationCode\", jsonData.reservation.code);",
+              "    console.log('✅ Reserva creada, ID:', jsonData.reservation.id);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mainGuestId\": {{mainGuestId}},\n  \"additionalGuestIds\": [],\n  \"roomIds\": [{{roomId1}}],\n  \"roomGuestAssignments\": [\n    {\n      \"roomId\": {{roomId1}},\n      \"guestIds\": [{{mainGuestId}}]\n    }\n  ],\n  \"roomServiceAssignments\": [],\n  \"checkInDate\": \"{{checkInDate}}\",\n  \"checkOutDate\": \"{{checkOutDate}}\",\n  \"guestCount\": 1,\n  \"channel\": \"reception\",\n  \"paymentMethod\": \"bank_transfer\",\n  \"paymentAmount\": {{calculatedTotal}},\n  \"paymentType\": \"full\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations"]
+        }
+      }
+    },
+    {
+      "name": "6. Ver Pagos (Transfer Pending)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Debe haber 1 pago pending (transfer)\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.payments).to.be.an('array');",
+              "    pm.expect(jsonData.payments.length).to.be.greaterThan(0);",
+              "    ",
+              "    const transferPayment = jsonData.payments[0];",
+              "    pm.expect(transferPayment.method).to.equal('bank_transfer');",
+              "    pm.expect(transferPayment.status).to.equal('pending');",
+              "    ",
+              "    pm.environment.set(\"transferPaymentId\", transferPayment.id);",
+              "    console.log('✅ Pago transfer pending, ID:', transferPayment.id, 'Monto:', transferPayment.amount);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/payments",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "{{reservationId}}", "payments"]
+        }
+      }
+    },
+    {
+      "name": "7. Confirmar Transferencia",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"✅ Transferencia confirmada exitosamente\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Payment status cambiado a 'confirmed'\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.payment.status).to.equal('confirmed');",
+              "    console.log('✅ Transferencia confirmada');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"confirmationDetails\": \"Transferencia confirmada por banco\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations/payments/{{transferPaymentId}}/confirm",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "payments", "{{transferPaymentId}}", "confirm"]
+        }
+      }
+    },
+    {
+      "name": "8. Cambiar a Confirmed",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Status cambiado a 'confirmed'\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.currentStatus).to.equal('confirmed');",
+              "    console.log('✅ Status ahora es:', jsonData.reservation.currentStatus);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"newStatus\": \"confirmed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "{{reservationId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "9. Ready for Check-in",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Status cambiado a 'ready_for_checkin'\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.currentStatus).to.equal('ready_for_checkin');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"newStatus\": \"ready_for_checkin\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "{{reservationId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "10. Check-in",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Check-in realizado, status = 'in_progress'\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.status).to.equal('in_progress');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/check-in",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "{{reservationId}}", "check-in"]
+        }
+      }
+    },
+    {
+      "name": "11. Pending Checkout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Status cambiado a 'pending_checkout'\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.currentStatus).to.equal('pending_checkout');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"newStatus\": \"pending_checkout\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "{{reservationId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "12. Check-out",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Check-out realizado, status = 'completed'\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.reservation.status).to.equal('completed');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/check-out",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "{{reservationId}}", "check-out"]
+        }
+      }
+    },
+    {
+      "name": "13. Ver Historial",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"✅ Historial tiene múltiples cambios\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.history).to.be.an('array');",
+              "    pm.expect(jsonData.history.length).to.be.greaterThan(4);",
+              "    console.log('Total de cambios:', jsonData.history.length);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/history",
+          "host": ["{{baseUrl}}"],
+          "path": ["reservations", "{{reservationId}}", "history"]
+        }
+      }
+    }
+  ]
+}
