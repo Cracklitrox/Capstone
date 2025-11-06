@@ -1,0 +1,509 @@
+{
+	"id": "caa349e9-0db2-4221-af2c-524fe82fa7cd",
+	"name": "02 - Pago Transferencia Bancaria (NUEVO MODELO)",
+	"timestamp": "2025-10-26T06:13:33.007Z",
+	"collection_id": "48304947-377d29f7-f7f0-44b9-bd6e-307bb0cfe020",
+	"folder_id": 0,
+	"environment_id": "48304947-36c09741-0e12-4e1a-8489-a935cf7a0ea1",
+	"totalPass": 26,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2025-10-26T06:13:29.804Z",
+	"totalFail": 1,
+	"results": [
+		{
+			"id": "b2ecb075-e275-48d7-a1f3-df52649dc82e",
+			"name": "1. Login Recepcionista",
+			"url": "http://localhost:3001/api/v1/auth/login",
+			"time": 341,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Token recibido": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Token recibido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				341
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Token recibido": true
+				}
+			]
+		},
+		{
+			"id": "a6bcb5b3-d00b-4932-876c-b7599cdb948e",
+			"name": "2. Crear Huésped Principal",
+			"url": "http://localhost:3001/api/v1/guests",
+			"time": 71,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Huésped creado exitosamente": true
+			},
+			"testPassFailCounts": {
+				"Huésped creado exitosamente": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				71
+			],
+			"allTests": [
+				{
+					"Huésped creado exitosamente": true
+				}
+			]
+		},
+		{
+			"id": "1b8253ba-5900-4c0f-8ee7-4a625ab7e35d",
+			"name": "3. Buscar Habitaciones Disponibles",
+			"url": "http://localhost:3001/api/v1/reservations/search-availability?checkInDate=2025-10-31&checkOutDate=2025-11-03&guests=1",
+			"time": 39,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Habitaciones disponibles encontradas": false
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Habitaciones disponibles encontradas": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				39
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Habitaciones disponibles encontradas": false
+				}
+			]
+		},
+		{
+			"id": "de8b7efb-30cd-4156-83c2-5f2fe7feeb5f",
+			"name": "4. Calcular Precio",
+			"url": "http://localhost:3001/api/v1/reservations/calculate-price",
+			"time": 29,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Precio calculado correctamente": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Precio calculado correctamente": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				29
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Precio calculado correctamente": true
+				}
+			]
+		},
+		{
+			"id": "48124a8f-4fc6-4285-b340-2cb717811b59",
+			"name": "5. Crear Reserva (Transfer 100%)",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 89,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"✅ Reserva creada exitosamente": true,
+				"✅ CRÍTICO: Status debe ser 'pending' (transfer no confirmada)": true,
+				"✅ CRÍTICO: paid_amount debe ser 0 (transfer no confirmada)": true,
+				"Guardar IDs": true
+			},
+			"testPassFailCounts": {
+				"✅ Reserva creada exitosamente": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ CRÍTICO: Status debe ser 'pending' (transfer no confirmada)": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ CRÍTICO: paid_amount debe ser 0 (transfer no confirmada)": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Guardar IDs": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				89
+			],
+			"allTests": [
+				{
+					"✅ Reserva creada exitosamente": true,
+					"✅ CRÍTICO: Status debe ser 'pending' (transfer no confirmada)": true,
+					"✅ CRÍTICO: paid_amount debe ser 0 (transfer no confirmada)": true,
+					"Guardar IDs": true
+				}
+			]
+		},
+		{
+			"id": "355f201c-7ab9-499d-a5cf-4d16bccd24bb",
+			"name": "6. Ver Pagos (Transfer Pending)",
+			"url": "http://localhost:3001/api/v1/reservations/56/payments",
+			"time": 44,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Debe haber 1 pago pending (transfer)": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Debe haber 1 pago pending (transfer)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				44
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Debe haber 1 pago pending (transfer)": true
+				}
+			]
+		},
+		{
+			"id": "4817722a-027a-43c0-9049-890726a1f148",
+			"name": "7. Confirmar Transferencia",
+			"url": "http://localhost:3001/api/v1/reservations/payments/56/confirm",
+			"time": 98,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ Transferencia confirmada exitosamente": true,
+				"✅ Payment status cambiado a 'confirmed'": true
+			},
+			"testPassFailCounts": {
+				"✅ Transferencia confirmada exitosamente": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Payment status cambiado a 'confirmed'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				98
+			],
+			"allTests": [
+				{
+					"✅ Transferencia confirmada exitosamente": true,
+					"✅ Payment status cambiado a 'confirmed'": true
+				}
+			]
+		},
+		{
+			"id": "fd83aebd-dc41-48ee-baa1-5061dbafbca5",
+			"name": "8. Cambiar a Confirmed",
+			"url": "http://localhost:3001/api/v1/reservations/56/status",
+			"time": 211,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Status cambiado a 'confirmed'": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Status cambiado a 'confirmed'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				211
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Status cambiado a 'confirmed'": true
+				}
+			]
+		},
+		{
+			"id": "bc8560b4-0cb4-4bd3-85af-72bc063baed2",
+			"name": "9. Ready for Check-in",
+			"url": "http://localhost:3001/api/v1/reservations/56/status",
+			"time": 76,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Status cambiado a 'ready_for_checkin'": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Status cambiado a 'ready_for_checkin'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				76
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Status cambiado a 'ready_for_checkin'": true
+				}
+			]
+		},
+		{
+			"id": "599d64f8-f3d5-415a-89f6-98d3f8627c4f",
+			"name": "10. Check-in",
+			"url": "http://localhost:3001/api/v1/reservations/56/check-in",
+			"time": 74,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Check-in realizado, status = 'in_progress'": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Check-in realizado, status = 'in_progress'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				74
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Check-in realizado, status = 'in_progress'": true
+				}
+			]
+		},
+		{
+			"id": "c3ba4bf8-939a-4f04-a033-595791d76cb1",
+			"name": "11. Pending Checkout",
+			"url": "http://localhost:3001/api/v1/reservations/56/status",
+			"time": 51,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Status cambiado a 'pending_checkout'": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Status cambiado a 'pending_checkout'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				51
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Status cambiado a 'pending_checkout'": true
+				}
+			]
+		},
+		{
+			"id": "719be363-fe5d-418c-b02c-ea0187b72500",
+			"name": "12. Check-out",
+			"url": "http://localhost:3001/api/v1/reservations/56/check-out",
+			"time": 92,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Check-out realizado, status = 'completed'": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Check-out realizado, status = 'completed'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				92
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Check-out realizado, status = 'completed'": true
+				}
+			]
+		},
+		{
+			"id": "1c1c474d-c9fa-408d-99a5-cf001fe9e275",
+			"name": "13. Ver Historial",
+			"url": "http://localhost:3001/api/v1/reservations/56/history",
+			"time": 33,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Historial tiene múltiples cambios": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Historial tiene múltiples cambios": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				33
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Historial tiene múltiples cambios": true
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 1248,
+	"collection": {
+		"requests": [
+			{
+				"id": "b2ecb075-e275-48d7-a1f3-df52649dc82e",
+				"method": "POST"
+			},
+			{
+				"id": "a6bcb5b3-d00b-4932-876c-b7599cdb948e",
+				"method": "POST"
+			},
+			{
+				"id": "1b8253ba-5900-4c0f-8ee7-4a625ab7e35d",
+				"method": "GET"
+			},
+			{
+				"id": "de8b7efb-30cd-4156-83c2-5f2fe7feeb5f",
+				"method": "POST"
+			},
+			{
+				"id": "48124a8f-4fc6-4285-b340-2cb717811b59",
+				"method": "POST"
+			},
+			{
+				"id": "355f201c-7ab9-499d-a5cf-4d16bccd24bb",
+				"method": "GET"
+			},
+			{
+				"id": "4817722a-027a-43c0-9049-890726a1f148",
+				"method": "POST"
+			},
+			{
+				"id": "fd83aebd-dc41-48ee-baa1-5061dbafbca5",
+				"method": "POST"
+			},
+			{
+				"id": "bc8560b4-0cb4-4bd3-85af-72bc063baed2",
+				"method": "POST"
+			},
+			{
+				"id": "599d64f8-f3d5-415a-89f6-98d3f8627c4f",
+				"method": "POST"
+			},
+			{
+				"id": "c3ba4bf8-939a-4f04-a033-595791d76cb1",
+				"method": "POST"
+			},
+			{
+				"id": "719be363-fe5d-418c-b02c-ea0187b72500",
+				"method": "POST"
+			},
+			{
+				"id": "1c1c474d-c9fa-408d-99a5-cf001fe9e275",
+				"method": "GET"
+			}
+		]
+	}
+}

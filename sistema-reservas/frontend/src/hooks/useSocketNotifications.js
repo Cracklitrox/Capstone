@@ -8,32 +8,36 @@ const SOCKET_URL =
   "http://localhost:3001";
 
 /**
- * Hook para gestionar notificaciones de checkout via WebSocket
- * @returns {Object} { checkoutCount, isConnected, requestUpdate }
+ * Hook para gestionar notificaciones de checkout y WhatsApp via WebSocket
+ * @returns {Object} { checkoutCount, whatsappCount, totalCount, isConnected, requestUpdate }
  */
 export function useSocketNotifications() {
   const [socket, setSocket] = useState(null);
   const [checkoutCount, setCheckoutCount] = useState(0);
+  const [whatsappCount, setWhatsappCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const { token, user } = useAuth();
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
 
   useEffect(() => {
-    // Solo conectar si el usuario es recepcionista o admin
+    // Solo conectar si el usuario es recepcionista
     if (!token || !user) {
       console.log("⏸️ WebSocket: Esperando autenticación");
       return;
     }
 
-    if (user.role !== "receptionist" && user.role !== "administrator") {
+    if (user.role !== "receptionist") {
       console.log(
-        "⏸️ WebSocket: Usuario no es recepcionista/admin, no se conecta"
+        "⏸️ WebSocket: Usuario no es recepcionista, no se conecta"
       );
       return;
     }
 
     console.log("🔌 Iniciando conexión WebSocket...");
+    console.log("🔌 Usuario:", user);
+    console.log("🔌 Rol del usuario:", user.role);
+    console.log("🔌 Token presente:", !!token);
 
     // Crear conexión Socket.IO con autenticación
     const socketInstance = io(SOCKET_URL, {
@@ -48,27 +52,40 @@ export function useSocketNotifications() {
     // ⭐ Evento: Conexión establecida
     socketInstance.on("connect", () => {
       console.log("✅ WebSocket conectado correctamente");
+      console.log("✅ Socket ID:", socketInstance.id);
+      console.log("✅ Rol del usuario:", user.role);
+      console.log("✅ Transportes activos:", socketInstance.io.engine.transport.name);
       setIsConnected(true);
       reconnectAttempts.current = 0;
 
       // Solicitar datos iniciales al conectar
+      console.log("📤 Solicitando datos iniciales...");
       socketInstance.emit("checkout:requestUpdate");
+      console.log("📤 Emitido: checkout:requestUpdate");
+      socketInstance.emit("whatsapp:requestUpdate");
+      console.log("📤 Emitido: whatsapp:requestUpdate");
+    });
+
+    // ⭐ DEBUG: Escuchar TODOS los eventos para diagnóstico
+    socketInstance.onAny((eventName, ...args) => {
+      console.log(`🔔 Evento recibido: "${eventName}"`, args);
     });
 
     // ⭐ Evento: Recibir actualización de checkouts
     socketInstance.on("checkout:update", (data) => {
-      console.log("📬 Notificación recibida via WebSocket:", data);
+      console.log("📬 Notificación de checkout recibida:", data);
+      console.log("📬 Contador recibido del backend:", data.count);
+      
+      // Actualizar el contador directamente
+      setCheckoutCount(data.count || 0);
+    });
 
-      // Verificar si ya fue marcada como leída hoy
-      const today = new Date().toDateString();
-      const readAlertsKey = `checkoutAlerts_read_${today}`;
-      const isReadToday = localStorage.getItem(readAlertsKey) === "true";
-
-      if (!isReadToday) {
-        setCheckoutCount(data.count || 0);
-      } else {
-        setCheckoutCount(0);
-      }
+    // ⭐ Evento: Recibir actualización de WhatsApp
+    socketInstance.on("whatsapp:update", (data) => {
+      console.log("📬 Notificación de WhatsApp recibida:", data);
+      console.log("📬 Contador recibido del backend:", data.count);
+      
+      setWhatsappCount(data.count || 0);
     });
 
     // ⭐ Evento: Error de checkout
@@ -111,9 +128,20 @@ export function useSocketNotifications() {
 
     setSocket(socketInstance);
 
+    // ⭐ Listener para evento personalizado: alertas marcadas como vistas
+    const handleAlertsViewed = () => {
+      console.log("📖 Alertas marcadas como vistas, actualizando contador...");
+      
+      // Solicitar actualización del contador
+      socketInstance.emit("whatsapp:requestUpdate");
+    };
+
+    window.addEventListener('whatsappAlertsViewed', handleAlertsViewed);
+
     // Cleanup al desmontar el componente
     return () => {
       console.log("🔌 Cerrando conexión WebSocket...");
+      window.removeEventListener('whatsappAlertsViewed', handleAlertsViewed);
       socketInstance.disconnect();
     };
   }, [token, user]);
@@ -123,6 +151,7 @@ export function useSocketNotifications() {
     if (socket && isConnected) {
       console.log("🔄 Solicitando actualización manual de notificaciones...");
       socket.emit("checkout:requestUpdate");
+      socket.emit("whatsapp:requestUpdate");
     } else {
       console.warn(
         "⚠️ No se puede solicitar actualización: WebSocket no conectado"
@@ -130,8 +159,21 @@ export function useSocketNotifications() {
     }
   }, [socket, isConnected]);
 
+  const totalCount = checkoutCount + whatsappCount;
+
+  // Debug: Log cuando cambien los contadores
+  useEffect(() => {
+    console.log('🔢 Contadores actualizados en hook:', {
+      checkoutCount,
+      whatsappCount,
+      totalCount
+    });
+  }, [checkoutCount, whatsappCount, totalCount]);
+
   return {
     checkoutCount,
+    whatsappCount,
+    totalCount,
     isConnected,
     requestUpdate,
   };

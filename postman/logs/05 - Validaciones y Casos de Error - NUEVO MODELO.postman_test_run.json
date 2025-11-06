@@ -1,0 +1,425 @@
+{
+	"id": "b54fb10d-506c-4cfe-a0ac-bc59a635eb1e",
+	"name": "05 - Validaciones y Casos de Error - NUEVO MODELO",
+	"timestamp": "2025-10-26T06:14:51.878Z",
+	"collection_id": "48304947-5721ea4a-7343-4527-bb6e-889598f3819a",
+	"folder_id": 0,
+	"environment_id": "48304947-36c09741-0e12-4e1a-8489-a935cf7a0ea1",
+	"totalPass": 13,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2025-10-26T06:14:48.885Z",
+	"totalFail": 0,
+	"results": [
+		{
+			"id": "aad62440-517e-4746-80d3-2efcde374462",
+			"name": "0. Setup - Login",
+			"url": "http://localhost:3001/api/v1/auth/login",
+			"time": 348,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Token recibido": true
+			},
+			"testPassFailCounts": {
+				"Token recibido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				348
+			],
+			"allTests": [
+				{
+					"Token recibido": true
+				}
+			]
+		},
+		{
+			"id": "46a150f1-b201-47fc-82e0-d08850a4d305",
+			"name": "0. Setup - Crear Huésped",
+			"url": "http://localhost:3001/api/v1/guests",
+			"time": 64,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Huésped creado": true
+			},
+			"testPassFailCounts": {
+				"Huésped creado": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				64
+			],
+			"allTests": [
+				{
+					"Huésped creado": true
+				}
+			]
+		},
+		{
+			"id": "e4a764bc-364a-473c-82dd-c03c2a14a72e",
+			"name": "0. Setup - Buscar Habitación",
+			"url": "http://localhost:3001/api/v1/reservations/search-availability?checkInDate=2025-12-01T15:00:00.000Z&checkOutDate=2025-12-02T11:00:00.000Z&guests=1",
+			"time": 45,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Habitación encontrada": true
+			},
+			"testPassFailCounts": {
+				"Habitación encontrada": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				45
+			],
+			"allTests": [
+				{
+					"Habitación encontrada": true
+				}
+			]
+		},
+		{
+			"id": "dab082fb-30d8-4115-9cc4-e09df040e954",
+			"name": "ERROR 1: Reserva 1 día con paymentType 'daily'",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 26,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - Reserva 1 día debe ser 'full'": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - Reserva 1 día debe ser 'full'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				26
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - Reserva 1 día debe ser 'full'": true
+				}
+			]
+		},
+		{
+			"id": "9a9ad8c3-22f4-42ff-83fd-e8d68b996d53",
+			"name": "ERROR 2: Reserva 1 día con paymentType 'half_upfront'",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 28,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - Reserva 1 día debe ser 'full'": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - Reserva 1 día debe ser 'full'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				28
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - Reserva 1 día debe ser 'full'": true
+				}
+			]
+		},
+		{
+			"id": "b9a9334b-63af-4fcb-8e3a-450d1dcd8373",
+			"name": "ERROR 3: Sin paymentType",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 37,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - paymentType requerido": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - paymentType requerido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				37
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - paymentType requerido": true
+				}
+			]
+		},
+		{
+			"id": "fec6b429-f53d-4d52-9f75-b12083bfd91c",
+			"name": "ERROR 4: paymentType inválido",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 39,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - paymentType inválido": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - paymentType inválido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				39
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - paymentType inválido": true
+				}
+			]
+		},
+		{
+			"id": "3a0ddc62-7ba3-424a-9297-1bbec5e34780",
+			"name": "ERROR 5: Sin mainGuestId",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 34,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - mainGuestId requerido": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - mainGuestId requerido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				34
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - mainGuestId requerido": true
+				}
+			]
+		},
+		{
+			"id": "c6c4ad3f-3a06-40cd-9e13-2653fafd5d4b",
+			"name": "ERROR 6: Sin roomIds",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 28,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - roomIds requerido": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - roomIds requerido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				28
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - roomIds requerido": true
+				}
+			]
+		},
+		{
+			"id": "5cc5ff37-ec2e-4fcb-b073-bd82db4ab649",
+			"name": "ERROR 7: Sin fechas",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 25,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - Fechas requeridas": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - Fechas requeridas": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				25
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - Fechas requeridas": true
+				}
+			]
+		},
+		{
+			"id": "fb54a843-3f91-48d1-a9f6-5f9b8f1a6640",
+			"name": "ERROR 8: Sin paymentMethod",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 23,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - paymentMethod requerido": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - paymentMethod requerido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				23
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - paymentMethod requerido": true
+				}
+			]
+		},
+		{
+			"id": "a3d58f5f-9ba4-46b7-a770-a024e3123132",
+			"name": "ERROR 9: guestCount inválido (0)",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 24,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"✅ ERROR 400 - guestCount inválido": true
+			},
+			"testPassFailCounts": {
+				"✅ ERROR 400 - guestCount inválido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				24
+			],
+			"allTests": [
+				{
+					"✅ ERROR 400 - guestCount inválido": true
+				}
+			]
+		},
+		{
+			"id": "5fcc4394-931f-4004-b5d9-f133f3658682",
+			"name": "SUCCESS: Reserva 1 día con paymentType 'full'",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 109,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"✅ SUCCESS 201 - Reserva 1 día válida": true
+			},
+			"testPassFailCounts": {
+				"✅ SUCCESS 201 - Reserva 1 día válida": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				109
+			],
+			"allTests": [
+				{
+					"✅ SUCCESS 201 - Reserva 1 día válida": true
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 830,
+	"collection": {
+		"requests": [
+			{
+				"id": "aad62440-517e-4746-80d3-2efcde374462",
+				"method": "POST"
+			},
+			{
+				"id": "46a150f1-b201-47fc-82e0-d08850a4d305",
+				"method": "POST"
+			},
+			{
+				"id": "e4a764bc-364a-473c-82dd-c03c2a14a72e",
+				"method": "GET"
+			},
+			{
+				"id": "dab082fb-30d8-4115-9cc4-e09df040e954",
+				"method": "POST"
+			},
+			{
+				"id": "9a9ad8c3-22f4-42ff-83fd-e8d68b996d53",
+				"method": "POST"
+			},
+			{
+				"id": "b9a9334b-63af-4fcb-8e3a-450d1dcd8373",
+				"method": "POST"
+			},
+			{
+				"id": "fec6b429-f53d-4d52-9f75-b12083bfd91c",
+				"method": "POST"
+			},
+			{
+				"id": "3a0ddc62-7ba3-424a-9297-1bbec5e34780",
+				"method": "POST"
+			},
+			{
+				"id": "c6c4ad3f-3a06-40cd-9e13-2653fafd5d4b",
+				"method": "POST"
+			},
+			{
+				"id": "5cc5ff37-ec2e-4fcb-b073-bd82db4ab649",
+				"method": "POST"
+			},
+			{
+				"id": "fb54a843-3f91-48d1-a9f6-5f9b8f1a6640",
+				"method": "POST"
+			},
+			{
+				"id": "a3d58f5f-9ba4-46b7-a770-a024e3123132",
+				"method": "POST"
+			},
+			{
+				"id": "5fcc4394-931f-4004-b5d9-f133f3658682",
+				"method": "POST"
+			}
+		]
+	}
+}

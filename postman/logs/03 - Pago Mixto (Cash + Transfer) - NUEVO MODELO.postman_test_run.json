@@ -1,0 +1,521 @@
+{
+	"id": "de092508-dae7-4966-bc25-c4ac3ea1594b",
+	"name": "03 - Pago Mixto (Cash + Transfer) - NUEVO MODELO",
+	"timestamp": "2025-10-26T06:13:54.010Z",
+	"collection_id": "48304947-8fcd75ef-337c-4682-9a0a-a4b61a8aa635",
+	"folder_id": 0,
+	"environment_id": "48304947-36c09741-0e12-4e1a-8489-a935cf7a0ea1",
+	"totalPass": 29,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2025-10-26T06:13:50.818Z",
+	"totalFail": 0,
+	"results": [
+		{
+			"id": "c49e84c4-2a2f-47cd-a285-2ba342e6cb27",
+			"name": "1. Login Recepcionista",
+			"url": "http://localhost:3001/api/v1/auth/login",
+			"time": 343,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Token recibido": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Token recibido": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				343
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Token recibido": true
+				}
+			]
+		},
+		{
+			"id": "c6e47696-0dd2-49bd-8169-af7253267a86",
+			"name": "2. Crear Huésped Principal",
+			"url": "http://localhost:3001/api/v1/guests",
+			"time": 47,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Huésped creado exitosamente": true
+			},
+			"testPassFailCounts": {
+				"Huésped creado exitosamente": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				47
+			],
+			"allTests": [
+				{
+					"Huésped creado exitosamente": true
+				}
+			]
+		},
+		{
+			"id": "7fe34681-5687-4fc7-b723-c86bcbccf8f4",
+			"name": "3. Buscar Habitaciones Disponibles",
+			"url": "http://localhost:3001/api/v1/reservations/search-availability?checkInDate=2025-10-31&checkOutDate=2025-11-03&guests=1",
+			"time": 42,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Hay habitaciones disponibles": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Hay habitaciones disponibles": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				42
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Hay habitaciones disponibles": true
+				}
+			]
+		},
+		{
+			"id": "a29edfd7-7dee-4052-878b-0ad63c9e6776",
+			"name": "4. Calcular Precio",
+			"url": "http://localhost:3001/api/v1/reservations/calculate-price",
+			"time": 32,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Precio calculado correctamente": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Precio calculado correctamente": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				32
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Precio calculado correctamente": true
+				}
+			]
+		},
+		{
+			"id": "42d2a3f6-1a0d-499f-a7dc-2fe5475c52ea",
+			"name": "5. Crear Reserva (Pago Mixto)",
+			"url": "http://localhost:3001/api/v1/reservations",
+			"time": 112,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Reserva creada exitosamente": true,
+				"✅ CRÍTICO: Status debe ser 'pending' (tiene transfer)": true,
+				"✅ CRÍTICO: paid_amount solo refleja el cash (40%)": true,
+				"Guardar IDs": true
+			},
+			"testPassFailCounts": {
+				"Reserva creada exitosamente": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ CRÍTICO: Status debe ser 'pending' (tiene transfer)": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ CRÍTICO: paid_amount solo refleja el cash (40%)": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Guardar IDs": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				112
+			],
+			"allTests": [
+				{
+					"Reserva creada exitosamente": true,
+					"✅ CRÍTICO: Status debe ser 'pending' (tiene transfer)": true,
+					"✅ CRÍTICO: paid_amount solo refleja el cash (40%)": true,
+					"Guardar IDs": true
+				}
+			]
+		},
+		{
+			"id": "d8d5dfad-c21d-4e39-9ad9-f6c7008d957f",
+			"name": "6. Ver Pagos de la Reserva",
+			"url": "http://localhost:3001/api/v1/reservations/57/payments",
+			"time": 31,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Deben haber 2 pagos (cash + transfer)": true,
+				"✅ Un pago confirmed (cash) y uno pending (transfer)": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Deben haber 2 pagos (cash + transfer)": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Un pago confirmed (cash) y uno pending (transfer)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				31
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Deben haber 2 pagos (cash + transfer)": true,
+					"✅ Un pago confirmed (cash) y uno pending (transfer)": true
+				}
+			]
+		},
+		{
+			"id": "911e7e2a-e0a6-4716-bcee-2b0bec87a6de",
+			"name": "7. Confirmar Transferencia",
+			"url": "http://localhost:3001/api/v1/reservations/payments/58/confirm",
+			"time": 63,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Transferencia confirmada exitosamente": true,
+				"✅ Payment status cambió a 'confirmed'": true,
+				"✅ Reservation paid_amount actualizado al 100%": true
+			},
+			"testPassFailCounts": {
+				"Transferencia confirmada exitosamente": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Payment status cambió a 'confirmed'": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Reservation paid_amount actualizado al 100%": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				63
+			],
+			"allTests": [
+				{
+					"Transferencia confirmada exitosamente": true,
+					"✅ Payment status cambió a 'confirmed'": true,
+					"✅ Reservation paid_amount actualizado al 100%": true
+				}
+			]
+		},
+		{
+			"id": "e09ced0b-cebe-4c3e-936e-281136d7da0b",
+			"name": "8. Cambiar Reserva a Confirmed",
+			"url": "http://localhost:3001/api/v1/reservations/57/status",
+			"time": 107,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"✅ Estado cambiado a 'confirmed'": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"✅ Estado cambiado a 'confirmed'": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				107
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"✅ Estado cambiado a 'confirmed'": true
+				}
+			]
+		},
+		{
+			"id": "19aafae3-d189-4267-b2cc-56d7a51b594f",
+			"name": "9. Ready for Check-in",
+			"url": "http://localhost:3001/api/v1/reservations/57/status",
+			"time": 60,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Estado cambiado a ready_for_checkin": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Estado cambiado a ready_for_checkin": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				60
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Estado cambiado a ready_for_checkin": true
+				}
+			]
+		},
+		{
+			"id": "282ea190-1f69-410c-acd2-3fde9a3e87a5",
+			"name": "10. Check-in",
+			"url": "http://localhost:3001/api/v1/reservations/57/check-in",
+			"time": 75,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Check-in realizado exitosamente": true,
+				"Estado cambiado a in_progress": true
+			},
+			"testPassFailCounts": {
+				"Check-in realizado exitosamente": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Estado cambiado a in_progress": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				75
+			],
+			"allTests": [
+				{
+					"Check-in realizado exitosamente": true,
+					"Estado cambiado a in_progress": true
+				}
+			]
+		},
+		{
+			"id": "89ffc02b-f2d4-4a19-8133-319b53e10cb5",
+			"name": "11. Pending Checkout",
+			"url": "http://localhost:3001/api/v1/reservations/57/status",
+			"time": 64,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Estado cambiado a pending_checkout": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Estado cambiado a pending_checkout": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				64
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Estado cambiado a pending_checkout": true
+				}
+			]
+		},
+		{
+			"id": "ecec62bf-9917-4710-abdc-2aad4a8c1796",
+			"name": "12. Check-out",
+			"url": "http://localhost:3001/api/v1/reservations/57/check-out",
+			"time": 89,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Check-out realizado exitosamente": true,
+				"Estado cambiado a completed": true
+			},
+			"testPassFailCounts": {
+				"Check-out realizado exitosamente": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Estado cambiado a completed": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				89
+			],
+			"allTests": [
+				{
+					"Check-out realizado exitosamente": true,
+					"Estado cambiado a completed": true
+				}
+			]
+		},
+		{
+			"id": "bffb5799-b384-40e9-8c6a-48c4d0bfc261",
+			"name": "13. Ver Historial",
+			"url": "http://localhost:3001/api/v1/reservations/57/history",
+			"time": 28,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status code is 200": true,
+				"Historial contiene cambios de pago mixto": true
+			},
+			"testPassFailCounts": {
+				"Status code is 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Historial contiene cambios de pago mixto": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				28
+			],
+			"allTests": [
+				{
+					"Status code is 200": true,
+					"Historial contiene cambios de pago mixto": true
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 1093,
+	"collection": {
+		"requests": [
+			{
+				"id": "c49e84c4-2a2f-47cd-a285-2ba342e6cb27",
+				"method": "POST"
+			},
+			{
+				"id": "c6e47696-0dd2-49bd-8169-af7253267a86",
+				"method": "POST"
+			},
+			{
+				"id": "7fe34681-5687-4fc7-b723-c86bcbccf8f4",
+				"method": "GET"
+			},
+			{
+				"id": "a29edfd7-7dee-4052-878b-0ad63c9e6776",
+				"method": "POST"
+			},
+			{
+				"id": "42d2a3f6-1a0d-499f-a7dc-2fe5475c52ea",
+				"method": "POST"
+			},
+			{
+				"id": "d8d5dfad-c21d-4e39-9ad9-f6c7008d957f",
+				"method": "GET"
+			},
+			{
+				"id": "911e7e2a-e0a6-4716-bcee-2b0bec87a6de",
+				"method": "POST"
+			},
+			{
+				"id": "e09ced0b-cebe-4c3e-936e-281136d7da0b",
+				"method": "POST"
+			},
+			{
+				"id": "19aafae3-d189-4267-b2cc-56d7a51b594f",
+				"method": "POST"
+			},
+			{
+				"id": "282ea190-1f69-410c-acd2-3fde9a3e87a5",
+				"method": "POST"
+			},
+			{
+				"id": "89ffc02b-f2d4-4a19-8133-319b53e10cb5",
+				"method": "POST"
+			},
+			{
+				"id": "ecec62bf-9917-4710-abdc-2aad4a8c1796",
+				"method": "POST"
+			},
+			{
+				"id": "bffb5799-b384-40e9-8c6a-48c4d0bfc261",
+				"method": "GET"
+			}
+		]
+	}
+}

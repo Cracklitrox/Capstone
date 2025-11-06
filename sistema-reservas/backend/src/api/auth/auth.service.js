@@ -28,6 +28,11 @@ const login = async (email, password, req) => {
       throw new Error("Credenciales inválidas");
     }
 
+    // Verificar si el usuario tiene permiso para iniciar sesión
+    if (user.can_login === false) {
+      throw new Error("Este usuario no tiene permisos para iniciar sesión en el sistema.");
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
     if (!isPasswordValid) {

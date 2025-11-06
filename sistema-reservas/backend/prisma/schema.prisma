@@ -35,10 +35,12 @@ model alerts {
   type              alert_type_enum
   status            alert_status_enum?  @default(pending)
   created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  last_viewed_at    DateTime?           @db.Timestamp(6)
   origin_user_id    Int?
   reservation_id    Int?
   payment_id        Int?
   detail            String?             @db.VarChar(250)
+  full_summary      Json?
   alert_read_status alert_read_status[]
   users             users?              @relation(fields: [origin_user_id], references: [id], onUpdate: NoAction)
   payments          payments?           @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
@@ -311,7 +313,8 @@ model users {
   country                                          String?                    @db.VarChar(100)
   region                                           String?                    @db.VarChar(100)
   city                                             String?                    @db.VarChar(100)
-  password_hash                                    String                     @db.VarChar(255)
+  password_hash                                    String?                    @db.VarChar(255)
+  can_login                                        Boolean?                   @default(true)
   status                                           user_status_enum?          @default(active)
   is_fully_registered                              Boolean?                   @default(true)
   last_login_at                                    DateTime?                  @db.Timestamp(6)
@@ -444,6 +447,7 @@ enum alert_type_enum {
   payment
   maintenance
   guest
+  booking_request
 }
 
 enum error_severity_enum {

@@ -3,3 +3,7 @@ node_modules
 .env
 
 /generated/prisma
+
+# WhatsApp sessions (no versionar credenciales)
+src/whatsapp/sessions/*
+!src/whatsapp/sessions/.gitkeep

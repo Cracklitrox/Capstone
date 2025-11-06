@@ -18,6 +18,8 @@ import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlerts.jsx";
 import GuestHistory from "./pages/Receptionist/GuestHistory.jsx";
 import NewReservation from "./pages/Reservations/NewReservation.jsx";
 import NotificationsPage from "./pages/NotificationsPage.jsx";
+import ChatbotPage from "./pages/ChatbotPage.jsx";
+import Reports from "./pages/Reports.jsx";
 
 import "./index.css";
 
@@ -65,8 +67,10 @@ const AppRoutes = () => {
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<DashboardSelector />} />
           <Route path="planning" element={<TapeChart />} />
-          <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="notifications/checkouts" element={<CheckoutAlertsImproved />} />
+          <Route path="notifications/chatbot" element={<ChatbotPage />} />
+          <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} /> {/* Redirect legacy */}
           <Route path="reservations" element={<ReservationsPage />} />
           <Route path="history" element={<ReservationHistory />} />
           <Route path="guests" element={<GuestHistory />} />
@@ -76,6 +80,7 @@ const AppRoutes = () => {
           <Route path="profile" element={<Profile />} />
           <Route path="admin/rooms-crud" element={<RoomsCrud />} />
           <Route path="admin/room-types-crud" element={<RoomTypesCrud />} />
+          <Route path="reports" element={<Reports />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />
