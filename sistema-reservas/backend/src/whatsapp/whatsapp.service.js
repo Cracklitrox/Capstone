@@ -98,32 +98,40 @@ class WhatsAppService {
       const { phoneNumber, data } = session;
 
       // Crear alerta en la base de datos
+      const guestName = data.name || 'Cliente';
+      const checkIn = data.checkInDate || 'No especificado';
+      const checkOut = data.checkOutDate || 'No especificado';
+      const roomType = data.roomType || 'No especificado';
+      const guests = `${data.adults || 1} adulto(s), ${data.children || 0} niño(s)`;
+
       const alert = await prisma.alerts.create({
         data: {
           type: 'booking_request',
+          priority: 'medium',
           status: 'pending',
+          title: 'Nueva Solicitud de Reserva desde WhatsApp',
+          message: `Nueva solicitud de reserva recibida vía WhatsApp.
+
+📱 Información de Contacto:
+- Nombre: ${guestName}
+- Teléfono: ${phoneNumber}
+- RUT: ${data.rut || 'No proporcionado'}
+- Email: ${data.email || 'No proporcionado'}
+
+📅 Detalles de la Reserva:
+- Check-in: ${checkIn}
+- Check-out: ${checkOut}
+- Tipo de Habitación: ${roomType}
+- Huéspedes: ${guests}
+${data.specialRequests ? `- Peticiones Especiales: ${data.specialRequests}` : ''}
+
+Fuente: WhatsApp Bot
+Fecha de Solicitud: ${new Date().toLocaleString('es-CL')}`,
+          target_role: 'receptionist',
+          action_type: 'create_reservation',
           origin_user_id: null, // No hay usuario registrado aún
           reservation_id: null,
-          payment_id: null,
-          detail: JSON.stringify({
-            source: 'whatsapp',
-            phone: phoneNumber,
-            guest_data: {
-              name: data.name || '',
-              rut: data.rut || '',
-              email: data.email || '',
-              phone: phoneNumber
-            },
-            reservation_data: {
-              check_in: data.checkInDate || '',
-              check_out: data.checkOutDate || '',
-              room_type: data.roomType || '',
-              adults: data.adults || 1,
-              children: data.children || 0,
-              special_requests: data.specialRequests || ''
-            },
-            timestamp: new Date().toISOString()
-          })
+          payment_id: null
         }
       });
 

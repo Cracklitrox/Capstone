@@ -446,6 +446,9 @@ const ReservationStepper = () => {
                 Grupo/Empresa (Próximamente)
               </TabsTrigger>
             </TabsList>
+            {/* TabsContent requeridos por Radix UI para ARIA validity */}
+            <TabsContent value="individual" className="hidden" />
+            <TabsContent value="corporate" className="hidden" />
           </Tabs>
         </CardContent>
       </Card>
@@ -470,6 +473,7 @@ const ReservationStepper = () => {
                       onClick={() => goToStep(step.id)}
                       disabled={isLocked}
                       className="flex items-center justify-center mb-2 disabled:cursor-not-allowed"
+                      aria-label={`${isLocked ? 'Paso bloqueado' : isCurrent ? 'Paso actual' : 'Ir al paso'}: ${step.name}`}
                     >
                       {showCheckmark ? (
                         <CheckCircle2 className="h-8 w-8 text-green-500" />
@@ -491,7 +495,7 @@ const ReservationStepper = () => {
                           isCurrent
                             ? "text-foreground"
                             : isLocked
-                              ? "text-muted-foreground/50"
+                              ? "text-muted-foreground"
                               : "text-muted-foreground"
                         }`}
                       >

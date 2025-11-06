@@ -33,17 +33,25 @@ model alert_read_status {
 model alerts {
   id                Int                 @id @default(autoincrement())
   type              alert_type_enum
-  status            alert_status_enum?  @default(pending)
-  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  priority          alert_priority_enum @default(medium)
+  status            alert_status_enum   @default(pending)
+  title             String              @db.VarChar(150)
+  message           String              @db.Text
+  target_role       role_name_enum?
+  action_type       String?             @db.VarChar(50)
+  created_at        DateTime            @default(now()) @db.Timestamp(6)
+  resolved_at       DateTime?           @db.Timestamp(6)
+  resolved_by       Int?
+  resolution_notes  String?             @db.Text
   origin_user_id    Int?
   reservation_id    Int?
   payment_id        Int?
-  detail            String?             @db.VarChar(250)
   alert_read_status alert_read_status[]
-  users             users?              @relation(fields: [origin_user_id], references: [id], onUpdate: NoAction)
+  maintenance_tasks maintenance_tasks[]
+  origin_user       users?              @relation("alert_origin", fields: [origin_user_id], references: [id], onUpdate: NoAction)
+  resolver_user     users?              @relation("alert_resolver", fields: [resolved_by], references: [id], onUpdate: NoAction)
   payments          payments?           @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
   reservations      reservations?       @relation(fields: [reservation_id], references: [id], onUpdate: NoAction)
-  maintenance_tasks maintenance_tasks[]
 }
 
 model cleaning_records {
@@ -327,7 +335,8 @@ model users {
 
   activity_logs                                    activity_logs[]
   alert_read_status                                alert_read_status[]
-  alerts                                           alerts[]
+  alerts_as_origin                                 alerts[]                   @relation("alert_origin")
+  alerts_as_resolver                               alerts[]                   @relation("alert_resolver")
   cleaning_records                                 cleaning_records[]
   guest_details                                    guest_details?
   maintenance_tasks                                maintenance_tasks[]
@@ -507,6 +516,13 @@ enum alert_status_enum {
   ignored
 }
 
+enum alert_priority_enum {
+  low
+  medium
+  high
+  critical
+}
+
 enum alert_type_enum {
   reservation
   payment
@@ -648,6 +664,11 @@ enum action_type_enum {
   COMPLETE_CLEANING
   CREATE_PAYMENT
   UPDATE_PAYMENT
+  CONFIRM_PAYMENT
+  REJECT_PAYMENT
+  ANNUL_PAYMENT
+  RETRY_PAYMENT
+  REQUEST_PAYMENT_ANNULMENT
   CREATE_USER
   UPDATE_USER
   UPDATE_PROFILE

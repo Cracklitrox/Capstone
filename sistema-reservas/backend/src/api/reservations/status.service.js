@@ -273,30 +273,20 @@ async function onPendingCheckOut(tx, reservation, userId, userRole) {
 
 /**
  * ACCIÓN: Al completar check-out
+ *
+ * ✅ CORREGIDO: Las habitaciones quedan en 'occupied' después del check-out
+ * El cambio a 'cleaning' debe ser MANUAL por parte del recepcionista/administrador
+ * Flujo: check-out → occupied → [manual trigger] → cleaning → available
  */
 async function onCompleted(tx, reservation, userId, userRole) {
   // Validar que no haya saldo pendiente
   await validatePaymentForCheckOut(tx, reservation.id);
 
-  // Actualizar habitaciones a 'cleaning'
-  const roomIds = await updateRoomStatuses(tx, reservation.id, 'cleaning');
-
-  // Crear registros de limpieza para cada habitación
-  if (roomIds && roomIds.length > 0) {
-    const cleaningRecords = roomIds.map(roomId => ({
-      room_id: roomId,
-      receptionist_id: userId,
-      is_completed: false
-    }));
-
-    await tx.cleaning_records.createMany({
-      data: cleaningRecords
-    });
-  }
+  // Las habitaciones permanecen en estado 'occupied' después del check-out
+  // El staff debe manualmente enviarlas a limpieza cuando corresponda
 
   return {
-    message: 'Check-out completado exitosamente',
-    cleaningRecordsCreated: roomIds?.length || 0
+    message: 'Check-out completado exitosamente. Las habitaciones quedan disponibles para limpieza.',
   };
 }
 
@@ -467,7 +457,16 @@ async function getReservationHistory(reservationId) {
           id: true,
           first_name: true,
           paternal_last_name: true,
-          maternal_last_name: true
+          maternal_last_name: true,
+          user_roles: {
+            select: {
+              roles: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
         }
       }
     },

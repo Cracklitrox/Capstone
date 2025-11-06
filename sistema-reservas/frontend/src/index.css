@@ -37,26 +37,26 @@
   }
 
   .dark {
-    /* MODO OSCURO POR DEFECTO */
-    --background: 210 11% 15%;       /* Versión oscura del Grafito Suave */
-    --foreground: 43 10% 97%;        /* Versión oscura del Crema Suave */
-    --card: 210 11% 20%;             /* Más oscuro que el background */
-    --card-foreground: 43 10% 97%;
-    --popover: 210 11% 20%;
-    --popover-foreground: 43 10% 97%;
-    --primary: 43 10% 97%;           /* Color neutro por defecto oscuro */
-    --primary-foreground: 210 11% 15%;
-    --secondary: 215 16% 25%;
-    --secondary-foreground: 43 10% 97%;
-    --muted: 215 16% 25%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 215 16% 25%;
-    --accent-foreground: 43 10% 97%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 215 16% 25%;
-    --input: 215 16% 25%;
-    --ring: 43 10% 80%;
+    /* MODO OSCURO MEJORADO - Inspirado en GitHub/Vercel */
+    --background: 220 13% 9%;        /* Negro azulado profundo #0d1117 */
+    --foreground: 213 31% 91%;       /* Blanco suave #e6edf3 */
+    --card: 217 19% 12%;             /* Cards elevadas #161b22 */
+    --card-foreground: 213 31% 91%;
+    --popover: 217 19% 12%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 213 94% 68%;          /* Azul vibrante #3b82f6 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 14% 18%;        /* Gris intermedio #21262d */
+    --secondary-foreground: 213 31% 91%;
+    --muted: 215 14% 18%;
+    --muted-foreground: 217 10% 64%; /* Gris medio #8b949e */
+    --accent: 217 19% 27%;           /* Azul oscuro sutil #30363d */
+    --accent-foreground: 213 31% 91%;
+    --destructive: 0 72% 51%;        /* Rojo más vibrante #e74c3c */
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 19% 19%;           /* Bordes sutiles #30363d */
+    --input: 215 14% 18%;            /* Inputs con contraste */
+    --ring: 213 94% 68%;             /* Focus ring azul vibrante */
   }
 
   /*
@@ -154,5 +154,18 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Screen Reader Only - Utility class for accessibility */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
   }
 }

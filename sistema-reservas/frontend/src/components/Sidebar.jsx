@@ -13,7 +13,14 @@ import {
   BellIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
-import { PlusCircle } from "lucide-react";
+import {
+  PlusCircle,
+  ClipboardList,
+  CheckCircle2,
+  DoorOpen,
+  Hotel,
+  LayoutGrid
+} from "lucide-react";
 
 // Menú principal con submenú para habitaciones
 const navLinks = [
@@ -30,8 +37,46 @@ const navLinks = [
     roles: ["administrator", "receptionist"],
   },
   {
+    label: "Gestión de Reservas",
+    icon: ClipboardList,
+    roles: ["administrator", "receptionist"],
+    submenu: [
+      {
+        href: "/reservations/manage",
+        label: "Todas las Reservas",
+        icon: ClipboardList,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/reservations/new",
+        label: "Nueva Reserva",
+        icon: PlusCircle,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/reservations/checkins-today",
+        label: "Check-ins Hoy",
+        icon: CheckCircle2,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/reservations/checkouts-today",
+        label: "Check-outs Hoy",
+        icon: DoorOpen,
+        roles: ["administrator", "receptionist"],
+        showBadge: true,
+      },
+      {
+        href: "/reservations/in-progress",
+        label: "En Progreso",
+        icon: Hotel,
+        roles: ["administrator", "receptionist"],
+      },
+    ],
+  },
+  {
     href: "/checkout-alerts",
-    label: "Check-outs Hoy",
+    label: "Check-outs Hoy (Viejo)",
     icon: BellAlertIcon,
     roles: ["administrator", "receptionist"],
     showBadge: true,
@@ -51,8 +96,20 @@ const navLinks = [
   {
     label: "Gestionar Habitaciones",
     icon: ViewColumnsIcon,
-    roles: ["administrator"],
+    roles: ["administrator", "receptionist"],
     submenu: [
+      {
+        href: "/rooms/pending",
+        label: "Habitaciones Pendientes",
+        icon: ClockIcon,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/admin/room-status-board",
+        label: "Tablero de Estados",
+        icon: LayoutGrid,
+        roles: ["administrator"],
+      },
       {
         href: "/admin/rooms-crud",
         label: "Habitaciones",
@@ -66,12 +123,6 @@ const navLinks = [
         roles: ["administrator"],
       },
     ],
-  },
-  {
-    href: "/reservations/new",
-    label: "Nueva Reserva",
-    icon: PlusCircle,
-    roles: ["receptionist", "administrator"],
   },
   {
     href: "/history",
@@ -131,7 +182,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { user } = useAuth();
   const closeSidebar = () => setSidebarOpen(false);
   const [roomsOpen, setRoomsOpen] = useState(false);
-  
+  const [reservationsOpen, setReservationsOpen] = useState(false);
+
   // ⭐ Usar WebSocket en lugar de polling
   const { checkoutCount, isConnected } = useSocketNotifications();
 
@@ -168,9 +220,15 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       <button
                         type="button"
                         className="flex items-center gap-2 font-semibold text-[var(--secondary)] mb-1 w-full focus:outline-none px-2"
-                        onClick={() => setRoomsOpen((open) => !open)}
-                        aria-expanded={roomsOpen}
-                        aria-controls="submenu-habitaciones"
+                        onClick={() => {
+                          if (link.label === "Gestionar Habitaciones") {
+                            setRoomsOpen((open) => !open);
+                          } else if (link.label === "Gestión de Reservas") {
+                            setReservationsOpen((open) => !open);
+                          }
+                        }}
+                        aria-expanded={link.label === "Gestionar Habitaciones" ? roomsOpen : reservationsOpen}
+                        aria-controls={link.label === "Gestionar Habitaciones" ? "submenu-habitaciones" : "submenu-reservas"}
                         style={{ minHeight: "40px" }}
                       >
                         {link.icon && (
@@ -178,7 +236,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         )}
                         <span className="flex-1 text-left">{link.label}</span>
                         <svg
-                          className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${roomsOpen ? "rotate-90" : ""}`}
+                          className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${
+                            (link.label === "Gestionar Habitaciones" && roomsOpen) ||
+                            (link.label === "Gestión de Reservas" && reservationsOpen)
+                              ? "rotate-90"
+                              : ""
+                          }`}
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -192,9 +255,20 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         </svg>
                       </button>
                       <ul
-                        id="submenu-habitaciones"
-                        className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${roomsOpen ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}
-                        style={{ maxHeight: roomsOpen ? "200px" : "0px" }}
+                        id={link.label === "Gestionar Habitaciones" ? "submenu-habitaciones" : "submenu-reservas"}
+                        className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${
+                          (link.label === "Gestionar Habitaciones" && roomsOpen) ||
+                          (link.label === "Gestión de Reservas" && reservationsOpen)
+                            ? "max-h-96 opacity-100"
+                            : "max-h-0 opacity-0"
+                        }`}
+                        style={{
+                          maxHeight:
+                            (link.label === "Gestionar Habitaciones" && roomsOpen) ||
+                            (link.label === "Gestión de Reservas" && reservationsOpen)
+                              ? "400px"
+                              : "0px",
+                        }}
                       >
                         {link.submenu
                           .filter((sub) => sub.roles.includes(user.role))

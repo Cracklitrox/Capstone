@@ -83,7 +83,7 @@ function RoomDetailsTabsModal({ roomDetails, onShowDetail }) {
       (currentReservation.paidAmount || 0);
     const paymentPercentage =
       currentReservation.totalAmount > 0
-        ? (currentReservation.paidAmount / currentReservation.totalAmount) * 100
+        ? Math.min((currentReservation.paidAmount / currentReservation.totalAmount) * 100, 100)
         : 0;
 
     return (

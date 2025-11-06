@@ -24,6 +24,7 @@ export const LocationCombobox = ({ options, value, onChange, placeholder, disabl
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={`Seleccionar ${placeholder}. Valor actual: ${displayValue}`}
           className="w-full justify-between"
           disabled={disabled}
         >

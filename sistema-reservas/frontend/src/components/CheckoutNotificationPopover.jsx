@@ -78,11 +78,12 @@ function CheckoutNotificationPopover({ isOpen, onClose, onMarkAsRead, onRefetchC
               ¡Atención! Check-outs de Hoy
             </h3>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onClose}
             className="h-8 w-8 rounded-full"
+            aria-label="Cerrar ventana de notificaciones"
           >
             <XMarkIcon className="h-5 w-5" />
           </Button>

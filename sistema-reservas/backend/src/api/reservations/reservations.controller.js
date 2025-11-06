@@ -7,6 +7,367 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 /**
+ * Obtener todas las reservas con filtros opcionales
+ * GET /api/v1/reservations?status=confirmed&limit=50
+ */
+async function getAllReservations(req, res) {
+  try {
+    const { status, limit = 100, offset = 0 } = req.query;
+
+    const where = {
+      deleted_at: null,
+    };
+
+    // Filtro por estado
+    if (status) {
+      where.status = status;
+    }
+
+    const reservations = await prisma.reservations.findMany({
+      where,
+      take: parseInt(limit),
+      skip: parseInt(offset),
+      orderBy: {
+        created_at: 'desc',
+      },
+      include: {
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true,
+            email: true,
+            phone_number: true,
+          },
+        },
+        users_reservations_receptionist_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            email: true,
+          },
+        },
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true,
+              },
+            },
+            room_service_daily: {
+              include: {
+                services: true,
+              },
+            },
+          },
+        },
+        reservation_guests: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+              },
+            },
+          },
+        },
+        reservation_services: {
+          include: {
+            services: true,
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            payment_method: true,
+            status: true,
+            created_at: true,
+          },
+        },
+        additional_charges: {
+          where: {
+            deleted_at: null,
+          },
+          include: {
+            rooms: {
+              select: {
+                room_number: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Transformar la respuesta para que sea más amigable para el frontend (sin duplicados)
+    const transformedReservations = reservations.map((reservation) => {
+      const mainGuest = reservation.users_reservations_main_guest_idTousers;
+      const receptionist = reservation.users_reservations_receptionist_idTousers;
+
+      // Transformar reservation_guests para que el frontend pueda usar los nombres antiguos
+      const transformedGuests = reservation.reservation_guests?.map(rg => ({
+        ...rg,
+        guests: rg.users ? {
+          ...rg.users,
+          last_name_father: rg.users.paternal_last_name,
+          last_name_mother: rg.users.maternal_last_name,
+          rut: rg.users.identification_number,
+        } : null,
+      })) || [];
+
+      // Transformar reservation_rooms eliminando room_types duplicado
+      const transformedRooms = reservation.reservation_rooms?.map(rr => {
+        const { room_types, ...roomWithoutDuplicates } = rr.rooms || {};
+        return {
+          ...rr,
+          rooms: rr.rooms ? {
+            ...roomWithoutDuplicates,
+            room_type: rr.rooms.room_types,
+          } : null,
+        };
+      }) || [];
+
+      // Transformar payments eliminando payment_method duplicado
+      const transformedPayments = reservation.payments?.map(({ payment_method, ...payment }) => ({
+        ...payment,
+        method: payment_method,
+      })) || [];
+
+      // Eliminar relaciones de Prisma duplicadas
+      const {
+        users_reservations_main_guest_idTousers,
+        users_reservations_receptionist_idTousers,
+        ...reservationWithoutPrismaRelations
+      } = reservation;
+
+      return {
+        ...reservationWithoutPrismaRelations,
+        main_guest: mainGuest ? {
+          ...mainGuest,
+          last_name_father: mainGuest.paternal_last_name,
+          last_name_mother: mainGuest.maternal_last_name,
+          rut: mainGuest.identification_number,
+          phone: mainGuest.phone_number,
+        } : null,
+        receptionist: receptionist ? {
+          ...receptionist,
+          last_name_father: receptionist.paternal_last_name,
+          last_name_mother: receptionist.maternal_last_name,
+        } : null,
+        reservation_guests: transformedGuests,
+        reservation_rooms: transformedRooms,
+        payments: transformedPayments,
+      };
+    });
+
+    return res.status(200).json({
+      reservations: transformedReservations,
+      total: transformedReservations.length,
+    });
+  } catch (error) {
+    console.error('Error al obtener reservas:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener reservas: ${error.message}`,
+      originModule: 'reservations.controller - getAllReservations',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: 'Error al obtener reservas',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Obtener una reserva por ID
+ * GET /api/v1/reservations/:id
+ */
+async function getReservationById(req, res) {
+  try {
+    const { id } = req.params;
+    const reservationId = parseInt(id);
+
+    if (isNaN(reservationId)) {
+      return res.status(400).json({ message: 'ID de reserva inválido' });
+    }
+
+    const reservation = await prisma.reservations.findUnique({
+      where: { id: reservationId },
+      include: {
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true,
+            email: true,
+            phone_number: true,
+          },
+        },
+        users_reservations_receptionist_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            email: true,
+          },
+        },
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true,
+              },
+            },
+            room_service_daily: {
+              include: {
+                services: true,
+              },
+            },
+          },
+        },
+        reservation_guests: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+              },
+            },
+          },
+        },
+        reservation_services: {
+          include: {
+            services: true,
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            payment_method: true,
+            status: true,
+            created_at: true,
+          },
+        },
+        additional_charges: {
+          where: {
+            deleted_at: null,
+          },
+          include: {
+            rooms: {
+              select: {
+                room_number: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!reservation || reservation.deleted_at) {
+      return res.status(404).json({ message: 'Reserva no encontrada' });
+    }
+
+    // Transformar para frontend (eliminando campos duplicados de Prisma)
+    const mainGuest = reservation.users_reservations_main_guest_idTousers;
+    const receptionist = reservation.users_reservations_receptionist_idTousers;
+
+    const transformedGuests = reservation.reservation_guests?.map(rg => ({
+      ...rg,
+      guests: rg.users ? {
+        ...rg.users,
+        last_name_father: rg.users.paternal_last_name,
+        last_name_mother: rg.users.maternal_last_name,
+        rut: rg.users.identification_number,
+      } : null,
+    })) || [];
+
+    const transformedRooms = reservation.reservation_rooms?.map(rr => {
+      const { room_types, ...roomWithoutDuplicates } = rr.rooms || {};
+      return {
+        ...rr,
+        rooms: rr.rooms ? {
+          ...roomWithoutDuplicates,
+          room_type: rr.rooms.room_types,
+        } : null,
+      };
+    }) || [];
+
+    const transformedPayments = reservation.payments?.map(({ payment_method, ...payment }) => ({
+      ...payment,
+      method: payment_method,
+    })) || [];
+
+    // Eliminar campos duplicados de Prisma en el objeto principal
+    const {
+      users_reservations_main_guest_idTousers,
+      users_reservations_receptionist_idTousers,
+      ...reservationWithoutPrismaRelations
+    } = reservation;
+
+    const transformed = {
+      ...reservationWithoutPrismaRelations,
+      main_guest: mainGuest ? {
+        ...mainGuest,
+        last_name_father: mainGuest.paternal_last_name,
+        last_name_mother: mainGuest.maternal_last_name,
+        rut: mainGuest.identification_number,
+        phone: mainGuest.phone_number,
+      } : null,
+      receptionist: receptionist ? {
+        ...receptionist,
+        last_name_father: receptionist.paternal_last_name,
+        last_name_mother: receptionist.maternal_last_name,
+      } : null,
+      reservation_guests: transformedGuests,
+      reservation_rooms: transformedRooms,
+      payments: transformedPayments,
+    };
+
+    console.log('🔍 Backend getReservationById - Enviando response:', JSON.stringify({
+      reservationId: transformed.id,
+      main_guest: transformed.main_guest,
+      reservation_rooms_count: transformed.reservation_rooms?.length,
+      reservation_rooms: transformed.reservation_rooms,
+      reservation_guests_count: transformed.reservation_guests?.length,
+      payments_count: transformed.payments?.length,
+    }, null, 2));
+
+    return res.status(200).json({ reservation: transformed });
+  } catch (error) {
+    console.error('Error al obtener reserva:', error);
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener reserva ${req.params.id}: ${error.message}`,
+      originModule: 'reservations.controller - getReservationById',
+      severity: 'medium',
+      errorObject: error,
+    });
+    return res.status(500).json({ message: 'Error al obtener reserva', error: error.message });
+  }
+}
+
+/**
  * Buscar disponibilidad de habitaciones
  */
 async function searchAvailability(req, res) {
@@ -450,20 +811,7 @@ async function getHistory(req, res) {
 
     return res.status(200).json({
       reservationId: parseInt(id),
-      history: history.map(h => ({
-        id: h.id,
-        changeType: h.change_type,
-        fieldChanged: h.field_changed,
-        oldValue: h.old_value,
-        newValue: h.new_value,
-        changedBy: h.changed_by_user ? {
-          id: h.changed_by_user.id,
-          name: `${h.changed_by_user.first_name} ${h.changed_by_user.paternal_last_name}`
-        } : null,
-        reason: h.change_reason,
-        metadata: h.metadata,
-        createdAt: h.created_at
-      }))
+      history
     });
 
   } catch (error) {
@@ -519,6 +867,8 @@ async function getValidTransitions(req, res) {
 }
 
 module.exports = {
+  getAllReservations,
+  getReservationById,
   searchAvailability,
   calculatePrice,
   createReservation,

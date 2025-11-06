@@ -135,7 +135,7 @@ export const ReservationDetailView = ({ item, onBack }) => {
 
   // Progreso de pago
   const paymentProgress =
-    item.totalAmount > 0 ? (item.paidAmount / item.totalAmount) * 100 : 0;
+    item.totalAmount > 0 ? Math.min((item.paidAmount / item.totalAmount) * 100, 100) : 0;
 
   return (
     <div>

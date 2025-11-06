@@ -47,6 +47,7 @@ const Navbar = ({ toggleSidebar, markAsRead }) => {
           variant="ghost"
           size="icon"
           className="md:hidden"
+          aria-label="Abrir menú de navegación"
         >
           <Bars3Icon className="h-6 w-6" />
         </Button>
@@ -86,6 +87,7 @@ const Navbar = ({ toggleSidebar, markAsRead }) => {
               size="icon"
               className="relative"
               title="Ver checkouts de hoy"
+              aria-label={`Ver checkouts de hoy. ${checkoutCount > 0 ? `${checkoutCount} pendientes` : 'No hay pendientes'}`}
             >
               <BellAlertIcon className="h-6 w-6" />
               {checkoutCount > 0 && (

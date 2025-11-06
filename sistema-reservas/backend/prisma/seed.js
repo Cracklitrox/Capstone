@@ -721,7 +721,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "occupied",
+      status: "occupied", // Para pending_checkout
     },
     {
       room_number: "104",
@@ -729,7 +729,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "occupied",
+      status: "occupied", // Para pending_checkout
     },
     {
       room_number: "105",
@@ -737,7 +737,7 @@ async function createRooms(roomTypes) {
       room_type_id: dobleDosType.id,
       capacity: 2,
       base_price: 30000,
-      status: "available",
+      status: "occupied", // Para pending_checkout
     },
     {
       room_number: "106",
@@ -753,7 +753,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "cleaning",
+      status: "occupied", // Para pending_checkout
     },
     {
       room_number: "108",
@@ -769,7 +769,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "available",
+      status: "occupied", // Para pending_checkout
     },
     // PISO 2
     {
@@ -778,7 +778,7 @@ async function createRooms(roomTypes) {
       room_type_id: suiteType.id,
       capacity: 2,
       base_price: 45000,
-      status: "available",
+      status: "occupied", // Para pending_checkout
       description: "Suite premium con living",
     },
     {
@@ -788,7 +788,6 @@ async function createRooms(roomTypes) {
       capacity: 2,
       base_price: 40000,
       status: "available",
-      description: "Suite Junior con vista",
     },
     {
       room_number: "203",
@@ -804,7 +803,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "occupied",
+      status: "occupied", // Para in_progress
     },
     {
       room_number: "205",
@@ -828,7 +827,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "pending",
+      status: "occupied", // Para in_progress
     },
     {
       room_number: "208",
@@ -852,7 +851,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "cleaning",
+      status: "occupied", // Para pending_checkout
     },
     {
       room_number: "211",
@@ -876,7 +875,7 @@ async function createRooms(roomTypes) {
       room_type_id: matrimonialType.id,
       capacity: 2,
       base_price: 30000,
-      status: "occupied",
+      status: "occupied", // Para pending_checkout
     },
     // PISO 3
     {
@@ -885,7 +884,7 @@ async function createRooms(roomTypes) {
       room_type_id: cuadrupleType.id,
       capacity: 4,
       base_price: 40000,
-      status: "available",
+      status: "occupied", // Para pending_checkout
       description: "Habitación familiar en último piso",
     },
   ];
@@ -914,187 +913,421 @@ async function createComplexScenarios(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // RESERVAS CON CHECK-OUT HOY (5 reservas)
-  console.log("📅 Creando reservas con check-out HOY...");
-  const occupiedRooms = rooms
-    .filter((r) => r.status === "occupied")
-    .slice(0, 5);
+  console.log("🧠 Creando reservas con lógica inteligente...");
 
-  for (let i = 0; i < Math.min(5, occupiedRooms.length); i++) {
-    const room = occupiedRooms[i];
-    const mainGuest = faker.helpers.arrayElement(completeGuests);
-    const receptionist = faker.helpers.arrayElement(receptionists);
-
-    const stayDays = faker.number.int({ min: 1, max: 3 });
-    const checkInDate = new Date(today);
-    checkInDate.setDate(today.getDate() - stayDays);
-    checkInDate.setHours(8, 0, 0, 0);
-
-    const checkOutToday = new Date(today);
-    checkOutToday.setHours(11, 0, 0, 0);
-
-    const subtotalRoom = room.base_price * stayDays;
-    const service = faker.helpers.arrayElement(services);
-    const serviceQuantity = faker.number.int({ min: 1, max: 3 });
-    const subtotalService = service.price * serviceQuantity;
-    const totalAmount = subtotalRoom + subtotalService;
-
-    await prisma.reservations.create({
-      data: {
-        code: `CHECKOUT-TODAY-${String(i + 1).padStart(3, "0")}`,
-        main_guest_id: mainGuest.id,
-        receptionist_id: receptionist.id,
-        channel: faker.helpers.arrayElement(["reception", "web", "chatbot", "in_person", "walk_in"]),
-        status: "in_progress",
-        check_in_date: checkInDate,
-        check_out_date: checkOutToday,
-        guest_count: faker.number.int({ min: 1, max: room.capacity }),
-        total_amount: totalAmount,
-        paid_amount: totalAmount,
-        reservation_rooms: {
-          create: {
-            room_id: room.id,
-            start_date: checkInDate,
-            end_date: checkOutToday,
-            unit_price: room.base_price,
-            subtotal: subtotalRoom,
-          },
-        },
-        reservation_services: {
-          create: {
-            service_id: service.id,
-            quantity: serviceQuantity,
-            unit_price: service.price,
-            subtotal: subtotalService,
-          },
-        },
-        payments: {
-          create: {
-            amount: totalAmount,
-            payment_method: faker.helpers.arrayElement([
-              "credit_card",
-              "debit_card",
-              "cash",
-            ]),
-            status: "confirmed",
-            is_deposit: false,
-          },
-        },
-      },
-    });
-  }
-
-  console.log(
-    `✅ ${Math.min(5, occupiedRooms.length)} reservas con check-out HOY creadas`
-  );
-
-  // 50 RESERVAS ADICIONALES (pasadas, futuras)
-  console.log("📋 Creando 50 reservas adicionales...");
-
-  const availableRooms = rooms.filter((r) =>
-    ["available", "pending", "occupied"].includes(r.status)
-  );
-
-  for (let i = 0; i < 50; i++) {
-    const mainGuest = faker.helpers.arrayElement(completeGuests);
-    const receptionist = faker.helpers.arrayElement(receptionists);
-
-    // Rango: últimas 2 semanas O próximas 2 semanas
-    const isPast = faker.datatype.boolean();
-    let checkIn;
-
-    if (isPast) {
-      // Pasadas: últimas 2 semanas
-      checkIn = faker.date.recent({ days: 14, refDate: today });
-    } else {
-      // Futuras: próximas 2 semanas
-      checkIn = faker.date.soon({ days: 14, refDate: today });
-    }
-
-    const stayDays = faker.number.int({ min: 1, max: 7 });
-    const checkOut = new Date(checkIn);
-    checkOut.setDate(checkIn.getDate() + stayDays);
-
-    const reservedRoom = faker.helpers.arrayElement(availableRooms);
-    const subtotalRoom = reservedRoom.base_price * stayDays;
-
-    const service = faker.helpers.arrayElement(services);
-    const serviceQuantity = faker.number.int({ min: 1, max: 2 });
-    const subtotalService = service.price * serviceQuantity;
-    const totalAmount = subtotalRoom + subtotalService;
-
-    const guestCount = faker.number.int({ min: 1, max: reservedRoom.capacity });
-
-    // Crear reservation_guests con mix de completos e incompletos
-    const additionalGuestsData = [];
-    const numAdditional = Math.min(guestCount - 1, 2);
-
-    for (let j = 0; j < numAdditional; j++) {
-      const useIncomplete = faker.datatype.boolean();
-      const additionalGuest = useIncomplete
+  // Helper: crear huéspedes adicionales
+  const createAdditionalGuests = (mainGuestId, maxCount) => {
+    const count = faker.number.int({ min: 0, max: Math.min(maxCount, 2) });
+    const guests = [];
+    for (let i = 0; i < count; i++) {
+      const useIncomplete = faker.datatype.boolean({ probability: 0.3 });
+      const guest = useIncomplete
         ? faker.helpers.arrayElement(incompleteGuests)
-        : faker.helpers.arrayElement(
-            completeGuests.filter((g) => g.id !== mainGuest.id)
-          );
-
-      additionalGuestsData.push({ guest_id: additionalGuest.id });
+        : faker.helpers.arrayElement(completeGuests.filter(g => g.id !== mainGuestId));
+      guests.push({ guest_id: guest.id });
     }
+    return guests;
+  };
+
+  // Helper: calcular totales
+  const calculateTotals = (room, nights, includeService = true) => {
+    const roomTotal = room.base_price * nights;
+    let serviceTotal = 0;
+    let serviceData = null;
+
+    if (includeService && faker.datatype.boolean({ probability: 0.7 })) {
+      const service = faker.helpers.arrayElement(services);
+      const qty = faker.number.int({ min: 1, max: 3 });
+      serviceTotal = service.price * qty;
+      serviceData = { service, quantity: qty, subtotal: serviceTotal };
+    }
+
+    return { roomTotal, serviceTotal, total: roomTotal + serviceTotal, serviceData };
+  };
+
+  let resCounter = 1;
+
+  // 1️⃣ COMPLETADAS (pasado - últimos 30 días): 6 reservas
+  console.log("  ↳ Completadas (pasado)...");
+  const cleaningRooms = rooms.filter(r => r.status === "cleaning");
+  for (let i = 0; i < Math.min(6, cleaningRooms.length); i++) {
+    const room = cleaningRooms[i];
+    const nights = faker.number.int({ min: 2, max: 5 });
+    const checkOut = faker.date.recent({ days: 30, refDate: today });
+    const checkIn = new Date(checkOut);
+    checkIn.setDate(checkOut.getDate() - nights);
+    checkIn.setHours(14, 0, 0, 0);
+    checkOut.setHours(11, 0, 0, 0);
+
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const { roomTotal, serviceTotal, total, serviceData } = calculateTotals(room, nights);
 
     await prisma.reservations.create({
       data: {
         code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
         main_guest_id: mainGuest.id,
-        receptionist_id: receptionist.id,
-        channel: faker.helpers.arrayElement(["reception", "chatbot", "web", "in_person", "walk_in"]),
-        status: isPast
-          ? "completed"
-          : faker.helpers.arrayElement(["pending", "confirmed", "in_progress"]),
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        channel: faker.helpers.arrayElement(["reception", "web", "chatbot"]),
+        status: "completed",
         check_in_date: checkIn,
         check_out_date: checkOut,
-        guest_count: guestCount,
-        total_amount: totalAmount,
-        paid_amount: isPast
-          ? totalAmount
-          : faker.helpers.arrayElement([0, totalAmount / 2, totalAmount]),
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: total,
+        paid_amount: total,
         reservation_rooms: {
           create: {
-            room_id: reservedRoom.id,
+            room_id: room.id,
             start_date: checkIn,
             end_date: checkOut,
-            unit_price: reservedRoom.base_price,
-            subtotal: subtotalRoom,
+            unit_price: room.base_price,
+            subtotal: roomTotal,
           },
         },
-        reservation_services: {
+        reservation_services: serviceData ? {
           create: {
-            service_id: service.id,
-            quantity: serviceQuantity,
-            unit_price: service.price,
-            subtotal: subtotalService,
+            service_id: serviceData.service.id,
+            quantity: serviceData.quantity,
+            unit_price: serviceData.service.price,
+            subtotal: serviceData.subtotal,
           },
-        },
+        } : undefined,
         payments: {
           create: {
-            amount: totalAmount / 2,
-            payment_method: faker.helpers.arrayElement([
-              "credit_card",
-              "bank_transfer",
-              "debit_card",
-              "cash",
-            ]),
+            amount: total,
+            payment_method: faker.helpers.arrayElement(["credit_card", "debit_card", "cash"]),
             status: "confirmed",
-            is_deposit: true,
+            is_deposit: false,
           },
         },
-        reservation_guests:
-          additionalGuestsData.length > 0
-            ? { create: additionalGuestsData }
-            : undefined,
+        reservation_guests: { create: createAdditionalGuests(mainGuest.id, room.capacity - 1) },
       },
     });
   }
 
-  console.log("✅ 50 reservas adicionales creadas");
+  // 2️⃣ CHECK-OUTS HOY (pending_checkout): 6 reservas
+  console.log("  ↳ Check-outs hoy...");
+  const occupiedForCheckout = rooms.filter(r => r.status === "occupied").slice(0, 6);
+  for (let i = 0; i < occupiedForCheckout.length; i++) {
+    const room = occupiedForCheckout[i];
+    const nights = faker.number.int({ min: 2, max: 4 });
+    const checkIn = new Date(today);
+    checkIn.setDate(today.getDate() - nights);
+    checkIn.setHours(14, 0, 0, 0);
+    const checkOut = new Date(today);
+    checkOut.setHours(11, 0, 0, 0);
+
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const { roomTotal, serviceTotal, total, serviceData } = calculateTotals(room, nights);
+
+    // 50% con saldo pendiente, 50% pagado completo
+    const hasPending = faker.datatype.boolean();
+    const paidAmount = hasPending ? total * 0.8 : total;
+
+    await prisma.reservations.create({
+      data: {
+        code: `CHECKOUT-TODAY-${String(i + 1).padStart(3, "0")}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        channel: faker.helpers.arrayElement(["reception", "web"]),
+        status: "pending_checkout",
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: total,
+        paid_amount: paidAmount,
+        reservation_rooms: {
+          create: {
+            room_id: room.id,
+            start_date: checkIn,
+            end_date: checkOut,
+            unit_price: room.base_price,
+            subtotal: roomTotal,
+          },
+        },
+        reservation_services: serviceData ? {
+          create: {
+            service_id: serviceData.service.id,
+            quantity: serviceData.quantity,
+            unit_price: serviceData.service.price,
+            subtotal: serviceData.subtotal,
+          },
+        } : undefined,
+        payments: {
+          create: {
+            amount: paidAmount,
+            payment_method: faker.helpers.arrayElement(["credit_card", "bank_transfer"]),
+            status: "confirmed",
+            is_deposit: false,
+          },
+        },
+        reservation_guests: { create: createAdditionalGuests(mainGuest.id, room.capacity - 1) },
+      },
+    });
+  }
+
+  // 3️⃣ EN PROGRESO (in_progress): 2 reservas
+  console.log("  ↳ En progreso...");
+  const occupiedForProgress = rooms.filter(r => r.status === "occupied").slice(6, 8);
+  for (let i = 0; i < occupiedForProgress.length; i++) {
+    const room = occupiedForProgress[i];
+    const nightsPast = faker.number.int({ min: 1, max: 3 });
+    const nightsFuture = faker.number.int({ min: 2, max: 5 });
+    const totalNights = nightsPast + nightsFuture;
+
+    const checkIn = new Date(today);
+    checkIn.setDate(today.getDate() - nightsPast);
+    checkIn.setHours(14, 0, 0, 0);
+    const checkOut = new Date(today);
+    checkOut.setDate(today.getDate() + nightsFuture);
+    checkOut.setHours(11, 0, 0, 0);
+
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const { roomTotal, serviceTotal, total, serviceData } = calculateTotals(room, totalNights);
+
+    // Algunos con cargos adicionales pendientes
+    const hasExtraCharges = faker.datatype.boolean({ probability: 0.4 });
+    const extraCharge = hasExtraCharges ? faker.number.int({ min: 5000, max: 15000 }) : 0;
+    const finalTotal = total + extraCharge;
+    const paidAmount = total; // Pagaron lo original, falta el cargo extra
+
+    await prisma.reservations.create({
+      data: {
+        code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        channel: faker.helpers.arrayElement(["reception", "chatbot", "web"]),
+        status: "in_progress",
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: finalTotal,
+        paid_amount: paidAmount,
+        reservation_rooms: {
+          create: {
+            room_id: room.id,
+            start_date: checkIn,
+            end_date: checkOut,
+            unit_price: room.base_price,
+            subtotal: roomTotal,
+          },
+        },
+        reservation_services: serviceData ? {
+          create: {
+            service_id: serviceData.service.id,
+            quantity: serviceData.quantity,
+            unit_price: serviceData.service.price,
+            subtotal: serviceData.subtotal,
+          },
+        } : undefined,
+        payments: {
+          create: {
+            amount: paidAmount,
+            payment_method: faker.helpers.arrayElement(["credit_card", "debit_card"]),
+            status: "confirmed",
+            is_deposit: false,
+          },
+        },
+        additional_charges: hasExtraCharges ? {
+          create: {
+            charge_type: faker.helpers.arrayElement(["minibar", "extra_service", "room_damage"]),
+            description: "Cargo adicional durante estadía",
+            amount: extraCharge,
+            quantity: 1,
+            subtotal: extraCharge,
+            charged_by_id: faker.helpers.arrayElement(receptionists).id,
+            room_id: room.id,
+          },
+        } : undefined,
+        reservation_guests: { create: createAdditionalGuests(mainGuest.id, room.capacity - 1) },
+      },
+    });
+  }
+
+  // 4️⃣ CHECK-INS HOY (ready_for_checkin): 2 reservas
+  console.log("  ↳ Check-ins hoy...");
+  const availableForCheckin = rooms.filter(r => r.status === "available").slice(0, 2);
+  for (let i = 0; i < availableForCheckin.length; i++) {
+    const room = availableForCheckin[i];
+    const nights = faker.number.int({ min: 2, max: 6 });
+    const checkIn = new Date(today);
+    checkIn.setHours(14, 0, 0, 0);
+    const checkOut = new Date(today);
+    checkOut.setDate(today.getDate() + nights);
+    checkOut.setHours(11, 0, 0, 0);
+
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const { roomTotal, serviceTotal, total, serviceData } = calculateTotals(room, nights);
+
+    // 70% pagado completo, 30% con 80%
+    const paidAmount = faker.datatype.boolean({ probability: 0.7 }) ? total : total * 0.8;
+
+    await prisma.reservations.create({
+      data: {
+        code: `CHECKIN-TODAY-${String(i + 1).padStart(3, "0")}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        channel: faker.helpers.arrayElement(["web", "chatbot", "reception"]),
+        status: "ready_for_checkin",
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: total,
+        paid_amount: paidAmount,
+        reservation_rooms: {
+          create: {
+            room_id: room.id,
+            start_date: checkIn,
+            end_date: checkOut,
+            unit_price: room.base_price,
+            subtotal: roomTotal,
+          },
+        },
+        reservation_services: serviceData ? {
+          create: {
+            service_id: serviceData.service.id,
+            quantity: serviceData.quantity,
+            unit_price: serviceData.service.price,
+            subtotal: serviceData.subtotal,
+          },
+        } : undefined,
+        payments: {
+          create: {
+            amount: paidAmount,
+            payment_method: faker.helpers.arrayElement(["credit_card", "bank_transfer"]),
+            status: "confirmed",
+            is_deposit: paidAmount < total,
+          },
+        },
+        reservation_guests: { create: createAdditionalGuests(mainGuest.id, room.capacity - 1) },
+      },
+    });
+  }
+
+  // 5️⃣ CONFIRMADAS (próximos 2-7 días): 5 reservas
+  console.log("  ↳ Confirmadas (futuro cercano)...");
+  const availableForConfirmed = rooms.filter(r => r.status === "available").slice(2, 7);
+  for (let i = 0; i < availableForConfirmed.length; i++) {
+    const room = availableForConfirmed[i];
+    const nights = faker.number.int({ min: 2, max: 7 });
+    const daysUntilCheckin = faker.number.int({ min: 2, max: 7 });
+    const checkIn = new Date(today);
+    checkIn.setDate(today.getDate() + daysUntilCheckin);
+    checkIn.setHours(14, 0, 0, 0);
+    const checkOut = new Date(checkIn);
+    checkOut.setDate(checkIn.getDate() + nights);
+    checkOut.setHours(11, 0, 0, 0);
+
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const { roomTotal, serviceTotal, total, serviceData } = calculateTotals(room, nights);
+
+    // 60% pagado 50%, 40% pagado completo
+    const paidAmount = faker.datatype.boolean({ probability: 0.6 }) ? total * 0.5 : total;
+
+    await prisma.reservations.create({
+      data: {
+        code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        channel: faker.helpers.arrayElement(["web", "chatbot", "in_person"]),
+        status: "confirmed",
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: total,
+        paid_amount: paidAmount,
+        reservation_rooms: {
+          create: {
+            room_id: room.id,
+            start_date: checkIn,
+            end_date: checkOut,
+            unit_price: room.base_price,
+            subtotal: roomTotal,
+          },
+        },
+        reservation_services: serviceData ? {
+          create: {
+            service_id: serviceData.service.id,
+            quantity: serviceData.quantity,
+            unit_price: serviceData.service.price,
+            subtotal: serviceData.subtotal,
+          },
+        } : undefined,
+        payments: {
+          create: {
+            amount: paidAmount,
+            payment_method: faker.helpers.arrayElement(["bank_transfer", "credit_card"]),
+            status: "confirmed",
+            is_deposit: paidAmount < total,
+          },
+        },
+        reservation_guests: { create: createAdditionalGuests(mainGuest.id, room.capacity - 1) },
+      },
+    });
+  }
+
+  // 6️⃣ PENDIENTES (8-30 días futuro): 5 reservas
+  console.log("  ↳ Pendientes (futuro lejano)...");
+  const availableForPending = rooms.filter(r => r.status === "available").slice(7, 12);
+  for (let i = 0; i < availableForPending.length; i++) {
+    const room = availableForPending[i];
+    const nights = faker.number.int({ min: 1, max: 5 });
+    const daysUntilCheckin = faker.number.int({ min: 8, max: 30 });
+    const checkIn = new Date(today);
+    checkIn.setDate(today.getDate() + daysUntilCheckin);
+    checkIn.setHours(14, 0, 0, 0);
+    const checkOut = new Date(checkIn);
+    checkOut.setDate(checkIn.getDate() + nights);
+    checkOut.setHours(11, 0, 0, 0);
+
+    const mainGuest = faker.helpers.arrayElement(completeGuests);
+    const { roomTotal, serviceTotal, total, serviceData } = calculateTotals(room, nights);
+
+    // 70% sin pago, 30% con 30% pagado
+    const paidAmount = faker.datatype.boolean({ probability: 0.3 }) ? total * 0.3 : 0;
+
+    await prisma.reservations.create({
+      data: {
+        code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
+        main_guest_id: mainGuest.id,
+        receptionist_id: faker.helpers.arrayElement(receptionists).id,
+        channel: faker.helpers.arrayElement(["chatbot", "web", "in_person"]),
+        status: "pending",
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        guest_count: faker.number.int({ min: 1, max: room.capacity }),
+        total_amount: total,
+        paid_amount: paidAmount,
+        reservation_rooms: {
+          create: {
+            room_id: room.id,
+            start_date: checkIn,
+            end_date: checkOut,
+            unit_price: room.base_price,
+            subtotal: roomTotal,
+          },
+        },
+        reservation_services: serviceData ? {
+          create: {
+            service_id: serviceData.service.id,
+            quantity: serviceData.quantity,
+            unit_price: serviceData.service.price,
+            subtotal: serviceData.subtotal,
+          },
+        } : undefined,
+        payments: paidAmount > 0 ? {
+          create: {
+            amount: paidAmount,
+            payment_method: "bank_transfer",
+            status: "confirmed",
+            is_deposit: true,
+          },
+        } : undefined,
+        reservation_guests: { create: createAdditionalGuests(mainGuest.id, room.capacity - 1) },
+      },
+    });
+  }
+
+  console.log("✅ 26 reservas inteligentes creadas (6 completadas + 6 checkout hoy + 2 en progreso + 2 checkin hoy + 5 confirmadas + 5 pendientes)");
 
   // ALERTAS, MANTENIMIENTO, LIMPIEZA
   console.log("🔧 Creando mantenimiento y alertas...");
@@ -1123,7 +1356,10 @@ async function createComplexScenarios(
     });
   }
 
-  const cleaningRooms = rooms.filter((r) => r.status === "cleaning");
+  // ❌ COMENTADO: Ya no se crean cleaning_records directamente
+  // Los cleaning_records se crean automáticamente cuando se hace checkout de una reserva
+  // Esto sigue el flujo real: checkout → estado cleaning + cleaning_record → completar limpieza → available
+  /*
   for (const room of cleaningRooms) {
     await prisma.cleaning_records.create({
       data: {
@@ -1141,8 +1377,9 @@ async function createComplexScenarios(
       },
     });
   }
+  */
 
-  console.log("✅ Mantenimiento, alertas y limpieza creados");
+  console.log("✅ Mantenimiento y alertas creados");
 }
 
 async function main() {
