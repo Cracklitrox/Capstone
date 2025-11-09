@@ -118,11 +118,13 @@ class WhatsAppService {
     try {
       const { phoneNumber, data } = session;
 
-      // Verificar si ya existe una solicitud pendiente reciente (últimas 24 horas) y no vista
+      // Verificar si ya existe una solicitud IDÉNTICA pendiente reciente (últimas 24 horas)
+      // Solo bloqueamos si es la misma habitación con las mismas fechas
       const yesterday = new Date();
       yesterday.setHours(yesterday.getHours() - 24);
 
-      const existingAlert = await prisma.alerts.findFirst({
+      // Buscar todas las alertas pendientes recientes del mismo teléfono
+      const existingAlerts = await prisma.alerts.findMany({
         where: {
           type: 'booking_request',
           status: 'pending',
@@ -137,9 +139,28 @@ class WhatsAppService {
         }
       });
 
-      if (existingAlert) {
-        console.log(`⚠️ Ya existe una solicitud pendiente reciente para ${phoneNumber} (ID: ${existingAlert.id})`);
+      // Verificar si alguna de las alertas existentes tiene la misma habitación y fechas
+      const isDuplicate = existingAlerts.some(alert => {
+        const summary = alert.full_summary;
+
+        // Verificar si es la misma combinación de tipo de habitación, check-in y check-out
+        const sameRoomType = summary?.reservation?.room_type_id === data.roomTypeId;
+        const sameCheckIn = summary?.reservation?.check_in === (data.checkInDateFormatted || data.checkInDate);
+        const sameCheckOut = summary?.reservation?.check_out === (data.checkOutDateFormatted || data.checkOutDate);
+
+        return sameRoomType && sameCheckIn && sameCheckOut;
+      });
+
+      if (isDuplicate) {
+        console.log(`⚠️ Ya existe una solicitud idéntica (misma habitación y fechas) para ${phoneNumber}`);
         throw new Error('DUPLICATE_REQUEST');
+      }
+
+      console.log(`✅ Permitiendo nueva reserva para ${phoneNumber} (habitación diferente o fechas diferentes)`);
+
+      // Si hay alertas existentes pero son para habitaciones o fechas diferentes, mostrar info
+      if (existingAlerts.length > 0) {
+        console.log(`ℹ️ El cliente ${phoneNumber} tiene ${existingAlerts.length} solicitud(es) pendiente(s) adicional(es)`);
       }
 
       // Calcular costos para el resumen

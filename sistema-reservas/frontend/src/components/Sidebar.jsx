@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useSocketNotifications } from "../hooks/useSocketNotifications.js";
+import { useNotificationsContext } from "../hooks/useNotificationsContext";
 import { Button } from "@/components/ui/Button.jsx";
 import {
   HomeIcon,
@@ -46,6 +47,7 @@ const navLinks = [
         label: "Centro de Notificaciones",
         icon: BellIcon,
         roles: ["administrator", "receptionist"],
+        showBadge: true, // ✅ Mostrar badge de notificaciones no leídas
       },
       {
         href: "/notifications/checkouts",
@@ -155,9 +157,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     'gestionar-habitaciones': false,
     'notificaciones': false,
   });
-  
+
   // ⭐ Usar WebSocket en lugar de polling
   const { checkoutCount, whatsappCount, isConnected } = useSocketNotifications();
+
+  // ⭐ Obtener contador de notificaciones no leídas
+  const { unreadCount } = useNotificationsContext();
 
   const toggleMenu = (menuKey) => {
     setOpenMenus((prev) => ({
@@ -233,7 +238,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                             // Determinar qué contador usar según el href
                             let badgeValue = null;
                             if (sub.showBadge) {
-                              if (sub.href === '/notifications/checkouts') {
+                              if (sub.href === '/notifications') {
+                                badgeValue = unreadCount; // ⭐ Contador de notificaciones no leídas
+                              } else if (sub.href === '/notifications/checkouts') {
                                 badgeValue = checkoutCount;
                               } else if (sub.href === '/notifications/chatbot') {
                                 badgeValue = whatsappCount;

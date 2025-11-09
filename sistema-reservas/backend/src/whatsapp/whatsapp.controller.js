@@ -100,12 +100,12 @@ class WhatsAppController {
           await whatsappService.clearSession(phoneNumber);
         } catch (alertError) {
           if (alertError.message === 'DUPLICATE_REQUEST') {
-            // Ya existe una solicitud pendiente
+            // Ya existe una solicitud idéntica (misma habitación y fechas)
             const duplicateMessage =
-              '⚠️ *Solicitud Pendiente*\n\n' +
-              'Ya tienes una solicitud de reserva pendiente.\n\n' +
+              '⚠️ *Solicitud Duplicada*\n\n' +
+              'Ya tienes una solicitud pendiente para esta *misma habitación y fechas*.\n\n' +
               'Un recepcionista la revisará pronto y se contactará contigo.\n\n' +
-              'Por favor espera su respuesta antes de crear una nueva solicitud.';
+              '💡 *Tip:* Si deseas reservar una *habitación diferente*, puedes iniciar una nueva reserva escribiendo "Hola" o "Reserva".';
 
             await whatsappService.sendMessage(from, duplicateMessage);
             await whatsappService.clearSession(phoneNumber);
