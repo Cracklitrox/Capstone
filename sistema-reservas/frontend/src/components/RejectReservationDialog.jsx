@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,23 +9,58 @@ import {
 } from './ui/Dialog';
 import { Button } from './ui/Button';
 import { Textarea } from './ui/Textarea';
-import { XCircle, AlertTriangle } from 'lucide-react';
+import { XCircle, AlertTriangle, CheckCircle } from 'lucide-react';
 
 /**
  * Diálogo de rechazo para rechazar una solicitud de reserva con motivo
  */
 export function RejectReservationDialog({ open, onOpenChange, guestName, onReject, loading = false }) {
   const [reason, setReason] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleReject = () => {
-    onReject(reason);
-    setReason(''); // Limpiar el campo después de rechazar
+  useEffect(() => {
+    if (!open) {
+      // Reset state when dialog closes
+      setTimeout(() => {
+        setShowSuccess(false);
+        setReason('');
+      }, 300);
+    }
+  }, [open]);
+
+  const handleReject = async () => {
+    await onReject(reason);
+    setShowSuccess(true);
+    // Close dialog after showing success message
+    setTimeout(() => {
+      onOpenChange(false);
+    }, 2000);
   };
 
   const handleCancel = () => {
     setReason(''); // Limpiar el campo al cancelar
     onOpenChange(false);
   };
+
+  if (showSuccess) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[450px]">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="p-4 bg-orange-100 dark:bg-orange-900/30 rounded-full mb-4">
+              <CheckCircle className="h-12 w-12 text-orange-600 dark:text-orange-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-2">
+              Solicitud Rechazada
+            </h3>
+            <p className="text-muted-foreground">
+              Se ha notificado al cliente por WhatsApp
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -59,6 +59,7 @@ const navLinks = [
         label: "Chatbot WhatsApp",
         icon: MessageSquare,
         roles: ["receptionist"], // ⭐ SOLO recepcionista
+        showBadge: true, // ✅ Mostrar badge de WhatsApp
       },
     ],
   },
@@ -156,7 +157,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   });
   
   // ⭐ Usar WebSocket en lugar de polling
-  const { checkoutCount, isConnected } = useSocketNotifications();
+  const { checkoutCount, whatsappCount, isConnected } = useSocketNotifications();
 
   const toggleMenu = (menuKey) => {
     setOpenMenus((prev) => ({
@@ -228,25 +229,37 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       >
                         {link.submenu
                           .filter((sub) => sub.roles.includes(user.role))
-                          .map((sub) => (
-                            <li key={sub.label} className="w-full">
-                              <NavLink
-                                href={sub.href}
-                                label={sub.label}
-                                icon={sub.icon}
-                                onClick={closeSidebar}
-                                className="px-2 py-2 rounded-md hover:bg-[var(--card)] transition text-sm min-w-0 flex-1 text-left break-words whitespace-normal sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg 2xl:max-w-xl"
-                                style={{
-                                  wordBreak: "break-word",
-                                  whiteSpace: "normal",
-                                  maxWidth: "100%",
-                                  overflowWrap: "break-word",
-                                  hyphens: "auto",
-                                }}
-                                badge={sub.showBadge ? checkoutCount : null}
-                              />
-                            </li>
-                          ))}
+                          .map((sub) => {
+                            // Determinar qué contador usar según el href
+                            let badgeValue = null;
+                            if (sub.showBadge) {
+                              if (sub.href === '/notifications/checkouts') {
+                                badgeValue = checkoutCount;
+                              } else if (sub.href === '/notifications/chatbot') {
+                                badgeValue = whatsappCount;
+                              }
+                            }
+
+                            return (
+                              <li key={sub.label} className="w-full">
+                                <NavLink
+                                  href={sub.href}
+                                  label={sub.label}
+                                  icon={sub.icon}
+                                  onClick={closeSidebar}
+                                  className="px-2 py-2 rounded-md hover:bg-[var(--card)] transition text-sm min-w-0 flex-1 text-left break-words whitespace-normal sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg 2xl:max-w-xl"
+                                  style={{
+                                    wordBreak: "break-word",
+                                    whiteSpace: "normal",
+                                    maxWidth: "100%",
+                                    overflowWrap: "break-word",
+                                    hyphens: "auto",
+                                  }}
+                                  badge={badgeValue}
+                                />
+                              </li>
+                            );
+                          })}
                       </ul>
                     </li>
                   ) : (

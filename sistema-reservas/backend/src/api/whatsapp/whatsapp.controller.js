@@ -16,7 +16,7 @@ async function getWhatsAppBookingAlerts(req, res) {
     const whereClause = {
       type: 'booking_request',
     };
-    
+
     // Si solo queremos no vistas, filtrar por pending y last_viewed_at null
     if (onlyUnviewed === 'true') {
       whereClause.status = 'pending';
@@ -274,9 +274,135 @@ async function confirmWhatsAppBookingAlert(req, res) {
   }
 }
 
+/**
+ * Eliminar una alerta de WhatsApp
+ * - Elimina permanentemente el registro de la tabla alerts
+ * - Solo para alertas confirmadas o rechazadas
+ */
+async function deleteWhatsAppBookingAlert(req, res) {
+  try {
+    const { alertId } = req.params;
+
+    // Buscar la alerta
+    const alert = await prisma.alerts.findUnique({
+      where: { id: parseInt(alertId) },
+    });
+
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        message: 'Alerta no encontrada',
+      });
+    }
+
+    // Verificar que la alerta esté confirmada o rechazada
+    if (alert.status !== 'resolved' && alert.status !== 'ignored') {
+      return res.status(400).json({
+        success: false,
+        message: 'Solo se pueden eliminar alertas confirmadas o rechazadas',
+      });
+    }
+
+    // Eliminar la alerta permanentemente
+    await prisma.alerts.delete({
+      where: { id: parseInt(alertId) },
+    });
+
+    console.log(`🗑️ Alerta ${alertId} eliminada permanentemente`);
+
+    res.json({
+      success: true,
+      message: 'Alerta eliminada correctamente',
+      data: {
+        alertId: parseInt(alertId),
+      },
+    });
+  } catch (error) {
+    console.error('Error al eliminar alerta:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar la alerta',
+    });
+  }
+}
+
+/**
+ * Eliminar múltiples alertas de WhatsApp (bulk delete)
+ * - Elimina permanentemente múltiples registros de la tabla alerts
+ * - Solo para alertas confirmadas o rechazadas
+ * Body: { alertIds: [1, 2, 3] }
+ */
+async function deleteMultipleWhatsAppBookingAlerts(req, res) {
+  try {
+    const { alertIds } = req.body;
+
+    // Validar que alertIds sea un array
+    if (!Array.isArray(alertIds) || alertIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar un array de IDs de alertas',
+      });
+    }
+
+    // Buscar todas las alertas
+    const alerts = await prisma.alerts.findMany({
+      where: {
+        id: {
+          in: alertIds.map(id => parseInt(id)),
+        },
+      },
+    });
+
+    // Verificar que todas las alertas existan
+    if (alerts.length !== alertIds.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Una o más alertas no fueron encontradas',
+      });
+    }
+
+    // Verificar que todas las alertas estén confirmadas o rechazadas
+    const invalidAlerts = alerts.filter(
+      alert => alert.status !== 'resolved' && alert.status !== 'ignored'
+    );
+
+    if (invalidAlerts.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Solo se pueden eliminar alertas confirmadas o rechazadas',
+      });
+    }
+
+    // Eliminar todas las alertas
+    const result = await prisma.alerts.deleteMany({
+      where: {
+        id: {
+          in: alertIds.map(id => parseInt(id)),
+        },
+      },
+    });
+
+    console.log(`🗑️ ${result.count} alertas eliminadas permanentemente`);
+
+    res.json({
+      success: true,
+      message: `${result.count} alerta${result.count !== 1 ? 's' : ''} eliminada${result.count !== 1 ? 's' : ''} correctamente`,
+      count: result.count,
+    });
+  } catch (error) {
+    console.error('Error al eliminar múltiples alertas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar las alertas',
+    });
+  }
+}
+
 module.exports = {
   getWhatsAppBookingAlerts,
   markWhatsAppAlertsAsViewed,
   rejectWhatsAppBookingAlert,
   confirmWhatsAppBookingAlert,
+  deleteWhatsAppBookingAlert,
+  deleteMultipleWhatsAppBookingAlerts,
 };

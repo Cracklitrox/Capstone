@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -7,12 +8,50 @@ import {
   DialogTitle,
 } from './ui/Dialog';
 import { Button } from './ui/Button';
-import { CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, PartyPopper } from 'lucide-react';
 
 /**
  * Diálogo de confirmación para aceptar una solicitud de reserva
  */
 export function ConfirmReservationDialog({ open, onOpenChange, guestName, onConfirm, loading = false }) {
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      // Reset success state when dialog closes
+      setTimeout(() => setShowSuccess(false), 300);
+    }
+  }, [open]);
+
+  const handleConfirm = async () => {
+    await onConfirm();
+    setShowSuccess(true);
+    // Close dialog after showing success message
+    setTimeout(() => {
+      onOpenChange(false);
+    }, 2000);
+  };
+
+  if (showSuccess) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[450px]">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-full mb-4 animate-bounce">
+              <PartyPopper className="h-12 w-12 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
+              ¡Reserva Confirmada!
+            </h3>
+            <p className="text-muted-foreground">
+              Se ha enviado la confirmación al cliente por WhatsApp
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -54,7 +93,7 @@ export function ConfirmReservationDialog({ open, onOpenChange, guestName, onConf
           </Button>
           <Button
             type="button"
-            onClick={onConfirm}
+            onClick={handleConfirm}
             disabled={loading}
             className="bg-green-600 hover:bg-green-700 text-white"
           >

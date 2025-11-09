@@ -245,6 +245,30 @@ export async function getNotificationReadStats(token, notificationId) {
   return response.json();
 }
 
+// ==================== ALERTAS ====================
+
+/**
+ * Obtiene el conteo de todas las alertas agrupadas por tipo
+ * @param {string} token - JWT token de autenticación
+ * @returns {Promise<Object>} Objeto con conteos por tipo de alerta
+ */
+export async function getAllAlertsCount(token) {
+  const response = await fetch(`${API_BASE_URL}/notifications/alerts-count`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al obtener el conteo de alertas');
+  }
+
+  return response.json();
+}
+
 // ==================== ALERTAS DE CHECK-OUT ====================
 
 /**
