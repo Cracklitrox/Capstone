@@ -14,7 +14,8 @@
       "Bash(git commit:*)",
       "Bash(docker-compose down:*)",
       "Bash(docker-compose up:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
