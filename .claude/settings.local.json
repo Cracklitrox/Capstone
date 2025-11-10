@@ -15,7 +15,10 @@
       "Bash(docker-compose down:*)",
       "Bash(docker-compose up:*)",
       "Bash(docker exec:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(echo:*)",
+      "Bash(prisma/migrations/20251110000000_init_complete_schema/migration.sql)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

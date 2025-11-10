@@ -28,6 +28,8 @@ model alert_read_status {
   updated_at DateTime?          @default(now()) @db.Timestamp(6)
   alerts     alerts             @relation(fields: [alert_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users      users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([alert_id, user_id])
 }
 
 model alerts {
@@ -428,11 +430,11 @@ model room_guest_assignments {
   deleted_at          DateTime?         @db.Timestamp(6)
   created_at          DateTime          @default(now()) @db.Timestamp(6)
   updated_at          DateTime          @updatedAt @db.Timestamp(6)
-  
+
   reservation_rooms   reservation_rooms @relation(fields: [reservation_room_id], references: [id], onDelete: Cascade)
   users               users             @relation(fields: [guest_id], references: [id], onDelete: Cascade)
   changed_by_user     users?            @relation("changed_by_user", fields: [changed_by_user_id], references: [id])
-  
+
   @@index([reservation_room_id, guest_id, deleted_at, valid_to])
 }
 
@@ -448,6 +450,7 @@ enum alert_type_enum {
   maintenance
   guest
   booking_request
+  checkout
 }
 
 enum error_severity_enum {

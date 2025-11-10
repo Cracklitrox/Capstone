@@ -2,7 +2,7 @@
 CREATE TYPE "public"."alert_status_enum" AS ENUM ('pending', 'resolved', 'ignored');
 
 -- CreateEnum
-CREATE TYPE "public"."alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest', 'booking_request');
+CREATE TYPE "public"."alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest', 'booking_request', 'checkout');
 
 -- CreateEnum
 CREATE TYPE "public"."error_severity_enum" AS ENUM ('low', 'medium', 'high', 'critical');
@@ -630,3 +630,6 @@ ALTER TABLE "public"."room_guest_assignments" ADD CONSTRAINT "room_guest_assignm
 
 -- AddForeignKey
 ALTER TABLE "public"."room_guest_assignments" ADD CONSTRAINT "room_guest_assignments_changed_by_user_id_fkey" FOREIGN KEY ("changed_by_user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Add unique constraint to alert_read_status
+ALTER TABLE "public"."alert_read_status" ADD CONSTRAINT "alert_read_status_alert_id_user_id_key" UNIQUE ("alert_id", "user_id");

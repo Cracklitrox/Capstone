@@ -48,10 +48,14 @@ if (require.main === module) {
   const { emitCheckoutAlerts } = require("./config/socket");
 
   /**
-   * Emite checkout alerts via WebSocket cada 5 minutos
+   * Crea/actualiza alertas de checkout en BD y las emite via WebSocket cada 5 minutos
    */
   async function emitCheckoutAlertsJob() {
     try {
+      // Primero crear/actualizar alertas en la tabla alerts
+      await notificationsService.createOrUpdateCheckoutAlerts();
+
+      // Luego obtener las alertas para emitirlas
       const alerts = await notificationsService.getCheckoutAlertsForToday();
 
       // Solo emitir si hay al menos un checkout

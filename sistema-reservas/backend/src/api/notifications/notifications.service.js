@@ -100,38 +100,246 @@ async function getCheckoutAlertsForToday() {
 }
 
 /**
- * Obtiene solo el conteo de alertas de check-out para hoy
- * Útil para badges y notificaciones rápidas
+ * Crea o actualiza alertas de checkout en la tabla alerts
+ * Esto debe ejecutarse periódicamente (ej. cada 5 minutos por el cron job)
+ * @returns {Object} Resultado de la operación
  */
-async function getCheckoutAlertsCount() {
-  // Configurar fecha actual en zona horaria de Chile (UTC-3)
-  const now = new Date();
-  const chileOffset = -3 * 60; // Chile está en UTC-3
-  const localOffset = now.getTimezoneOffset();
-  const chileTime = new Date(now.getTime() + (localOffset + chileOffset) * 60 * 1000);
-  
-  // Inicio del día en Chile (00:00:00)
-  const startOfDay = new Date(chileTime);
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  // Fin del día en Chile (23:59:59)
-  const endOfDay = new Date(chileTime);
-  endOfDay.setHours(23, 59, 59, 999);
+async function createOrUpdateCheckoutAlerts() {
+  try {
+    // Obtener checkouts de hoy
+    const checkouts = await getCheckoutAlertsForToday();
 
-  // Contar reservas con check-out hoy
-  const count = await prisma.reservations.count({
-    where: {
-      check_out_date: {
-        gte: startOfDay,
-        lte: endOfDay,
-      },
-      status: {
-        in: ['in_progress', 'confirmed'],
-      },
-    },
-  });
+    // Obtener fecha actual en Chile
+    const now = new Date();
+    const chileOffset = -3 * 60;
+    const localOffset = now.getTimezoneOffset();
+    const chileTime = new Date(now.getTime() + (localOffset + chileOffset) * 60 * 1000);
+    const startOfDay = new Date(chileTime);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(chileTime);
+    endOfDay.setHours(23, 59, 59, 999);
 
-  return count;
+    // Crear o actualizar una alerta por cada reserva con checkout hoy
+    for (const checkout of checkouts) {
+      // Verificar si ya existe una alerta de checkout para esta reserva hoy
+      const existingAlert = await prisma.alerts.findFirst({
+        where: {
+          reservation_id: checkout.reservationId,
+          type: 'checkout',
+          created_at: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+      });
+
+      if (!existingAlert) {
+        // Crear nueva alerta de checkout
+        await prisma.alerts.create({
+          data: {
+            type: 'checkout',
+            status: 'pending',
+            reservation_id: checkout.reservationId,
+            detail: `Check-out hoy: ${checkout.guestInfo.fullName} - ${checkout.roomCount} hab.`,
+            full_summary: checkout,
+          },
+        });
+        console.log(`✅ Alerta de checkout creada para reserva ${checkout.reservationId}`);
+      } else {
+        // Actualizar alerta existente con datos más recientes
+        await prisma.alerts.update({
+          where: { id: existingAlert.id },
+          data: {
+            full_summary: checkout,
+            detail: `Check-out hoy: ${checkout.guestInfo.fullName} - ${checkout.roomCount} hab.`,
+          },
+        });
+      }
+    }
+
+    return {
+      success: true,
+      checkoutsCount: checkouts.length,
+      message: `${checkouts.length} alertas de checkout procesadas`,
+    };
+  } catch (error) {
+    console.error('❌ Error al crear/actualizar alertas de checkout:', error);
+    throw error;
+  }
+}
+
+/**
+ * Obtiene el conteo de alertas de checkout no leídas para un usuario
+ * @param {number} userId - ID del usuario
+ * @returns {Promise<number>} Número de alertas no leídas
+ */
+async function getCheckoutAlertsCount(userId) {
+  try {
+    console.log(`🔍 getCheckoutAlertsCount called for userId: ${userId}`);
+
+    // Obtener fecha actual UTC
+    const now = new Date();
+
+    // Calcular el inicio del día de HOY en Chile y convertirlo a UTC
+    // Chile está en UTC-3
+    const chileOffsetHours = -3;
+
+    // Obtener la hora actual en Chile
+    const chileNow = new Date(now.getTime() + (chileOffsetHours * 60 * 60 * 1000));
+
+    // Inicio del día en Chile (00:00:00 hora de Chile)
+    const startOfDayChile = new Date(chileNow);
+    startOfDayChile.setUTCHours(0, 0, 0, 0);
+
+    // Convertir a UTC: si es 00:00 en Chile (UTC-3), es 03:00 UTC
+    const startOfDay = new Date(startOfDayChile.getTime() - (chileOffsetHours * 60 * 60 * 1000));
+
+    // Fin del día en Chile (23:59:59 hora de Chile)
+    const endOfDayChile = new Date(chileNow);
+    endOfDayChile.setUTCHours(23, 59, 59, 999);
+
+    // Convertir a UTC
+    const endOfDay = new Date(endOfDayChile.getTime() - (chileOffsetHours * 60 * 60 * 1000));
+
+    console.log(`🔍 Hora actual UTC: ${now.toISOString()}`);
+    console.log(`🔍 Hora actual Chile: ${chileNow.toISOString()}`);
+    console.log(`🔍 Buscando alertas entre ${startOfDay.toISOString()} y ${endOfDay.toISOString()}`);
+
+    // Primero contar TODAS las alertas de checkout de hoy
+    const totalCheckoutAlerts = await prisma.alerts.count({
+      where: {
+        type: 'checkout',
+        created_at: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+
+    console.log(`🔍 Total de alertas de checkout hoy: ${totalCheckoutAlerts}`);
+
+    // Contar alertas de checkout creadas hoy que el usuario no ha marcado como leídas
+    const count = await prisma.alerts.count({
+      where: {
+        type: 'checkout',
+        created_at: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+        // No debe tener un registro de lectura para este usuario con status resolved o ignored
+        alert_read_status: {
+          none: {
+            user_id: userId,
+            status: {
+              in: ['resolved', 'ignored'],
+            },
+          },
+        },
+      },
+    });
+
+    console.log(`🔍 Alertas NO leídas por usuario ${userId}: ${count}`);
+
+    return count;
+  } catch (error) {
+    console.error('❌ Error al obtener conteo de alertas de checkout:', error);
+    console.error('Stack:', error.stack);
+    return 0;
+  }
+}
+
+/**
+ * Marca todas las alertas de checkout de hoy como leídas por el usuario
+ * @param {number} userId - ID del usuario
+ * @returns {Object} Resultado de la operación
+ */
+async function markCheckoutAlertsAsViewed(userId) {
+  try {
+    // Obtener fecha actual UTC
+    const now = new Date();
+    const viewedAt = new Date();
+
+    // Calcular el inicio del día de HOY en Chile y convertirlo a UTC
+    const chileOffsetHours = -3;
+    const chileNow = new Date(now.getTime() + (chileOffsetHours * 60 * 60 * 1000));
+
+    // Inicio del día en Chile (00:00:00 hora de Chile)
+    const startOfDayChile = new Date(chileNow);
+    startOfDayChile.setUTCHours(0, 0, 0, 0);
+    const startOfDay = new Date(startOfDayChile.getTime() - (chileOffsetHours * 60 * 60 * 1000));
+
+    // Fin del día en Chile (23:59:59 hora de Chile)
+    const endOfDayChile = new Date(chileNow);
+    endOfDayChile.setUTCHours(23, 59, 59, 999);
+    const endOfDay = new Date(endOfDayChile.getTime() - (chileOffsetHours * 60 * 60 * 1000));
+
+    // Obtener todas las alertas de checkout de hoy
+    const checkoutAlerts = await prisma.alerts.findMany({
+      where: {
+        type: 'checkout',
+        created_at: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+
+    // Actualizar cada alerta con last_viewed_at y crear registros de lectura
+    const updatePromises = checkoutAlerts.map(async (alert) => {
+      // Actualizar last_viewed_at en la alerta
+      await prisma.alerts.update({
+        where: { id: alert.id },
+        data: { last_viewed_at: viewedAt },
+      });
+
+      // Crear/actualizar registro de lectura
+      await prisma.alert_read_status.upsert({
+        where: {
+          alert_id_user_id: {
+            alert_id: alert.id,
+            user_id: userId,
+          },
+        },
+        update: {
+          status: 'resolved',
+          updated_at: viewedAt,
+        },
+        create: {
+          alert_id: alert.id,
+          user_id: userId,
+          status: 'resolved',
+        },
+      });
+    });
+
+    await Promise.all(updatePromises);
+
+    console.log(`✅ Usuario ${userId} marcó ${checkoutAlerts.length} alertas de checkout como vistas`);
+
+    return {
+      success: true,
+      message: 'Checkout alerts marked as viewed',
+      count: checkoutAlerts.length,
+    };
+  } catch (error) {
+    console.error('❌ Error al marcar checkout alerts como vistos:', error);
+    throw error;
+  }
+}
+
+/**
+ * Verifica si el usuario ya vio todas las alertas de checkout de hoy
+ * @param {number} userId - ID del usuario
+ * @returns {Promise<boolean>} True si ya vio todas, false si no
+ */
+async function hasUserViewedCheckoutsToday(userId) {
+  try {
+    const count = await getCheckoutAlertsCount(userId);
+    return count === 0;
+  } catch (error) {
+    console.error('❌ Error al verificar si usuario vio checkouts:', error);
+    return false;
+  }
 }
 
 /**
@@ -317,4 +525,7 @@ module.exports = {
   getChileTime,
   getPastCheckouts,
   getFutureCheckouts,
+  createOrUpdateCheckoutAlerts,
+  markCheckoutAlertsAsViewed,
+  hasUserViewedCheckoutsToday,
 };

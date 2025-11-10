@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { fetchCheckoutAlerts } from '../services/notifications';
+import { fetchCheckoutAlerts, markCheckoutAlertsAsViewed } from '../services/notifications';
 import { getWhatsAppBookingAlerts, markWhatsAppAlertsAsViewed } from '../services/whatsapp';
-import { BellAlertIcon, ClockIcon, ChatBubbleLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, ClockIcon, ChatBubbleLeftIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import {
@@ -80,6 +80,32 @@ export function AlertsBell({ checkoutCount = 0, whatsappCount = 0 }) {
     }
   };
 
+  const handleMarkAllAsRead = async () => {
+    try {
+      // Marcar checkouts como leídos (usando base de datos)
+      if (checkouts?.data && checkouts.data.length > 0) {
+        await markCheckoutAlertsAsViewed(token);
+        setCheckouts({ data: [], count: 0 });
+        // Emitir evento para limpiar el contador de checkouts en toda la app
+        window.dispatchEvent(new Event('checkoutAlertsCleared'));
+      }
+
+      // Marcar WhatsApp como leído
+      if (whatsappRequests.length > 0) {
+        await markWhatsAppAlertsAsViewed(token);
+        setWhatsappRequests([]);
+        window.dispatchEvent(new Event('whatsappAlertsViewed'));
+      }
+
+      console.log('✅ Todas las alertas marcadas como leídas');
+
+      // Cerrar el dropdown después de marcar como leído
+      setTimeout(() => setIsOpen(false), 300);
+    } catch (error) {
+      console.error("Error al marcar todas las alertas como leídas:", error);
+    }
+  };
+
   const getCategoryIcon = (category) => {
     const config = getAlertCategoryConfig(category);
     return (
@@ -93,7 +119,7 @@ export function AlertsBell({ checkoutCount = 0, whatsappCount = 0 }) {
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <BellAlertIcon className="h-5 w-5" />
+          <ExclamationTriangleIcon className="h-5 w-5" />
           {totalCount > 0 && (
             <Badge
               variant="destructive"
@@ -109,7 +135,15 @@ export function AlertsBell({ checkoutCount = 0, whatsappCount = 0 }) {
         <DropdownMenuLabel className="flex justify-between items-center">
           <span>Alertas del Sistema</span>
           {totalCount > 0 && (
-            <Badge variant="secondary">{totalCount}</Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleMarkAllAsRead}
+              className="text-xs h-7"
+            >
+              <CheckIcon className="h-3 w-3 mr-1" />
+              Marcar todo leído
+            </Button>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -121,7 +155,7 @@ export function AlertsBell({ checkoutCount = 0, whatsappCount = 0 }) {
             </div>
           ) : totalCount === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <BellAlertIcon className="h-12 w-12 mb-2 opacity-50" />
+              <ExclamationTriangleIcon className="h-12 w-12 mb-2 opacity-50" />
               <p className="text-sm">No hay alertas pendientes</p>
             </div>
           ) : (
@@ -211,22 +245,9 @@ export function AlertsBell({ checkoutCount = 0, whatsappCount = 0 }) {
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
-                          Ver todas
-                          <ArrowRightIcon className="h-3 w-3" />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs h-7"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMarkWhatsAppAsRead();
-                          }}
-                        >
-                          Marcar leídas
-                        </Button>
+                      <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
+                        Ver todas
+                        <ArrowRightIcon className="h-3 w-3" />
                       </div>
                     </div>
                   </div>
