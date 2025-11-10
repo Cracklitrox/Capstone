@@ -12,6 +12,7 @@ import { io } from 'socket.io-client';
 import { getWhatsAppBookingAlerts, rejectWhatsAppBookingAlert, confirmWhatsAppBookingAlert, deleteWhatsAppBookingAlert, deleteMultipleWhatsAppBookingAlerts } from '../services/whatsapp';
 import { ConfirmReservationDialog } from './ConfirmReservationDialog';
 import { RejectReservationDialog } from './RejectReservationDialog';
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:3001';
 
@@ -32,6 +33,16 @@ export function WhatsAppReservationPanel() {
   // Estados para selección múltiple
   const [selectedAlerts, setSelectedAlerts] = useState(new Set());
   const [deletingMultiple, setDeletingMultiple] = useState(false);
+
+  // Estados para el diálogo de eliminación
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    alertId: null,
+    guestName: null,
+    count: 1,
+    isDeleting: false,
+    isMultiple: false
+  });
 
   // Función para alternar expansión de cards
   const toggleCardExpansion = (id) => {
@@ -178,22 +189,44 @@ export function WhatsAppReservationPanel() {
   };
 
   // Handler para eliminar alerta (soft delete)
-  const handleDelete = async (alertId) => {
-    if (!confirm('¿Está seguro que desea eliminar esta alerta?')) {
-      return;
-    }
+  const handleDelete = async (alertId, guestName) => {
+    // Abrir diálogo de confirmación
+    setDeleteDialog({
+      open: true,
+      alertId,
+      guestName,
+      count: 1,
+      isDeleting: false,
+      isMultiple: false
+    });
+  };
+
+  // Confirmación de eliminación individual
+  const confirmDelete = async () => {
+    setDeleteDialog(prev => ({ ...prev, isDeleting: true }));
 
     try {
       const token = localStorage.getItem('token');
-      await deleteWhatsAppBookingAlert(token, alertId);
+      await deleteWhatsAppBookingAlert(token, deleteDialog.alertId);
 
       // Eliminar del estado local
-      setReservations((prev) => prev.filter((res) => res.id !== alertId));
+      setReservations((prev) => prev.filter((res) => res.id !== deleteDialog.alertId));
 
-      console.log(`✅ Alerta ${alertId} eliminada correctamente`);
+      console.log(`✅ Alerta ${deleteDialog.alertId} eliminada correctamente`);
+
+      // Cerrar diálogo
+      setDeleteDialog({
+        open: false,
+        alertId: null,
+        guestName: null,
+        count: 1,
+        isDeleting: false,
+        isMultiple: false
+      });
     } catch (error) {
       console.error('Error al eliminar alerta:', error);
       alert('Error al eliminar la alerta. Intente nuevamente.');
+      setDeleteDialog(prev => ({ ...prev, isDeleting: false }));
     }
   };
 
@@ -239,14 +272,26 @@ export function WhatsAppReservationPanel() {
     if (selectedAlerts.size === 0) return;
 
     const count = selectedAlerts.size;
-    if (!confirm(`¿Está seguro que desea eliminar ${count} alerta${count !== 1 ? 's' : ''}?`)) {
-      return;
-    }
 
-    setDeletingMultiple(true);
+    // Abrir diálogo de confirmación para eliminación múltiple
+    setDeleteDialog({
+      open: true,
+      alertId: null,
+      guestName: null,
+      count,
+      isDeleting: false,
+      isMultiple: true
+    });
+  };
+
+  // Confirmación de eliminación múltiple
+  const confirmDeleteMultiple = async () => {
+    setDeleteDialog(prev => ({ ...prev, isDeleting: true }));
+
     try {
       const token = localStorage.getItem('token');
       const alertIds = Array.from(selectedAlerts);
+      const count = selectedAlerts.size;
 
       await deleteMultipleWhatsAppBookingAlerts(token, alertIds);
 
@@ -257,11 +302,20 @@ export function WhatsAppReservationPanel() {
       setSelectedAlerts(new Set());
 
       console.log(`✅ ${count} alerta${count !== 1 ? 's' : ''} eliminada${count !== 1 ? 's' : ''} correctamente`);
+
+      // Cerrar diálogo
+      setDeleteDialog({
+        open: false,
+        alertId: null,
+        guestName: null,
+        count: 1,
+        isDeleting: false,
+        isMultiple: false
+      });
     } catch (error) {
       console.error('Error al eliminar alertas:', error);
       alert('Error al eliminar las alertas. Intente nuevamente.');
-    } finally {
-      setDeletingMultiple(false);
+      setDeleteDialog(prev => ({ ...prev, isDeleting: false }));
     }
   };
 
@@ -615,7 +669,7 @@ export function WhatsAppReservationPanel() {
                   variant="outline"
                   size="sm"
                   className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                  onClick={() => handleDelete(reservation.id)}
+                  onClick={() => handleDelete(reservation.id, guest.name)}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Eliminar
@@ -807,6 +861,16 @@ export function WhatsAppReservationPanel() {
       guestName={rejectDialog.guestName}
       onReject={handleReject}
       loading={actionLoading}
+    />
+
+    {/* Diálogo de confirmación de eliminación */}
+    <DeleteConfirmationDialog
+      open={deleteDialog.open}
+      onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}
+      onConfirm={deleteDialog.isMultiple ? confirmDeleteMultiple : confirmDelete}
+      count={deleteDialog.count}
+      guestName={deleteDialog.guestName}
+      isDeleting={deleteDialog.isDeleting}
     />
     </>
   );
