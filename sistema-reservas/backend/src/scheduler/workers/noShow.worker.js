@@ -80,12 +80,13 @@ const processor = async (job) => {
         // Verificar si ya pasó el deadline para este reservation
         // (en caso de que tenga check-in personalizado)
         if (now >= noShowDeadline) {
-          await changeReservationStatus(
-            reservation.id,
-            'no_show',
-            null, // userId (sistema automático)
-            `Cambio automático por scheduler - no se presentó después de ${noShowHours}h del fin de check-in`
-          );
+          await changeReservationStatus({
+            reservationId: reservation.id,
+            newStatus: 'no_show',
+            userId: null, // sistema automático
+            userRole: null,
+            reason: `Cambio automático por scheduler - no se presentó después de ${noShowHours}h del fin de check-in`
+          });
 
           results.success.push(reservation.code);
           console.log(`   ✅ Reservation ${reservation.code} → no_show`);
