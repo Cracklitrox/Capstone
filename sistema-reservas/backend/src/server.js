@@ -84,10 +84,44 @@ if (require.main === module) {
 
   console.log("⏰ Cron job de checkout alerts configurado (cada 5 min)");
 
+  // ==================== INICIALIZAR BULLMQ SCHEDULERS ====================
+  const { initializeSchedulers, shutdown: shutdownSchedulers } = require("./scheduler");
+
+  // Inicializar schedulers después de que el servidor esté listo
+  setTimeout(async () => {
+    try {
+      await initializeSchedulers();
+      console.log("✅ BullMQ schedulers inicializados correctamente");
+    } catch (error) {
+      console.error("❌ Error al inicializar schedulers:", error);
+    }
+  }, 3000); // Esperar 3 segundos para que Redis esté completamente listo
+
   // Cleanup al cerrar el servidor
-  process.on("SIGINT", () => {
+  process.on("SIGINT", async () => {
     console.log("🛑 Cerrando servidor...");
     clearInterval(checkoutAlertsInterval);
+
+    // Cerrar schedulers
+    try {
+      await shutdownSchedulers();
+    } catch (error) {
+      console.error("❌ Error cerrando schedulers:", error);
+    }
+
+    process.exit(0);
+  });
+
+  process.on("SIGTERM", async () => {
+    console.log("🛑 SIGTERM recibido, cerrando servidor...");
+    clearInterval(checkoutAlertsInterval);
+
+    try {
+      await shutdownSchedulers();
+    } catch (error) {
+      console.error("❌ Error cerrando schedulers:", error);
+    }
+
     process.exit(0);
   });
 }

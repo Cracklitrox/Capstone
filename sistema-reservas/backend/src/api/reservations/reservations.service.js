@@ -48,6 +48,8 @@ async function createReservation(reservationData, receptionistId, receptionistRo
     paymentAmount,
     isDeposit,
     multiplePayments = [], // NUEVO
+    roomGuestAssignments = [], // NUEVO: [{ roomId, guestIds: [] }]
+    roomServiceAssignments = [], // NUEVO: [{ roomId, serviceId, dates: [], quantity }]
   } = reservationData;
 
   // Validar fechas
@@ -82,22 +84,29 @@ async function createReservation(reservationData, receptionistId, receptionistRo
   // Generar código único
   let code = generateReservationCode();
   let codeExists = await prisma.reservations.findUnique({ where: { code } });
-  
+
   while (codeExists) {
     code = generateReservationCode();
     codeExists = await prisma.reservations.findUnique({ where: { code } });
   }
 
-  // Determinar estado inicial
-  let initialStatus = 'pending';
-  
-  if (paymentMethod === 'cash' && paymentAmount >= pricing.total) {
+  // Determinar estado inicial según método de pago
+  let initialStatus = 'pending'; // Default
+  let hasTransfer = false;
+
+  if (paymentMethod === 'multiple' && multiplePayments.length > 0) {
+    // Si hay algún pago por transferencia, queda pending
+    hasTransfer = multiplePayments.some(p => p.method === 'bank_transfer');
+    initialStatus = hasTransfer ? 'pending' : 'confirmed';
+  } else if (paymentMethod === 'cash') {
     initialStatus = 'confirmed';
+  } else if (paymentMethod === 'bank_transfer') {
+    initialStatus = 'pending';
   }
 
   // Crear reserva con transacción
   const reservation = await prisma.$transaction(async (tx) => {
-    // 1. Crear reserva
+    // 1. Crear reserva (paid_amount se calculará después de crear pagos)
     const newReservation = await tx.reservations.create({
       data: {
         code,
@@ -109,7 +118,7 @@ async function createReservation(reservationData, receptionistId, receptionistRo
         check_out_date: checkOut,
         guest_count: guestCount,
         total_amount: pricing.total,
-        paid_amount: paymentMethod === 'cash' && initialStatus === 'confirmed' ? paymentAmount : 0,
+        paid_amount: 0, // Temporal, se actualiza después
         booking_type: 'individual',
       },
     });
@@ -155,19 +164,20 @@ async function createReservation(reservationData, receptionistId, receptionistRo
       await tx.reservation_services.createMany({ data: servicesData });
     }
 
-    // 6. Crear registro(s) de pago - MODIFICADO
+    // 6. Crear registro(s) de pago
     if (paymentAmount > 0) {
       if (paymentMethod === 'multiple' && multiplePayments.length > 0) {
         // Pagos múltiples
         const paymentsData = multiplePayments.map((payment, index) => ({
           reservation_id: newReservation.id,
           payment_method: payment.method,
+          payment_type: payment.paymentType || 'full',
           status: payment.method === 'cash' ? 'confirmed' : 'pending',
           amount: payment.amount,
           is_deposit: paymentAmount < pricing.total,
           payment_sequence: index + 1,
         }));
-        
+
         await tx.payments.createMany({ data: paymentsData });
       } else {
         // Pago simple
@@ -175,6 +185,7 @@ async function createReservation(reservationData, receptionistId, receptionistRo
           data: {
             reservation_id: newReservation.id,
             payment_method: paymentMethod,
+            payment_type: reservationData.paymentType || 'full',
             status: paymentMethod === 'cash' ? 'confirmed' : 'pending',
             amount: paymentAmount,
             is_deposit: isDeposit || (paymentAmount < pricing.total),
@@ -183,10 +194,107 @@ async function createReservation(reservationData, receptionistId, receptionistRo
       }
     }
 
+    // 6b. Calcular paid_amount inicial (solo pagos confirmados = cash)
+    let initialPaidAmount = 0;
+
+    if (paymentMethod === 'multiple' && multiplePayments.length > 0) {
+      // Sumar solo pagos en efectivo (confirmed)
+      initialPaidAmount = multiplePayments
+        .filter(p => p.method === 'cash')
+        .reduce((sum, p) => sum + p.amount, 0);
+    } else if (paymentMethod === 'cash') {
+      // Pago simple en efectivo
+      initialPaidAmount = paymentAmount;
+    }
+    // Si es bank_transfer, initialPaidAmount queda en 0
+
+    // Actualizar paid_amount en la reserva
+    await tx.reservations.update({
+      where: { id: newReservation.id },
+      data: { paid_amount: initialPaidAmount }
+    });
+
+    // Actualizar el objeto local para que tenga el paid_amount correcto
+    newReservation.paid_amount = initialPaidAmount;
+
+    // 7. Crear room_guest_assignments si se proporcionaron
+    if (roomGuestAssignments.length > 0) {
+      // Primero obtener los reservation_room_ids
+      const reservationRooms = await tx.reservation_rooms.findMany({
+        where: { reservation_id: newReservation.id },
+        select: { id: true, room_id: true },
+      });
+
+      // Crear un mapa roomId -> reservation_room_id
+      const roomIdToReservationRoomId = {};
+      reservationRooms.forEach(rr => {
+        roomIdToReservationRoomId[rr.room_id] = rr.id;
+      });
+
+      // Preparar datos para room_guest_assignments
+      const guestAssignmentsData = [];
+      roomGuestAssignments.forEach(assignment => {
+        const reservationRoomId = roomIdToReservationRoomId[assignment.roomId];
+        if (reservationRoomId) {
+          assignment.guestIds.forEach(guestId => {
+            guestAssignmentsData.push({
+              reservation_room_id: reservationRoomId,
+              guest_id: guestId,
+            });
+          });
+        }
+      });
+
+      if (guestAssignmentsData.length > 0) {
+        await tx.room_guest_assignments.createMany({
+          data: guestAssignmentsData,
+        });
+      }
+    }
+
+    // 8. Crear room_service_daily si se proporcionaron
+    if (roomServiceAssignments.length > 0) {
+      // Obtener los reservation_room_ids
+      const reservationRooms = await tx.reservation_rooms.findMany({
+        where: { reservation_id: newReservation.id },
+        select: { id: true, room_id: true },
+      });
+
+      // Crear un mapa roomId -> reservation_room_id
+      const roomIdToReservationRoomId = {};
+      reservationRooms.forEach(rr => {
+        roomIdToReservationRoomId[rr.room_id] = rr.id;
+      });
+
+      // Preparar datos para room_service_daily
+      const serviceAssignmentsData = [];
+      roomServiceAssignments.forEach(assignment => {
+        const reservationRoomId = roomIdToReservationRoomId[assignment.roomId];
+        if (reservationRoomId) {
+          assignment.dates.forEach(date => {
+            serviceAssignmentsData.push({
+              reservation_room_id: reservationRoomId,
+              service_id: assignment.serviceId,
+              service_date: new Date(date),
+              unit_price: assignment.unitPrice,
+              quantity: assignment.quantity,
+              subtotal: assignment.unitPrice * assignment.quantity,
+            });
+          });
+        }
+      });
+
+      if (serviceAssignmentsData.length > 0) {
+        await tx.room_service_daily.createMany({
+          data: serviceAssignmentsData,
+        });
+      }
+    }
+
     return newReservation;
   });
 
-  // 7. Crear log de actividad
+  // 9. Crear log de actividad
   await createActivityLog(
     receptionistId,
     receptionistRole,

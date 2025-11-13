@@ -41,8 +41,8 @@ export default function NotificationsPage() {
         <div className={`flex items-center gap-2 px-4 py-2 rounded-md border ${connected ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
           {connected ? (
             <>
-              <Wifi className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-600">Conectado en tiempo real</span>
+              <Wifi className="h-4 w-4 text-green-700 dark:text-green-400" />
+              <span className="text-sm text-green-700 dark:text-green-400">Conectado en tiempo real</span>
             </>
           ) : (
             <>

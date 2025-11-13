@@ -302,7 +302,7 @@ const ReservationHistory = () => {
                   handleFilterChange("floor", value === "all" ? "" : value)
                 }
               >
-                <SelectTrigger className="w-full sm:w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]" aria-label="Filtrar por piso">
                   <SelectValue placeholder="Piso..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -396,7 +396,7 @@ const ReservationHistory = () => {
               history.map((item) => {
                 const paymentProgress =
                   item.total_amount > 0
-                    ? (item.paid_amount / item.total_amount) * 100
+                    ? Math.min((item.paid_amount / item.total_amount) * 100, 100)
                     : 0;
                 const statusBadgeVariant =
                   {
@@ -419,9 +419,9 @@ const ReservationHistory = () => {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <HashtagIcon className="h-4 w-4 text-primary" />
-                              <h3 className="text-lg font-bold text-foreground">
+                              <h2 className="text-lg font-bold text-foreground">
                                 {item.code}
-                              </h3>
+                              </h2>
                             </div>
                             <Badge
                               variant={
@@ -507,14 +507,18 @@ const ReservationHistory = () => {
                             <span
                               className={`text-xs font-semibold ${
                                 paymentProgress === 100
-                                  ? "text-green-600"
-                                  : "text-orange-600"
+                                  ? "text-green-700 dark:text-green-400"
+                                  : "text-orange-700 dark:text-orange-400"
                               }`}
                             >
                               {paymentProgress.toFixed(0)}%
                             </span>
                           </div>
-                          <Progress value={paymentProgress} className="h-2" />
+                          <Progress
+                            value={paymentProgress}
+                            className="h-2"
+                            aria-label={`Progreso de pago: ${paymentProgress.toFixed(0)}%`}
+                          />
                         </div>
                         <Button
                           variant="outline"

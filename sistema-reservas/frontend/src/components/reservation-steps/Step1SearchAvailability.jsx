@@ -215,7 +215,7 @@ const Step1SearchAvailability = ({ data, onUpdate, onNext }) => {
           <div className="space-y-2">
             <Label>Tipo de Habitación</Label>
             <Select value={selectedRoomType} onValueChange={setSelectedRoomType}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Seleccionar tipo de habitación">
                 <SelectValue placeholder="Todos los tipos" />
               </SelectTrigger>
               <SelectContent>
@@ -233,7 +233,7 @@ const Step1SearchAvailability = ({ data, onUpdate, onNext }) => {
           <div className="space-y-2">
             <Label>Piso Preferido</Label>
             <Select value={selectedFloor} onValueChange={setSelectedFloor}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Seleccionar piso preferido">
                 <SelectValue placeholder="Todos los pisos" />
               </SelectTrigger>
               <SelectContent>

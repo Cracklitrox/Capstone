@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { guestHistoryService } from "@/services/guestHistory";
@@ -11,6 +11,7 @@ import {
   cleanRut,
 } from "@/lib/rutValidator";
 import { toast } from "sonner";
+import { useDebounce } from "use-debounce";
 
 // Componentes UI
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import GuestProfileModal from "@/components/GuestProfileModal";
+import CreateGuestForm from "@/components/CreateGuestForm";
 
 // Iconos
 import {
@@ -62,6 +64,7 @@ import {
   MapPinIcon,
   IdentificationIcon,
   CakeIcon,
+  PlusCircleIcon,
 } from "@heroicons/react/24/outline";
 
 const GuestHistory = () => {
@@ -107,6 +110,9 @@ const GuestHistory = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [guestsMeta, setGuestsMeta] = useState({ page: 1, totalPages: 1 });
 
+  // Debounce search term (500ms delay) para reducir llamadas API innecesarias
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+
   // Estados para filtros
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -140,6 +146,9 @@ const GuestHistory = () => {
   // Estado para confirmación de eliminación
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingGuest, setDeletingGuest] = useState(null);
+
+  // Estado para modal de crear huésped
+  const [isCreateGuestModalOpen, setIsCreateGuestModalOpen] = useState(false);
 
   // Funciones de utilidad
   const calculateAge = (birthDate) => {
@@ -191,7 +200,7 @@ const GuestHistory = () => {
     no_show: "No se Presentó",
   };
 
-  // Buscar huéspedes
+  // Buscar huéspedes (debounced para reducir llamadas API)
   const searchGuests = useCallback(
     async (page = 1) => {
       if (!token) return;
@@ -201,7 +210,7 @@ const GuestHistory = () => {
 
       try {
         const response = await guestHistoryService.searchAllGuests(
-          searchTerm,
+          debouncedSearchTerm,
           page,
           20
         );
@@ -234,7 +243,7 @@ const GuestHistory = () => {
         setSearchLoading(false);
       }
     },
-    [token, searchTerm, filters]
+    [token, debouncedSearchTerm, filters]
   );
 
   // Cargar perfil
@@ -327,6 +336,12 @@ const GuestHistory = () => {
     } catch (err) {
       toast.error(err.message);
     }
+  };
+
+  // Handler para crear huésped exitosamente
+  const handleGuestCreated = (newGuest) => {
+    // Refrescar la lista de huéspedes
+    searchGuests(1);
   };
 
   // Manejo de observaciones
@@ -707,10 +722,19 @@ const GuestHistory = () => {
               Gestiona la información de los huéspedes
             </p>
           </div>
-          <Badge variant="outline" className="flex items-center gap-2 w-fit">
-            <UserGroupIcon className="h-4 w-4" />
-            {guestsMeta.totalCount || guests.length} huéspedes
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="flex items-center gap-2">
+              <UserGroupIcon className="h-4 w-4" />
+              {guestsMeta.totalCount || guests.length} huéspedes
+            </Badge>
+            <Button
+              onClick={() => setIsCreateGuestModalOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <PlusCircleIcon className="h-4 w-4" />
+              Nuevo Huésped
+            </Button>
+          </div>
         </div>
 
         {/* Panel de búsqueda */}
@@ -892,6 +916,7 @@ const GuestHistory = () => {
                           variant="default"
                           size="sm"
                           onClick={() => handleEditGuest(guest)}
+                          aria-label="Editar huésped"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
@@ -901,6 +926,7 @@ const GuestHistory = () => {
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteGuest(guest)}
+                          aria-label="Eliminar huésped"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </Button>
@@ -998,6 +1024,14 @@ const GuestHistory = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de crear huésped */}
+        <CreateGuestForm
+          isOpen={isCreateGuestModalOpen}
+          onClose={() => setIsCreateGuestModalOpen(false)}
+          onSuccess={handleGuestCreated}
+          isMainGuest={true}
+        />
       </div>
     </div>
   );

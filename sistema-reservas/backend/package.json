@@ -19,6 +19,7 @@
     "@prisma/client": "^6.16.2",
     "@whiskeysockets/baileys": "6.6.0",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.61.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.19.2",

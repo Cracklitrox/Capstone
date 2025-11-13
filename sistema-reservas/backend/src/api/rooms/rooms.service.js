@@ -427,9 +427,330 @@ async function updateRoomStatus(roomId, newStatus, userId, userRole) {
   };
 }
 
+/**
+ * Obtener habitaciones listas para limpieza (después de checkout)
+ * Habitaciones en estado 'occupied' con reserva completada
+ */
+async function getRoomsReadyForCleaning() {
+  const rooms = await prisma.rooms.findMany({
+    where: {
+      status: 'occupied',
+      is_active: true,
+      reservation_rooms: {
+        some: {
+          reservations: {
+            status: 'completed',
+          },
+        },
+      },
+    },
+    include: {
+      room_types: {
+        select: { name: true },
+      },
+      reservation_rooms: {
+        where: {
+          reservations: {
+            status: 'completed',
+          },
+        },
+        orderBy: {
+          reservations: {
+            check_out_date: 'desc',
+          },
+        },
+        take: 1,
+        include: {
+          reservations: {
+            select: {
+              id: true,
+              code: true,
+              check_out_date: true,
+              users_reservations_main_guest_idTousers: {
+                select: {
+                  first_name: true,
+                  paternal_last_name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [
+      { floor: 'asc' },
+      { room_number: 'asc' },
+    ],
+  });
+
+  return rooms.map((room) => {
+    const lastReservation = room.reservation_rooms[0]?.reservations;
+
+    return {
+      id: room.id,
+      number: room.room_number,
+      type: room.room_types?.name || 'N/A',
+      floor: room.floor,
+      status: room.status,
+      lastCheckout: lastReservation?.check_out_date,
+      lastGuest: lastReservation
+        ? `${lastReservation.users_reservations_main_guest_idTousers.first_name} ${lastReservation.users_reservations_main_guest_idTousers.paternal_last_name}`
+        : null,
+      reservationCode: lastReservation?.code || null,
+    };
+  });
+}
+
+/**
+ * Obtener habitaciones en limpieza con sus cleaning_records
+ */
+async function getRoomsInCleaning() {
+  const rooms = await prisma.rooms.findMany({
+    where: {
+      status: 'cleaning',
+      is_active: true,
+    },
+    include: {
+      room_types: {
+        select: { name: true },
+      },
+      cleaning_records: {
+        where: {
+          is_completed: false,
+        },
+        orderBy: {
+          record_date: 'desc',
+        },
+        take: 1,
+        include: {
+          users: {
+            select: {
+              first_name: true,
+              paternal_last_name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: [
+      { floor: 'asc' },
+      { room_number: 'asc' },
+    ],
+  });
+
+  return rooms.map((room) => {
+    const currentCleaning = room.cleaning_records[0];
+
+    return {
+      id: room.id,
+      number: room.room_number,
+      type: room.room_types?.name || 'N/A',
+      floor: room.floor,
+      status: room.status,
+      cleaningRecord: currentCleaning
+        ? {
+            id: currentCleaning.id,
+            startedAt: currentCleaning.record_date,
+            observations: currentCleaning.observations,
+            receptionistName: `${currentCleaning.users.first_name} ${currentCleaning.users.paternal_last_name}`,
+          }
+        : null,
+    };
+  });
+}
+
+/**
+ * Completar limpieza de una habitación
+ */
+async function completeCleaning(roomId, observations, userId, userRole) {
+  const id = Number(roomId);
+  if (isNaN(id)) {
+    throw new Error('El ID de la habitación debe ser un número válido.');
+  }
+
+  // Verificar que la habitación exista y esté en limpieza
+  const room = await prisma.rooms.findUnique({
+    where: { id },
+    select: {
+      status: true,
+      room_number: true,
+      cleaning_records: {
+        where: { is_completed: false },
+        orderBy: { record_date: 'desc' },
+        take: 1,
+      },
+    },
+  });
+
+  if (!room) {
+    throw new Error('Habitación no encontrada.');
+  }
+
+  if (room.status !== 'cleaning') {
+    throw new Error('La habitación no está en estado de limpieza.');
+  }
+
+  const cleaningRecord = room.cleaning_records[0];
+
+  if (!cleaningRecord) {
+    throw new Error('No se encontró un registro de limpieza activo para esta habitación.');
+  }
+
+  // Actualizar en transacción
+  await prisma.$transaction(async (tx) => {
+    // 1. Marcar cleaning_record como completado
+    await tx.cleaning_records.update({
+      where: { id: cleaningRecord.id },
+      data: {
+        is_completed: true,
+        completed_at: new Date(),
+        observations: observations || cleaningRecord.observations,
+      },
+    });
+
+    // 2. Cambiar estado de habitación a available
+    await tx.rooms.update({
+      where: { id },
+      data: { status: 'available' },
+    });
+
+    // 3. Crear log de actividad
+    await createActivityLog(
+      userId,
+      userRole,
+      'UPDATE_ROOM_STATUS',
+      'rooms',
+      id,
+      {
+        room_number: room.room_number,
+        old_status: 'cleaning',
+        new_status: 'available',
+        cleaning_completed: true,
+        observations,
+      }
+    );
+  });
+
+  return {
+    message: 'Limpieza completada exitosamente',
+    roomNumber: room.room_number,
+  };
+}
+
+/**
+ * Actualizar observaciones de limpieza
+ */
+async function updateCleaningObservations(roomId, observations, userId) {
+  const id = Number(roomId);
+  if (isNaN(id)) {
+    throw new Error('El ID de la habitación debe ser un número válido.');
+  }
+
+  // Buscar el cleaning_record activo
+  const room = await prisma.rooms.findUnique({
+    where: { id },
+    select: {
+      room_number: true,
+      cleaning_records: {
+        where: { is_completed: false },
+        orderBy: { record_date: 'desc' },
+        take: 1,
+      },
+    },
+  });
+
+  if (!room || !room.cleaning_records[0]) {
+    throw new Error('No se encontró un registro de limpieza activo.');
+  }
+
+  const cleaningRecord = room.cleaning_records[0];
+
+  await prisma.cleaning_records.update({
+    where: { id: cleaningRecord.id },
+    data: { observations },
+  });
+
+  return {
+    message: 'Observaciones actualizadas',
+    roomNumber: room.room_number,
+  };
+}
+
+/**
+ * Iniciar limpieza manual de una habitación
+ * Este endpoint se usa después del check-out para enviar la habitación a limpieza
+ */
+async function startCleaning(roomId, userId, userRole) {
+  const id = Number(roomId);
+  if (isNaN(id)) {
+    throw new Error('El ID de la habitación debe ser un número válido.');
+  }
+
+  // Verificar que la habitación exista
+  const room = await prisma.rooms.findUnique({
+    where: { id },
+    select: {
+      status: true,
+      room_number: true,
+      is_active: true,
+    },
+  });
+
+  if (!room || !room.is_active) {
+    throw new Error('Habitación no encontrada.');
+  }
+
+  if (room.status !== 'occupied') {
+    throw new Error(`La habitación ${room.room_number} no está en estado "occupied". Estado actual: ${room.status}`);
+  }
+
+  // Actualizar en transacción
+  await prisma.$transaction(async (tx) => {
+    // 1. Cambiar estado de habitación a cleaning
+    await tx.rooms.update({
+      where: { id },
+      data: { status: 'cleaning' },
+    });
+
+    // 2. Crear registro de limpieza
+    await tx.cleaning_records.create({
+      data: {
+        room_id: id,
+        receptionist_id: userId,
+        is_completed: false,
+      },
+    });
+
+    // 3. Crear log de actividad
+    await createActivityLog(
+      userId,
+      userRole,
+      'UPDATE_ROOM_STATUS',
+      'rooms',
+      id,
+      {
+        room_number: room.room_number,
+        old_status: 'occupied',
+        new_status: 'cleaning',
+        action: 'start_cleaning',
+      }
+    );
+  });
+
+  return {
+    message: `Habitación ${room.room_number} enviada a limpieza exitosamente`,
+    roomNumber: room.room_number,
+  };
+}
+
 module.exports = {
   getAllRooms,
   getRoomById,
   getAllRoomTypes,
   updateRoomStatus,
+  getRoomsReadyForCleaning,
+  getRoomsInCleaning,
+  completeCleaning,
+  updateCleaningObservations,
+  startCleaning,
 };

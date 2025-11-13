@@ -1,9 +1,371 @@
 const reservationsService = require("./reservations.service");
 const availabilityService = require("./availability.service");
 const pricingService = require("./pricing.service");
+const statusService = require("./status.service");
 const { logError } = require("../../utils/errorLogger");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+
+/**
+ * Obtener todas las reservas con filtros opcionales
+ * GET /api/v1/reservations?status=confirmed&limit=50
+ */
+async function getAllReservations(req, res) {
+  try {
+    const { status, limit = 100, offset = 0 } = req.query;
+
+    const where = {
+      deleted_at: null,
+    };
+
+    // Filtro por estado
+    if (status) {
+      where.status = status;
+    }
+
+    const reservations = await prisma.reservations.findMany({
+      where,
+      take: parseInt(limit),
+      skip: parseInt(offset),
+      orderBy: {
+        created_at: 'desc',
+      },
+      include: {
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true,
+            email: true,
+            phone_number: true,
+          },
+        },
+        users_reservations_receptionist_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            email: true,
+          },
+        },
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true,
+              },
+            },
+            room_service_daily: {
+              include: {
+                services: true,
+              },
+            },
+          },
+        },
+        reservation_guests: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+              },
+            },
+          },
+        },
+        reservation_services: {
+          include: {
+            services: true,
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            payment_method: true,
+            status: true,
+            created_at: true,
+          },
+        },
+        additional_charges: {
+          where: {
+            deleted_at: null,
+          },
+          include: {
+            rooms: {
+              select: {
+                room_number: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Transformar la respuesta para que sea más amigable para el frontend (sin duplicados)
+    const transformedReservations = reservations.map((reservation) => {
+      const mainGuest = reservation.users_reservations_main_guest_idTousers;
+      const receptionist = reservation.users_reservations_receptionist_idTousers;
+
+      // Transformar reservation_guests para que el frontend pueda usar los nombres antiguos
+      const transformedGuests = reservation.reservation_guests?.map(rg => ({
+        ...rg,
+        guests: rg.users ? {
+          ...rg.users,
+          last_name_father: rg.users.paternal_last_name,
+          last_name_mother: rg.users.maternal_last_name,
+          rut: rg.users.identification_number,
+        } : null,
+      })) || [];
+
+      // Transformar reservation_rooms eliminando room_types duplicado
+      const transformedRooms = reservation.reservation_rooms?.map(rr => {
+        const { room_types, ...roomWithoutDuplicates } = rr.rooms || {};
+        return {
+          ...rr,
+          rooms: rr.rooms ? {
+            ...roomWithoutDuplicates,
+            room_type: rr.rooms.room_types,
+          } : null,
+        };
+      }) || [];
+
+      // Transformar payments eliminando payment_method duplicado
+      const transformedPayments = reservation.payments?.map(({ payment_method, ...payment }) => ({
+        ...payment,
+        method: payment_method,
+      })) || [];
+
+      // Eliminar relaciones de Prisma duplicadas
+      const {
+        users_reservations_main_guest_idTousers,
+        users_reservations_receptionist_idTousers,
+        ...reservationWithoutPrismaRelations
+      } = reservation;
+
+      return {
+        ...reservationWithoutPrismaRelations,
+        main_guest: mainGuest ? {
+          ...mainGuest,
+          last_name_father: mainGuest.paternal_last_name,
+          last_name_mother: mainGuest.maternal_last_name,
+          rut: mainGuest.identification_number,
+          phone: mainGuest.phone_number,
+        } : null,
+        receptionist: receptionist ? {
+          ...receptionist,
+          last_name_father: receptionist.paternal_last_name,
+          last_name_mother: receptionist.maternal_last_name,
+        } : null,
+        reservation_guests: transformedGuests,
+        reservation_rooms: transformedRooms,
+        payments: transformedPayments,
+      };
+    });
+
+    return res.status(200).json({
+      reservations: transformedReservations,
+      total: transformedReservations.length,
+    });
+  } catch (error) {
+    console.error('Error al obtener reservas:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener reservas: ${error.message}`,
+      originModule: 'reservations.controller - getAllReservations',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: 'Error al obtener reservas',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Obtener una reserva por ID
+ * GET /api/v1/reservations/:id
+ */
+async function getReservationById(req, res) {
+  try {
+    const { id } = req.params;
+    const reservationId = parseInt(id);
+
+    if (isNaN(reservationId)) {
+      return res.status(400).json({ message: 'ID de reserva inválido' });
+    }
+
+    const reservation = await prisma.reservations.findUnique({
+      where: { id: reservationId },
+      include: {
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true,
+            email: true,
+            phone_number: true,
+          },
+        },
+        users_reservations_receptionist_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            email: true,
+          },
+        },
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true,
+              },
+            },
+            room_service_daily: {
+              include: {
+                services: true,
+              },
+            },
+          },
+        },
+        reservation_guests: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+              },
+            },
+          },
+        },
+        reservation_services: {
+          include: {
+            services: true,
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            payment_method: true,
+            status: true,
+            created_at: true,
+          },
+        },
+        additional_charges: {
+          where: {
+            deleted_at: null,
+          },
+          include: {
+            rooms: {
+              select: {
+                room_number: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!reservation || reservation.deleted_at) {
+      return res.status(404).json({ message: 'Reserva no encontrada' });
+    }
+
+    // Transformar para frontend (eliminando campos duplicados de Prisma)
+    const mainGuest = reservation.users_reservations_main_guest_idTousers;
+    const receptionist = reservation.users_reservations_receptionist_idTousers;
+
+    const transformedGuests = reservation.reservation_guests?.map(rg => ({
+      ...rg,
+      guests: rg.users ? {
+        ...rg.users,
+        last_name_father: rg.users.paternal_last_name,
+        last_name_mother: rg.users.maternal_last_name,
+        rut: rg.users.identification_number,
+      } : null,
+    })) || [];
+
+    const transformedRooms = reservation.reservation_rooms?.map(rr => {
+      const { room_types, ...roomWithoutDuplicates } = rr.rooms || {};
+      return {
+        ...rr,
+        rooms: rr.rooms ? {
+          ...roomWithoutDuplicates,
+          room_type: rr.rooms.room_types,
+        } : null,
+      };
+    }) || [];
+
+    const transformedPayments = reservation.payments?.map(({ payment_method, ...payment }) => ({
+      ...payment,
+      method: payment_method,
+    })) || [];
+
+    // Eliminar campos duplicados de Prisma en el objeto principal
+    const {
+      users_reservations_main_guest_idTousers,
+      users_reservations_receptionist_idTousers,
+      ...reservationWithoutPrismaRelations
+    } = reservation;
+
+    const transformed = {
+      ...reservationWithoutPrismaRelations,
+      main_guest: mainGuest ? {
+        ...mainGuest,
+        last_name_father: mainGuest.paternal_last_name,
+        last_name_mother: mainGuest.maternal_last_name,
+        rut: mainGuest.identification_number,
+        phone: mainGuest.phone_number,
+      } : null,
+      receptionist: receptionist ? {
+        ...receptionist,
+        last_name_father: receptionist.paternal_last_name,
+        last_name_mother: receptionist.maternal_last_name,
+      } : null,
+      reservation_guests: transformedGuests,
+      reservation_rooms: transformedRooms,
+      payments: transformedPayments,
+    };
+
+    console.log('🔍 Backend getReservationById - Enviando response:', JSON.stringify({
+      reservationId: transformed.id,
+      main_guest: transformed.main_guest,
+      reservation_rooms_count: transformed.reservation_rooms?.length,
+      reservation_rooms: transformed.reservation_rooms,
+      reservation_guests_count: transformed.reservation_guests?.length,
+      payments_count: transformed.payments?.length,
+    }, null, 2));
+
+    return res.status(200).json({ reservation: transformed });
+  } catch (error) {
+    console.error('Error al obtener reserva:', error);
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener reserva ${req.params.id}: ${error.message}`,
+      originModule: 'reservations.controller - getReservationById',
+      severity: 'medium',
+      errorObject: error,
+    });
+    return res.status(500).json({ message: 'Error al obtener reserva', error: error.message });
+  }
+}
 
 /**
  * Buscar disponibilidad de habitaciones
@@ -146,6 +508,32 @@ async function createReservation(req, res) {
       });
     }
 
+    // Validar paymentType
+    if (!reservationData.paymentType) {
+      return res.status(400).json({
+        message: "Tipo de pago es requerido (full, half_upfront, daily)",
+      });
+    }
+
+    const validPaymentTypes = ['full', 'half_upfront', 'daily'];
+    if (!validPaymentTypes.includes(reservationData.paymentType)) {
+      return res.status(400).json({
+        message: "Tipo de pago inválido. Debe ser: full, half_upfront o daily",
+      });
+    }
+
+    // VALIDACIÓN ESPECIAL: Reservas de 1 día deben ser pago completo
+    const checkIn = new Date(reservationData.checkInDate);
+    const checkOut = new Date(reservationData.checkOutDate);
+    const diffTime = Math.abs(checkOut - checkIn);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1 && reservationData.paymentType !== 'full') {
+      return res.status(400).json({
+        message: "Las reservas de 1 día deben pagarse completas (paymentType: 'full')",
+      });
+    }
+
     const result = await reservationsService.createReservation(
       reservationData,
       receptionistId,
@@ -265,10 +653,231 @@ async function getBreakfastMenu(req, res) {
   }
 }
 
+/**
+ * Cambiar estado de una reserva
+ */
+async function changeStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { newStatus, reason, metadata } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.user_roles[0]?.roles.name || 'guest';
+
+    if (!newStatus) {
+      return res.status(400).json({
+        message: 'El nuevo estado es requerido'
+      });
+    }
+
+    const result = await statusService.changeReservationStatus({
+      reservationId: parseInt(id),
+      newStatus,
+      userId,
+      userRole,
+      reason,
+      metadata
+    });
+
+    return res.status(200).json({
+      message: result.message,
+      reservation: {
+        id: result.reservation.id,
+        code: result.reservation.code,
+        previousStatus: result.previousStatus,
+        currentStatus: result.newStatus
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al cambiar estado:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al cambiar estado de reserva: ${error.message}`,
+      originModule: 'reservations.controller - changeStatus',
+      severity: 'high',
+      errorObject: error
+    });
+
+    return res.status(400).json({
+      message: error.message || 'Error al cambiar estado de reserva'
+    });
+  }
+}
+
+/**
+ * Realizar check-in
+ */
+async function checkIn(req, res) {
+  try {
+    const { id } = req.params;
+    const { reason, metadata } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.user_roles[0]?.roles.name || 'receptionist';
+
+    const result = await statusService.changeReservationStatus({
+      reservationId: parseInt(id),
+      newStatus: 'in_progress',
+      userId,
+      userRole,
+      reason: reason || 'Check-in realizado',
+      metadata
+    });
+
+    return res.status(200).json({
+      message: 'Check-in realizado exitosamente',
+      reservation: {
+        id: result.reservation.id,
+        code: result.reservation.code,
+        status: result.newStatus,
+        roomsOccupied: result.roomsOccupied
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en check-in:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error en check-in: ${error.message}`,
+      originModule: 'reservations.controller - checkIn',
+      severity: 'high',
+      errorObject: error
+    });
+
+    return res.status(400).json({
+      message: error.message || 'Error al realizar check-in'
+    });
+  }
+}
+
+/**
+ * Realizar check-out
+ */
+async function checkOut(req, res) {
+  try {
+    const { id } = req.params;
+    const { reason, metadata } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.user_roles[0]?.roles.name || 'receptionist';
+
+    const result = await statusService.changeReservationStatus({
+      reservationId: parseInt(id),
+      newStatus: 'completed',
+      userId,
+      userRole,
+      reason: reason || 'Check-out realizado',
+      metadata
+    });
+
+    return res.status(200).json({
+      message: 'Check-out realizado exitosamente',
+      reservation: {
+        id: result.reservation.id,
+        code: result.reservation.code,
+        status: result.newStatus,
+        cleaningRecordsCreated: result.cleaningRecordsCreated
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en check-out:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error en check-out: ${error.message}`,
+      originModule: 'reservations.controller - checkOut',
+      severity: 'high',
+      errorObject: error
+    });
+
+    return res.status(400).json({
+      message: error.message || 'Error al realizar check-out'
+    });
+  }
+}
+
+/**
+ * Obtener historial de cambios de una reserva
+ */
+async function getHistory(req, res) {
+  try {
+    const { id } = req.params;
+
+    const history = await statusService.getReservationHistory(parseInt(id));
+
+    return res.status(200).json({
+      reservationId: parseInt(id),
+      history
+    });
+
+  } catch (error) {
+    console.error('Error al obtener historial:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener historial: ${error.message}`,
+      originModule: 'reservations.controller - getHistory',
+      severity: 'medium',
+      errorObject: error
+    });
+
+    return res.status(500).json({
+      message: 'Error al obtener historial de reserva'
+    });
+  }
+}
+
+/**
+ * Obtener transiciones válidas para una reserva
+ */
+async function getValidTransitions(req, res) {
+  try {
+    const { id } = req.params;
+
+    const reservation = await prisma.reservations.findUnique({
+      where: { id: parseInt(id) },
+      select: { status: true }
+    });
+
+    if (!reservation) {
+      return res.status(404).json({
+        message: 'Reserva no encontrada'
+      });
+    }
+
+    const validTransitions = statusService.getValidTransitions(reservation.status);
+
+    return res.status(200).json({
+      currentStatus: reservation.status,
+      validTransitions
+    });
+
+  } catch (error) {
+    console.error('Error al obtener transiciones válidas:', error);
+
+    return res.status(500).json({
+      message: 'Error al obtener transiciones válidas'
+    });
+  }
+}
+
 module.exports = {
+  getAllReservations,
+  getReservationById,
   searchAvailability,
   calculatePrice,
   createReservation,
   getAvailableServices,
-  getBreakfastMenu, // NUEVO
+  getBreakfastMenu,
+  // Nuevos endpoints de estado
+  changeStatus,
+  checkIn,
+  checkOut,
+  getHistory,
+  getValidTransitions
 };

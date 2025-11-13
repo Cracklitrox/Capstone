@@ -51,19 +51,19 @@ const StatusSummary = ({ rooms }) => {
     {
       label: "Disponibles",
       count: statusCounts.available,
-      color: "text-green-500",
+      color: "text-green-700 dark:text-green-400",
     },
-    { label: "Ocupadas", count: statusCounts.occupied, color: "text-red-500" },
+    { label: "Ocupadas", count: statusCounts.occupied, color: "text-red-700 dark:text-red-400" },
     {
       label: "Pendientes",
       count: statusCounts.pending,
-      color: "text-orange-500",
+      color: "text-orange-700 dark:text-orange-400",
     },
-    { label: "Limpieza", count: statusCounts.cleaning, color: "text-blue-500" },
+    { label: "Limpieza", count: statusCounts.cleaning, color: "text-blue-700 dark:text-blue-400" },
     {
       label: "Mantenimiento",
       count: statusCounts.maintenance,
-      color: "text-slate-500",
+      color: "text-slate-700 dark:text-slate-400",
     },
   ];
   return (
@@ -374,7 +374,7 @@ function RoomBoard() {
                   handleFilterChange("selectedType", value)
                 }
               >
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filtrar por tipo de habitación">
                   <SelectValue placeholder="Tipo..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -391,7 +391,7 @@ function RoomBoard() {
                   handleFilterChange("selectedCapacity", value)
                 }
               >
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filtrar por capacidad">
                   <SelectValue placeholder="Capacidad..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -408,7 +408,7 @@ function RoomBoard() {
                   handleFilterChange("selectedFloor", value)
                 }
               >
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filtrar por piso">
                   <SelectValue placeholder="Piso..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -425,7 +425,7 @@ function RoomBoard() {
                   handleFilterChange("selectedStatus", value)
                 }
               >
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filtrar por estado">
                   <SelectValue placeholder="Estado..." />
                 </SelectTrigger>
                 <SelectContent>

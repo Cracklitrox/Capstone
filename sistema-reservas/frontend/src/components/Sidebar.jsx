@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useSocketNotifications } from "../hooks/useSocketNotifications.js";
-import { useNotificationsContext } from "../hooks/useNotificationsContext";
 import { Button } from "@/components/ui/Button.jsx";
 import {
   HomeIcon,
@@ -12,10 +11,17 @@ import {
   ClockIcon,
   BellAlertIcon,
   BellIcon,
-  ChartBarIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
-import { PlusCircle, MessageSquare } from "lucide-react";
+import {
+  PlusCircle,
+  ClipboardList,
+  CheckCircle2,
+  DoorOpen,
+  Hotel,
+  LayoutGrid,
+  MessageSquare
+} from "lucide-react";
 
 // Menú principal con submenú para habitaciones
 const navLinks = [
@@ -30,6 +36,51 @@ const navLinks = [
     label: "Planning",
     icon: ViewColumnsIcon,
     roles: ["administrator", "receptionist"],
+  },
+  {
+    label: "Gestión de Reservas",
+    icon: ClipboardList,
+    roles: ["administrator", "receptionist"],
+    submenu: [
+      {
+        href: "/reservations/manage",
+        label: "Todas las Reservas",
+        icon: ClipboardList,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/reservations/new",
+        label: "Nueva Reserva",
+        icon: PlusCircle,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/reservations/checkins-today",
+        label: "Check-ins Hoy",
+        icon: CheckCircle2,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/reservations/checkouts-today",
+        label: "Check-outs Hoy",
+        icon: DoorOpen,
+        roles: ["administrator", "receptionist"],
+        showBadge: true,
+      },
+      {
+        href: "/reservations/in-progress",
+        label: "En Progreso",
+        icon: Hotel,
+        roles: ["administrator", "receptionist"],
+      },
+    ],
+  },
+  {
+    href: "/checkout-alerts",
+    label: "Check-outs Hoy (Viejo)",
+    icon: BellAlertIcon,
+    roles: ["administrator", "receptionist"],
+    showBadge: true,
   },
   {
     href: "/guests",
@@ -47,29 +98,41 @@ const navLinks = [
         label: "Centro de Notificaciones",
         icon: BellIcon,
         roles: ["administrator", "receptionist"],
-        showBadge: true, // ✅ Mostrar badge de notificaciones no leídas
+        showBadge: true,
       },
       {
         href: "/notifications/checkouts",
         label: "Check-outs",
         icon: BellAlertIcon,
-        roles: ["receptionist"], // ⭐ SOLO recepcionista
+        roles: ["receptionist"],
         showBadge: true,
       },
       {
         href: "/notifications/chatbot",
         label: "Chatbot WhatsApp",
         icon: MessageSquare,
-        roles: ["receptionist"], // ⭐ SOLO recepcionista
-        showBadge: true, // ✅ Mostrar badge de WhatsApp
+        roles: ["receptionist"],
+        showBadge: true,
       },
     ],
   },
   {
     label: "Gestionar Habitaciones",
     icon: ViewColumnsIcon,
-    roles: ["administrator"],
+    roles: ["administrator", "receptionist"],
     submenu: [
+      {
+        href: "/rooms/pending",
+        label: "Habitaciones Pendientes",
+        icon: ClockIcon,
+        roles: ["administrator", "receptionist"],
+      },
+      {
+        href: "/admin/room-status-board",
+        label: "Tablero de Estados",
+        icon: LayoutGrid,
+        roles: ["administrator"],
+      },
       {
         href: "/admin/rooms-crud",
         label: "Habitaciones",
@@ -85,12 +148,6 @@ const navLinks = [
     ],
   },
   {
-    href: "/reservations/new",
-    label: "Nueva Reserva",
-    icon: PlusCircle,
-    roles: ["receptionist", "administrator"],
-  },
-  {
     href: "/history",
     label: "Historial de Reservas",
     icon: ClockIcon,
@@ -98,7 +155,7 @@ const navLinks = [
   },
   {
     href: "/reports",
-    label: "Reportes y Estadísticas",
+    label: "Reportes",
     icon: ChartBarIcon,
     roles: ["administrator"],
   },
@@ -153,23 +210,11 @@ const NavLink = ({
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { user } = useAuth();
   const closeSidebar = () => setSidebarOpen(false);
-  const [openMenus, setOpenMenus] = useState({
-    'gestionar-habitaciones': false,
-    'notificaciones': false,
-  });
+  const [roomsOpen, setRoomsOpen] = useState(false);
+  const [reservationsOpen, setReservationsOpen] = useState(false);
 
   // ⭐ Usar WebSocket en lugar de polling
-  const { checkoutCount, whatsappCount, isConnected } = useSocketNotifications();
-
-  // ⭐ Obtener contador de notificaciones no leídas
-  const { unreadCount } = useNotificationsContext();
-
-  const toggleMenu = (menuKey) => {
-    setOpenMenus((prev) => ({
-      ...prev,
-      [menuKey]: !prev[menuKey],
-    }));
-  };
+  const { checkoutCount, isConnected } = useSocketNotifications();
 
   return (
     <>
@@ -204,9 +249,15 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       <button
                         type="button"
                         className="flex items-center gap-2 font-semibold text-[var(--secondary)] mb-1 w-full focus:outline-none px-2"
-                        onClick={() => toggleMenu(link.label.toLowerCase().replace(/\s+/g, '-'))}
-                        aria-expanded={openMenus[link.label.toLowerCase().replace(/\s+/g, '-')]}
-                        aria-controls={`submenu-${link.label.toLowerCase().replace(/\s+/g, '-')}`}
+                        onClick={() => {
+                          if (link.label === "Gestionar Habitaciones") {
+                            setRoomsOpen((open) => !open);
+                          } else if (link.label === "Gestión de Reservas") {
+                            setReservationsOpen((open) => !open);
+                          }
+                        }}
+                        aria-expanded={link.label === "Gestionar Habitaciones" ? roomsOpen : reservationsOpen}
+                        aria-controls={link.label === "Gestionar Habitaciones" ? "submenu-habitaciones" : "submenu-reservas"}
                         style={{ minHeight: "40px" }}
                       >
                         {link.icon && (
@@ -214,7 +265,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         )}
                         <span className="flex-1 text-left">{link.label}</span>
                         <svg
-                          className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${openMenus[link.label.toLowerCase().replace(/\s+/g, '-')] ? "rotate-90" : ""}`}
+                          className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${
+                            (link.label === "Gestionar Habitaciones" && roomsOpen) ||
+                            (link.label === "Gestión de Reservas" && reservationsOpen)
+                              ? "rotate-90"
+                              : ""
+                          }`}
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -228,45 +284,41 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         </svg>
                       </button>
                       <ul
-                        id={`submenu-${link.label.toLowerCase().replace(/\s+/g, '-')}`}
-                        className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${openMenus[link.label.toLowerCase().replace(/\s+/g, '-')] ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}
-                        style={{ maxHeight: openMenus[link.label.toLowerCase().replace(/\s+/g, '-')] ? "200px" : "0px" }}
+                        id={link.label === "Gestionar Habitaciones" ? "submenu-habitaciones" : "submenu-reservas"}
+                        className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${
+                          (link.label === "Gestionar Habitaciones" && roomsOpen) ||
+                          (link.label === "Gestión de Reservas" && reservationsOpen)
+                            ? "max-h-96 opacity-100"
+                            : "max-h-0 opacity-0"
+                        }`}
+                        style={{
+                          maxHeight:
+                            (link.label === "Gestionar Habitaciones" && roomsOpen) ||
+                            (link.label === "Gestión de Reservas" && reservationsOpen)
+                              ? "400px"
+                              : "0px",
+                        }}
                       >
                         {link.submenu
                           .filter((sub) => sub.roles.includes(user.role))
-                          .map((sub) => {
-                            // Determinar qué contador usar según el href
-                            let badgeValue = null;
-                            if (sub.showBadge) {
-                              if (sub.href === '/notifications') {
-                                badgeValue = unreadCount; // ⭐ Contador de notificaciones no leídas
-                              } else if (sub.href === '/notifications/checkouts') {
-                                badgeValue = checkoutCount;
-                              } else if (sub.href === '/notifications/chatbot') {
-                                badgeValue = whatsappCount;
-                              }
-                            }
-
-                            return (
-                              <li key={sub.label} className="w-full">
-                                <NavLink
-                                  href={sub.href}
-                                  label={sub.label}
-                                  icon={sub.icon}
-                                  onClick={closeSidebar}
-                                  className="px-2 py-2 rounded-md hover:bg-[var(--card)] transition text-sm min-w-0 flex-1 text-left break-words whitespace-normal sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg 2xl:max-w-xl"
-                                  style={{
-                                    wordBreak: "break-word",
-                                    whiteSpace: "normal",
-                                    maxWidth: "100%",
-                                    overflowWrap: "break-word",
-                                    hyphens: "auto",
-                                  }}
-                                  badge={badgeValue}
-                                />
-                              </li>
-                            );
-                          })}
+                          .map((sub) => (
+                            <li key={sub.label} className="w-full">
+                              <NavLink
+                                href={sub.href}
+                                label={sub.label}
+                                icon={sub.icon}
+                                onClick={closeSidebar}
+                                className="px-2 py-2 rounded-md hover:bg-[var(--card)] transition text-sm min-w-0 flex-1 text-left break-words whitespace-normal sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg 2xl:max-w-xl"
+                                style={{
+                                  wordBreak: "break-word",
+                                  whiteSpace: "normal",
+                                  maxWidth: "100%",
+                                  overflowWrap: "break-word",
+                                  hyphens: "auto",
+                                }}
+                              />
+                            </li>
+                          ))}
                       </ul>
                     </li>
                   ) : (
@@ -276,6 +328,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                         label={link.label}
                         icon={link.icon}
                         onClick={closeSidebar}
+                        badge={link.showBadge ? checkoutCount : null}
                       />
                     </li>
                   )
