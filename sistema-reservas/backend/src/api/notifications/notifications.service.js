@@ -2,9 +2,9 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 /**
- * Obtiene las reservas con check-out para el día actual en zona horaria de Chile
- * Retorna información detallada de habitaciones y huéspedes que deben hacer check-out hoy
- * Agrupa por huésped principal mostrando todas sus habitaciones
+ * Obtiene las alertas de checkout del día actual desde la tabla alerts
+ * Retorna información detallada de las reservas con checkout programado para hoy
+ * Ahora usa la tabla alerts en lugar de consultar reservations directamente
  */
 async function getCheckoutAlertsForToday() {
   // Configurar fecha actual en zona horaria de Chile (UTC-3)
@@ -12,89 +12,100 @@ async function getCheckoutAlertsForToday() {
   const chileOffset = -3 * 60; // Chile está en UTC-3
   const localOffset = now.getTimezoneOffset();
   const chileTime = new Date(now.getTime() + (localOffset + chileOffset) * 60 * 1000);
-  
+
   // Inicio del día en Chile (00:00:00)
   const startOfDay = new Date(chileTime);
   startOfDay.setHours(0, 0, 0, 0);
-  
+
   // Fin del día en Chile (23:59:59)
   const endOfDay = new Date(chileTime);
   endOfDay.setHours(23, 59, 59, 999);
 
-  // Consultar reservas con check-out hoy y estado activo
-  const reservations = await prisma.reservations.findMany({
+  // Consultar alertas de checkout creadas hoy
+  const checkoutAlerts = await prisma.alerts.findMany({
     where: {
-      check_out_date: {
+      type: 'checkout',
+      created_at: {
         gte: startOfDay,
         lte: endOfDay,
       },
       status: {
-        in: ['in_progress', 'confirmed'], // Solo reservas activas
+        in: ['pending', 'resolved'], // Incluir pending y resolved
       },
     },
     include: {
-      users_reservations_main_guest_idTousers: {
-        select: {
-          id: true,
-          first_name: true,
-          paternal_last_name: true,
-          maternal_last_name: true,
-          email: true,
-          phone_number: true,
-        },
-      },
-      reservation_rooms: {
+      reservations: {
         include: {
-          rooms: {
+          users_reservations_main_guest_idTousers: {
+            select: {
+              id: true,
+              first_name: true,
+              paternal_last_name: true,
+              maternal_last_name: true,
+              email: true,
+              phone_number: true,
+            },
+          },
+          reservation_rooms: {
             include: {
-              room_types: true,
+              rooms: {
+                include: {
+                  room_types: true,
+                },
+              },
             },
           },
         },
       },
     },
     orderBy: {
-      check_out_date: 'asc',
+      created_at: 'asc',
     },
   });
 
-  // Transformar los datos agrupando por huésped con todas sus habitaciones
-  const alerts = reservations.map((reservation) => {
-    const guest = reservation.users_reservations_main_guest_idTousers;
-    
-    // Obtener todas las habitaciones de esta reserva
-    const rooms = reservation.reservation_rooms.map((roomData) => ({
-      id: roomData.rooms.id,
-      number: roomData.rooms.room_number,
-      floor: roomData.rooms.floor,
-      type: roomData.rooms.room_types?.name || 'N/A',
-      status: roomData.rooms.status,
-      startDate: roomData.start_date,
-      endDate: roomData.end_date,
-      price: roomData.unit_price,
-      subtotal: roomData.subtotal,
-    }));
+  // Transformar los datos al mismo formato que antes para compatibilidad
+  const alerts = checkoutAlerts
+    .filter(alert => alert.reservations) // Filtrar alertas sin reserva
+    .map((alert) => {
+      const reservation = alert.reservations;
+      const guest = reservation.users_reservations_main_guest_idTousers;
 
-    return {
-      reservationId: reservation.id,
-      reservationCode: reservation.code,
-      checkOutDate: reservation.check_out_date,
-      checkOutTime: '11:00 AM', // Hora estándar de check-out
-      guestInfo: {
-        id: guest.id,
-        fullName: `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ' ' + guest.maternal_last_name : ''}`.trim(),
-        firstName: guest.first_name,
-        paternalLastName: guest.paternal_last_name,
-        maternalLastName: guest.maternal_last_name,
-        email: guest.email,
-        phone: guest.phone_number,
-      },
-      rooms: rooms, // Array de todas las habitaciones
-      roomCount: rooms.length, // Número de habitaciones
-      status: reservation.status,
-      guestCount: reservation.guest_count,
-    };
-  });
+      // Obtener todas las habitaciones de esta reserva
+      const rooms = reservation.reservation_rooms.map((roomData) => ({
+        id: roomData.rooms.id,
+        number: roomData.rooms.room_number,
+        floor: roomData.rooms.floor,
+        type: roomData.rooms.room_types?.name || 'N/A',
+        status: roomData.rooms.status,
+        startDate: roomData.start_date,
+        endDate: roomData.end_date,
+        price: roomData.unit_price,
+        subtotal: roomData.subtotal,
+      }));
+
+      return {
+        alertId: alert.id, // ID de la alerta
+        reservationId: reservation.id,
+        reservationCode: reservation.code,
+        checkOutDate: reservation.check_out_date,
+        checkOutTime: '11:00 AM', // Hora estándar de check-out
+        guestInfo: {
+          id: guest.id,
+          fullName: `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ' ' + guest.maternal_last_name : ''}`.trim(),
+          firstName: guest.first_name,
+          paternalLastName: guest.paternal_last_name,
+          maternalLastName: guest.maternal_last_name,
+          email: guest.email,
+          phone: guest.phone_number,
+        },
+        rooms: rooms, // Array de todas las habitaciones
+        roomCount: rooms.length, // Número de habitaciones
+        status: reservation.status,
+        guestCount: reservation.guest_count,
+        detail: alert.detail, // Campo detail de la alerta
+        createdAt: alert.created_at, // Cuándo se creó la alerta
+      };
+    });
 
   return alerts;
 }
