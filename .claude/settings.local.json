@@ -21,7 +21,8 @@
       "Bash(curl:*)",
       "Bash(set DATABASE_URL=postgresql://reservas_user:ReservasDevPass_2025@localhost:5433/reservas_db)",
       "Bash(git rm:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(prisma/migrations/20251113000000_init_complete_schema/migration.sql)"
     ],
     "deny": [],
     "ask": []

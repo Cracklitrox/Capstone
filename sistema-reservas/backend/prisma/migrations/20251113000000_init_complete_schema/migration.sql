@@ -5,7 +5,7 @@ CREATE TYPE "alert_status_enum" AS ENUM ('pending', 'resolved', 'ignored');
 CREATE TYPE "alert_priority_enum" AS ENUM ('low', 'medium', 'high', 'critical');
 
 -- CreateEnum
-CREATE TYPE "alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest', 'booking_request');
+CREATE TYPE "alert_type_enum" AS ENUM ('reservation', 'payment', 'maintenance', 'guest', 'booking_request', 'checkout');
 
 -- CreateEnum
 CREATE TYPE "error_severity_enum" AS ENUM ('low', 'medium', 'high', 'critical');
@@ -88,6 +88,7 @@ CREATE TABLE "alert_read_status" (
     "user_id" INTEGER NOT NULL,
     "status" "alert_status_enum" DEFAULT 'pending',
     "updated_at" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
+    "deleted_at" TIMESTAMP(6),
 
     CONSTRAINT "alert_read_status_pkey" PRIMARY KEY ("id")
 );
@@ -96,19 +97,12 @@ CREATE TABLE "alert_read_status" (
 CREATE TABLE "alerts" (
     "id" SERIAL NOT NULL,
     "type" "alert_type_enum" NOT NULL,
-    "priority" "alert_priority_enum" NOT NULL DEFAULT 'medium',
     "status" "alert_status_enum" NOT NULL DEFAULT 'pending',
-    "title" VARCHAR(150) NOT NULL,
-    "message" TEXT NOT NULL,
-    "target_role" "role_name_enum",
-    "action_type" VARCHAR(50),
     "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "resolved_at" TIMESTAMP(6),
-    "resolved_by" INTEGER,
-    "resolution_notes" TEXT,
-    "origin_user_id" INTEGER,
+    "last_viewed_at" TIMESTAMP(6),
     "reservation_id" INTEGER,
-    "payment_id" INTEGER,
+    "detail" VARCHAR(250),
+    "full_summary" JSONB,
 
     CONSTRAINT "alerts_pkey" PRIMARY KEY ("id")
 );
@@ -386,7 +380,8 @@ CREATE TABLE "users" (
     "country" VARCHAR(100),
     "region" VARCHAR(100),
     "city" VARCHAR(100),
-    "password_hash" VARCHAR(255) NOT NULL,
+    "password_hash" VARCHAR(255),
+    "can_login" BOOLEAN DEFAULT true,
     "status" "user_status_enum" DEFAULT 'active',
     "is_fully_registered" BOOLEAN DEFAULT true,
     "last_login_at" TIMESTAMP(6),
@@ -544,6 +539,9 @@ CREATE TABLE "additional_charges" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "alert_read_status_alert_id_user_id_key" ON "alert_read_status"("alert_id", "user_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "promotions_code_key" ON "promotions"("code");
 
 -- CreateIndex
@@ -593,15 +591,6 @@ ALTER TABLE "alert_read_status" ADD CONSTRAINT "alert_read_status_alert_id_fkey"
 
 -- AddForeignKey
 ALTER TABLE "alert_read_status" ADD CONSTRAINT "alert_read_status_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
-
--- AddForeignKey
-ALTER TABLE "alerts" ADD CONSTRAINT "alerts_origin_user_id_fkey" FOREIGN KEY ("origin_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
-
--- AddForeignKey
-ALTER TABLE "alerts" ADD CONSTRAINT "alerts_resolved_by_fkey" FOREIGN KEY ("resolved_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
-
--- AddForeignKey
-ALTER TABLE "alerts" ADD CONSTRAINT "alerts_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "payments"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "alerts" ADD CONSTRAINT "alerts_reservation_id_fkey" FOREIGN KEY ("reservation_id") REFERENCES "reservations"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
@@ -728,3 +717,4 @@ ALTER TABLE "additional_charges" ADD CONSTRAINT "additional_charges_service_id_f
 
 -- AddForeignKey
 ALTER TABLE "additional_charges" ADD CONSTRAINT "additional_charges_charged_by_id_fkey" FOREIGN KEY ("charged_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+
