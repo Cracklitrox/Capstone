@@ -4,9 +4,10 @@ const prisma = new PrismaClient();
 /**
  * Obtiene las alertas de checkout del día actual desde la tabla alerts
  * Retorna información detallada de las reservas con checkout programado para hoy
- * Ahora usa la tabla alerts en lugar de consultar reservations directamente
+ * Filtra solo las alertas que el usuario NO ha marcado como leídas
+ * @param {number} userId - ID del usuario (opcional, si no se pasa retorna todas)
  */
-async function getCheckoutAlertsForToday() {
+async function getCheckoutAlertsForToday(userId = null) {
   // Configurar fecha actual en zona horaria de Chile (UTC-3)
   const now = new Date();
   const chileOffset = -3 * 60; // Chile está en UTC-3
@@ -21,18 +22,42 @@ async function getCheckoutAlertsForToday() {
   const endOfDay = new Date(chileTime);
   endOfDay.setHours(23, 59, 59, 999);
 
+  // Construir where clause base
+  const whereClause = {
+    type: 'checkout',
+    created_at: {
+      gte: startOfDay,
+      lte: endOfDay,
+    },
+    status: {
+      in: ['pending', 'resolved'], // Incluir pending y resolved
+    },
+  };
+
+  // Si se proporciona userId, filtrar solo alertas NO vistas por este usuario
+  if (userId) {
+    whereClause.alert_read_status = {
+      none: {
+        user_id: userId,
+        OR: [
+          {
+            status: {
+              in: ['resolved', 'ignored'],
+            },
+          },
+          {
+            deleted_at: {
+              not: null,
+            },
+          },
+        ],
+      },
+    };
+  }
+
   // Consultar alertas de checkout creadas hoy
   const checkoutAlerts = await prisma.alerts.findMany({
-    where: {
-      type: 'checkout',
-      created_at: {
-        gte: startOfDay,
-        lte: endOfDay,
-      },
-      status: {
-        in: ['pending', 'resolved'], // Incluir pending y resolved
-      },
-    },
+    where: whereClause,
     include: {
       reservations: {
         include: {

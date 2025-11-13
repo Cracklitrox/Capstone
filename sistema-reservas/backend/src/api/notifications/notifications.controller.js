@@ -2,11 +2,16 @@ const notificationsService = require('./notifications.service');
 
 /**
  * Controlador para obtener las alertas de check-out del día actual
+ * Filtra solo las alertas que el usuario actual NO ha marcado como leídas
  * @route GET /api/v1/notifications/checkout-alerts
  */
 async function getCheckoutAlerts(req, res, next) {
   try {
-    const alerts = await notificationsService.getCheckoutAlertsForToday();
+    // Obtener userId del token JWT (agregado por middleware de autenticación)
+    const userId = req.user?.id;
+
+    // Pasar userId para filtrar solo alertas NO vistas por este usuario
+    const alerts = await notificationsService.getCheckoutAlertsForToday(userId);
     const chileTime = notificationsService.getChileTime();
 
     res.json({
@@ -14,7 +19,7 @@ async function getCheckoutAlerts(req, res, next) {
       count: alerts.length,
       currentTime: chileTime,
       data: alerts,
-      message: alerts.length > 0 
+      message: alerts.length > 0
         ? `Se encontraron ${alerts.length} habitación(es) con check-out programado para hoy.`
         : 'No hay check-outs programados para hoy.',
     });
