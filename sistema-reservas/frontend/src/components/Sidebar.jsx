@@ -92,14 +92,7 @@ const navLinks = [
         label: "Centro de Notificaciones",
         icon: BellIcon,
         roles: ["administrator", "receptionist"],
-        showBadge: true,
-      },
-      {
-        href: "/notifications/checkouts",
-        label: "Check-outs",
-        icon: BellAlertIcon,
-        roles: ["receptionist"],
-        showBadge: true,
+        showBadge: false,
       },
       {
         href: "/notifications/chatbot",
@@ -234,7 +227,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-primary">Hotel Don Teo</h2>
           </div>
-          <nav className="flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-primary/40 scrollbar-track-card/40 pr-2">
+          <nav className="flex-grow overflow-y-auto pr-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <ul className="space-y-2">
               {navLinks
                 .filter((link) => link.roles.includes(user.role))
@@ -320,14 +313,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                             // Determinar el badge basado en la ruta
                             let badgeCount = null;
                             if (sub.showBadge) {
-                              if (sub.href === "/notifications/checkouts") {
-                                badgeCount = checkoutCount;
-                              } else if (sub.href === "/notifications/chatbot") {
+                              if (sub.href === "/notifications/chatbot") {
                                 badgeCount = whatsappCount;
                               } else if (sub.href === "/reservations/checkouts-today") {
                                 badgeCount = checkoutCount;
-                              } else if (sub.href === "/notifications") {
-                                badgeCount = checkoutCount + whatsappCount;
                               }
                             }
 

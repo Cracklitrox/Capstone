@@ -47,18 +47,30 @@ const processor = async (job) => {
       failed: [],
     };
 
-    // Cambiar estado de cada reserva
+    // Cambiar estado de cada reserva y crear alerta
     for (const reservation of reservations) {
       try {
-        await changeReservationStatus(
-          reservation.id,
-          'pending_checkout',
-          null, // userId (sistema automático)
-          'Cambio automático por scheduler - día de check-out'
-        );
+        // Cambiar estado de la reserva
+        await changeReservationStatus({
+          reservationId: reservation.id,
+          newStatus: 'pending_checkout',
+          userId: null, // sistema automático
+          userRole: null,
+          reason: 'Cambio automático por scheduler - día de check-out'
+        });
+
+        // Crear alerta de checkout para esta reserva
+        await prisma.alerts.create({
+          data: {
+            type: 'checkout',
+            status: 'pending',
+            reservation_id: reservation.id,
+            detail: `Check-out para hoy - ${reservation.code}`,
+          },
+        });
 
         results.success.push(reservation.code);
-        console.log(`   ✅ Reservation ${reservation.code} → pending_checkout`);
+        console.log(`   ✅ Reservation ${reservation.code} → pending_checkout + alerta creada`);
       } catch (error) {
         results.failed.push({
           code: reservation.code,

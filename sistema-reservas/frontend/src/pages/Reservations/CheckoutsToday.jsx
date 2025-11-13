@@ -18,9 +18,35 @@ const CheckoutsToday = () => {
 
   useEffect(() => {
     fetchCheckouts();
+    markCheckoutAlertsAsViewed(); // Marcar alertas como vistas al cargar la página
     const interval = setInterval(fetchCheckouts, 300000); // 5 min
     return () => clearInterval(interval);
   }, []);
+
+  // Marcar alertas de checkout como vistas
+  const markCheckoutAlertsAsViewed = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        'http://localhost:3001/api/v1/notifications/checkout-alerts/mark-viewed',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+        }
+      );
+
+      if (response.ok) {
+        console.log('✅ Alertas de checkout marcadas como vistas');
+        // Emitir evento para actualizar contador
+        window.dispatchEvent(new Event('checkoutAlertsCleared'));
+      }
+    } catch (error) {
+      console.error('Error al marcar alertas como vistas:', error);
+    }
+  };
 
   const fetchCheckouts = async () => {
     try {

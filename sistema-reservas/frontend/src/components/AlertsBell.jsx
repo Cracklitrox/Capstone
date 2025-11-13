@@ -62,7 +62,7 @@ export function AlertsBell({ checkoutCount = 0, whatsappCount = 0 }) {
 
   const handleViewCheckouts = () => {
     setIsOpen(false);
-    navigate('/notifications/checkouts');
+    navigate('/reservations/checkouts-today');
   };
 
   const handleViewWhatsApp = () => {

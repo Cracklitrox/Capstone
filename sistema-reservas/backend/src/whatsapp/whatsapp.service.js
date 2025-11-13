@@ -255,9 +255,6 @@ class WhatsAppService {
         data: {
           type: 'booking_request',
           status: 'pending',
-          origin_user_id: null,
-          reservation_id: null,
-          payment_id: null,
           detail: shortDetail,
           full_summary: fullSummary
         }
