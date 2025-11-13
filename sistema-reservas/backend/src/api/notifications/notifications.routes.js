@@ -228,4 +228,17 @@ router.get(
   notificationsController.getFutureCheckouts
 );
 
+/**
+ * @route DELETE /api/v1/notifications/checkout-alerts/:id
+ * @desc Elimina (soft delete) una alerta de checkout para el usuario actual
+ * @access Recepcionista y Administrador
+ */
+router.delete(
+  "/checkout-alerts/:id",
+  notificationsLimiter,
+  authenticate,
+  authorize(["receptionist", "administrator"]),
+  notificationsController.deleteCheckoutAlert
+);
+
 module.exports = router;

@@ -79,6 +79,7 @@ CREATE TABLE "public"."alert_read_status" (
     "user_id" INTEGER NOT NULL,
     "status" "public"."alert_status_enum" DEFAULT 'pending',
     "updated_at" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
+    "deleted_at" TIMESTAMP(6),
 
     CONSTRAINT "alert_read_status_pkey" PRIMARY KEY ("id")
 );

@@ -218,7 +218,7 @@ async function getCheckoutAlertsCount(userId) {
 
     console.log(`🔍 Total de alertas de checkout hoy: ${totalCheckoutAlerts}`);
 
-    // Contar alertas de checkout creadas hoy que el usuario no ha marcado como leídas
+    // Contar alertas de checkout creadas hoy que el usuario no ha marcado como leídas o eliminadas
     const count = await prisma.alerts.count({
       where: {
         type: 'checkout',
@@ -226,13 +226,22 @@ async function getCheckoutAlertsCount(userId) {
           gte: startOfDay,
           lte: endOfDay,
         },
-        // No debe tener un registro de lectura para este usuario con status resolved o ignored
+        // No debe tener un registro de lectura para este usuario con status resolved/ignored o deleted_at no null
         alert_read_status: {
           none: {
             user_id: userId,
-            status: {
-              in: ['resolved', 'ignored'],
-            },
+            OR: [
+              {
+                status: {
+                  in: ['resolved', 'ignored'],
+                },
+              },
+              {
+                deleted_at: {
+                  not: null,
+                },
+              },
+            ],
           },
         },
       },
@@ -339,6 +348,58 @@ async function hasUserViewedCheckoutsToday(userId) {
   } catch (error) {
     console.error('❌ Error al verificar si usuario vio checkouts:', error);
     return false;
+  }
+}
+
+/**
+ * Elimina (soft delete) una alerta de checkout para un usuario
+ * @param {number} alertId - ID de la alerta
+ * @param {number} userId - ID del usuario
+ * @returns {Object} Resultado de la operación
+ */
+async function deleteCheckoutAlert(alertId, userId) {
+  try {
+    // Verificar que la alerta existe y es de tipo checkout
+    const alert = await prisma.alerts.findFirst({
+      where: {
+        id: alertId,
+        type: 'checkout',
+      },
+    });
+
+    if (!alert) {
+      throw new Error('Alerta de checkout no encontrada');
+    }
+
+    // Marcar como eliminada en alert_read_status
+    const result = await prisma.alert_read_status.upsert({
+      where: {
+        alert_id_user_id: {
+          alert_id: alertId,
+          user_id: userId,
+        },
+      },
+      update: {
+        deleted_at: new Date(),
+        updated_at: new Date(),
+      },
+      create: {
+        alert_id: alertId,
+        user_id: userId,
+        status: 'ignored',
+        deleted_at: new Date(),
+      },
+    });
+
+    console.log(`🗑️ Usuario ${userId} eliminó alerta de checkout ${alertId}`);
+
+    return {
+      success: true,
+      message: 'Alerta de checkout eliminada',
+    };
+  } catch (error) {
+    console.error('❌ Error al eliminar alerta de checkout:', error);
+    throw error;
   }
 }
 
@@ -528,4 +589,5 @@ module.exports = {
   createOrUpdateCheckoutAlerts,
   markCheckoutAlertsAsViewed,
   hasUserViewedCheckoutsToday,
+  deleteCheckoutAlert,
 };

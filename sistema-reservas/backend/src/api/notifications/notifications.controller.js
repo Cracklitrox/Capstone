@@ -160,6 +160,35 @@ async function getFutureCheckouts(req, res, next) {
   }
 }
 
+/**
+ * Controlador para eliminar una alerta de checkout (soft delete)
+ * @route DELETE /api/v1/notifications/checkout-alerts/:id
+ */
+async function deleteCheckoutAlert(req, res, next) {
+  try {
+    const alertId = parseInt(req.params.id);
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado',
+      });
+    }
+
+    const result = await notificationsService.deleteCheckoutAlert(alertId, userId);
+
+    res.json({
+      success: true,
+      message: 'Alerta de checkout eliminada',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error al eliminar alerta de checkout:', error);
+    next(error);
+  }
+}
+
 module.exports = {
   getCheckoutAlerts,
   getCheckoutAlertsCount,
@@ -167,4 +196,5 @@ module.exports = {
   hasViewedCheckoutsToday,
   getPastCheckouts,
   getFutureCheckouts,
+  deleteCheckoutAlert,
 };
