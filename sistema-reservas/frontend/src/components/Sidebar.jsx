@@ -94,10 +94,23 @@ const navLinks = [
     roles: ["administrator", "receptionist"],
   },
   {
-    href: "/reports",
-    label: "Reportes y Estadísticas",
+    label: "Reportes",
     icon: ChartBarIcon,
     roles: ["administrator"],
+    submenu: [
+      {
+        href: "/admin-reports",
+        label: "Dashboard Administrativo",
+        icon: ChartBarIcon,
+        roles: ["administrator"],
+      },
+      {
+        href: "/reports",
+        label: "Reportes Detallados",
+        icon: ChartBarIcon,
+        roles: ["administrator"],
+      },
+    ],
   },
   {
     href: "/profile",
