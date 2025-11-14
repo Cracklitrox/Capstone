@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useSocketNotifications } from "../hooks/useSocketNotifications"; // ⭐ NUEVO
 import { useNotificationsContext } from "../hooks/useNotificationsContext";
-import CheckoutNotificationPopover from "./CheckoutNotificationPopover";
+import { AlertsBell } from "./AlertsBell";
 import { NotificationBell } from "./NotificationBell";
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/Switch.jsx";
@@ -12,14 +12,12 @@ import {
   Bars3Icon,
   SunIcon,
   MoonIcon,
-  BellAlertIcon,
 } from "@heroicons/react/24/outline";
 import { Link } from "react-router-dom";
 
 const Navbar = ({ toggleSidebar }) => {
   const { logout, user, isDarkMode, toggleTheme } = useAuth();
   const { checkoutCount, whatsappCount, totalCount } = useSocketNotifications(); // ⭐ NUEVO: Usar WebSocket
-  const [showPopover, setShowPopover] = useState(false);
 
   // Hook de notificaciones en tiempo real desde el contexto global
   const {
@@ -77,32 +75,12 @@ const Navbar = ({ toggleSidebar }) => {
           />
         )}
 
-        {/* Campanita de notificaciones de checkout - Solo para recepcionistas */}
+        {/* Campanita de alertas del sistema - Solo para recepcionistas */}
         {user?.role === "receptionist" && (
-          <>
-            <Button
-              onClick={() => setShowPopover(true)}
-              variant="ghost"
-              size="icon"
-              className="relative"
-              title="Ver alertas"
-            >
-              <BellAlertIcon className="h-6 w-6" />
-              {totalCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {totalCount > 9 ? "9+" : totalCount}
-                </span>
-              )}
-            </Button>
-
-            {/* Popover de notificaciones */}
-            <CheckoutNotificationPopover
-              isOpen={showPopover}
-              onClose={() => setShowPopover(false)}
-              checkoutCount={checkoutCount}
-              whatsappCount={whatsappCount}
-            />
-          </>
+          <AlertsBell
+            checkoutCount={checkoutCount}
+            whatsappCount={whatsappCount}
+          />
         )}
 
         <div className="flex items-center space-x-2">

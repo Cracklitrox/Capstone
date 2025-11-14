@@ -245,6 +245,30 @@ export async function getNotificationReadStats(token, notificationId) {
   return response.json();
 }
 
+// ==================== ALERTAS ====================
+
+/**
+ * Obtiene el conteo de todas las alertas agrupadas por tipo
+ * @param {string} token - JWT token de autenticación
+ * @returns {Promise<Object>} Objeto con conteos por tipo de alerta
+ */
+export async function getAllAlertsCount(token) {
+  const response = await fetch(`${API_BASE_URL}/notifications/alerts-count`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al obtener el conteo de alertas');
+  }
+
+  return response.json();
+}
+
 // ==================== ALERTAS DE CHECK-OUT ====================
 
 /**
@@ -332,6 +356,50 @@ export async function fetchFutureCheckouts(token, days = 7) {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || 'Error al obtener checkouts futuros');
+  }
+
+  return response.json();
+}
+
+/**
+ * Marca las alertas de checkout de hoy como vistas
+ * @param {string} token - JWT token de autenticación
+ * @returns {Promise<Object>} Resultado de la operación
+ */
+export async function markCheckoutAlertsAsViewed(token) {
+  const response = await fetch(`${API_BASE_URL}/notifications/checkout-alerts/mark-viewed`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al marcar checkout alerts como vistos');
+  }
+
+  return response.json();
+}
+
+/**
+ * Verifica si el usuario ya vio los checkouts de hoy
+ * @param {string} token - JWT token de autenticación
+ * @returns {Promise<Object>} Resultado con hasViewed boolean
+ */
+export async function hasUserViewedCheckoutsToday(token) {
+  const response = await fetch(`${API_BASE_URL}/notifications/checkout-alerts/has-viewed`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al verificar visualización de checkouts');
   }
 
   return response.json();

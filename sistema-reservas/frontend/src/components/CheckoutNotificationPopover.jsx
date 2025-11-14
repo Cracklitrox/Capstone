@@ -6,8 +6,13 @@ import { getWhatsAppBookingAlerts, markWhatsAppAlertsAsViewed } from '../service
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { ClockIcon, HomeIcon, ChatBubbleLeftIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { Card } from '@/components/ui/Card';
+import { Separator } from '@/components/ui/Separator';
+import { ClockIcon, HomeIcon, ChatBubbleLeftIcon, CheckIcon, BellIcon } from '@heroicons/react/24/outline';
 import { XMarkIcon } from '@heroicons/react/24/solid';
+import { getAlertCategoryConfig } from '../config/alertCategories';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 /**
  * Popover que muestra notificaciones categorizadas: Checkouts y Solicitudes de WhatsApp

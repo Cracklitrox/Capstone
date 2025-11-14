@@ -315,6 +315,15 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
     return sum + (res.guest_count || 0);
   }, 0);
 
+  // Calcular habitaciones únicas ocupadas por reservas COMPLETADAS en el período
+  const uniqueRoomsInPeriod = new Set();
+  reservations.forEach(res => {
+    res.reservation_rooms.forEach(rr => {
+      uniqueRoomsInPeriod.add(rr.room_id);
+    });
+  });
+  const occupiedRoomsCount = uniqueRoomsInPeriod.size;
+
   const currentKPIs = {
     occupancyRate: parseFloat(occupancyRate.toFixed(2)),
     totalRevenue: Math.round(totalRevenue),
@@ -327,7 +336,8 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
     newClients: newClientsCount,
     returningClients: totalClients - newClientsCount,
     cancellationRate: parseFloat(cancellationRate.toFixed(2)),
-    noShowRate: parseFloat(noShowRate.toFixed(2))
+    noShowRate: parseFloat(noShowRate.toFixed(2)),
+    occupiedRoomsCount: occupiedRoomsCount // Habitaciones únicas usadas por reservas completadas
   };
 
   // Si no se requiere comparación, retornar solo el período actual

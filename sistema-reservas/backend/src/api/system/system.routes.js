@@ -3,6 +3,7 @@ const router = express.Router();
 const rateLimit = require("express-rate-limit");
 const { authenticate, authorize } = require("../../middleware/auth.middleware");
 const { getErrors, markErrorAsResolved } = require("./system.controller");
+const schedulerController = require("./scheduler.controller");
 
 // Rate limiter for sensitive admin actions
 const adminLimiter = rateLimit({
@@ -25,6 +26,24 @@ router.patch(
   authenticate,
   authorize(["admin"]),
   markErrorAsResolved
+);
+
+// ==================== SCHEDULER ENDPOINTS ====================
+// Obtener información de schedulers
+router.get(
+  "/scheduler/info",
+  authenticate,
+  authorize(["admin"]),
+  schedulerController.getInfo
+);
+
+// Ejecutar job manualmente (para testing)
+router.post(
+  "/scheduler/trigger",
+  adminLimiter,
+  authenticate,
+  authorize(["admin"]),
+  schedulerController.triggerJob
 );
 
 module.exports = router;

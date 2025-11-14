@@ -2,11 +2,16 @@ const notificationsService = require('./notifications.service');
 
 /**
  * Controlador para obtener las alertas de check-out del día actual
+ * Filtra solo las alertas que el usuario actual NO ha marcado como leídas
  * @route GET /api/v1/notifications/checkout-alerts
  */
 async function getCheckoutAlerts(req, res, next) {
   try {
-    const alerts = await notificationsService.getCheckoutAlertsForToday();
+    // Obtener userId del token JWT (agregado por middleware de autenticación)
+    const userId = req.user?.id;
+
+    // Pasar userId para filtrar solo alertas NO vistas por este usuario
+    const alerts = await notificationsService.getCheckoutAlertsForToday(userId);
     const chileTime = notificationsService.getChileTime();
 
     res.json({
@@ -14,7 +19,7 @@ async function getCheckoutAlerts(req, res, next) {
       count: alerts.length,
       currentTime: chileTime,
       data: alerts,
-      message: alerts.length > 0 
+      message: alerts.length > 0
         ? `Se encontraron ${alerts.length} habitación(es) con check-out programado para hoy.`
         : 'No hay check-outs programados para hoy.',
     });
@@ -26,23 +31,84 @@ async function getCheckoutAlerts(req, res, next) {
 
 /**
  * Controlador para obtener solo el conteo de alertas de check-out
+ * Considera si el usuario autenticado ya vio las alertas de hoy
  * @route GET /api/v1/notifications/checkout-count
  */
 async function getCheckoutAlertsCount(req, res, next) {
   try {
-    const count = await notificationsService.getCheckoutAlertsCount();
+    // Obtener userId del token JWT (agregado por middleware de autenticación)
+    const userId = req.user?.id;
+
+    const count = await notificationsService.getCheckoutAlertsCount(userId);
     const chileTime = notificationsService.getChileTime();
 
     res.json({
       success: true,
       count,
       currentTime: chileTime,
-      message: count > 0 
+      message: count > 0
         ? `${count} check-out(s) pendiente(s) para hoy.`
         : 'No hay check-outs pendientes para hoy.',
     });
   } catch (error) {
     console.error('Error al obtener conteo de alertas:', error);
+    next(error);
+  }
+}
+
+/**
+ * Controlador para marcar las alertas de checkout de hoy como vistas
+ * @route POST /api/v1/notifications/checkout-alerts/mark-viewed
+ */
+async function markCheckoutAlertsAsViewed(req, res, next) {
+  try {
+    // Obtener userId del token JWT
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado',
+      });
+    }
+
+    const result = await notificationsService.markCheckoutAlertsAsViewed(userId);
+
+    res.json({
+      success: true,
+      message: 'Alertas de checkout marcadas como vistas',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error al marcar checkout alerts como vistos:', error);
+    next(error);
+  }
+}
+
+/**
+ * Controlador para verificar si el usuario ya vio los checkouts de hoy
+ * @route GET /api/v1/notifications/checkout-alerts/has-viewed
+ */
+async function hasViewedCheckoutsToday(req, res, next) {
+  try {
+    // Obtener userId del token JWT
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado',
+      });
+    }
+
+    const hasViewed = await notificationsService.hasUserViewedCheckoutsToday(userId);
+
+    res.json({
+      success: true,
+      hasViewed,
+    });
+  } catch (error) {
+    console.error('Error al verificar visualización de checkouts:', error);
     next(error);
   }
 }
@@ -99,9 +165,41 @@ async function getFutureCheckouts(req, res, next) {
   }
 }
 
+/**
+ * Controlador para eliminar una alerta de checkout (soft delete)
+ * @route DELETE /api/v1/notifications/checkout-alerts/:id
+ */
+async function deleteCheckoutAlert(req, res, next) {
+  try {
+    const alertId = parseInt(req.params.id);
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado',
+      });
+    }
+
+    const result = await notificationsService.deleteCheckoutAlert(alertId, userId);
+
+    res.json({
+      success: true,
+      message: 'Alerta de checkout eliminada',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error al eliminar alerta de checkout:', error);
+    next(error);
+  }
+}
+
 module.exports = {
   getCheckoutAlerts,
   getCheckoutAlertsCount,
+  markCheckoutAlertsAsViewed,
+  hasViewedCheckoutsToday,
   getPastCheckouts,
   getFutureCheckouts,
+  deleteCheckoutAlert,
 };

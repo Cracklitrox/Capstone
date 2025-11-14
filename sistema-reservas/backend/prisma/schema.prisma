@@ -9,15 +9,15 @@ datasource db {
 }
 
 model activity_logs {
-  id             Int       @id @default(autoincrement())
+  id             Int               @id @default(autoincrement())
   user_id        Int?
-  user_role      String?   @db.VarChar(30)
+  user_role      String?           @db.VarChar(30)
   action         action_type_enum?
-  timestamp      DateTime? @default(now()) @db.Timestamp(6)
-  affected_table String?   @db.VarChar(60)
+  timestamp      DateTime?         @default(now()) @db.Timestamp(6)
+  affected_table String?           @db.VarChar(60)
   record_id      Int?
   details        String?
-  users          users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  users          users?            @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 }
 
 model alert_read_status {
@@ -26,26 +26,25 @@ model alert_read_status {
   user_id    Int
   status     alert_status_enum? @default(pending)
   updated_at DateTime?          @default(now()) @db.Timestamp(6)
+  deleted_at DateTime?          @db.Timestamp(6)
   alerts     alerts             @relation(fields: [alert_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users      users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([alert_id, user_id])
 }
 
 model alerts {
   id                Int                 @id @default(autoincrement())
   type              alert_type_enum
-  status            alert_status_enum?  @default(pending)
-  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  status            alert_status_enum   @default(pending)
+  created_at        DateTime            @default(now()) @db.Timestamp(6)
   last_viewed_at    DateTime?           @db.Timestamp(6)
-  origin_user_id    Int?
   reservation_id    Int?
-  payment_id        Int?
   detail            String?             @db.VarChar(250)
   full_summary      Json?
   alert_read_status alert_read_status[]
-  users             users?              @relation(fields: [origin_user_id], references: [id], onUpdate: NoAction)
-  payments          payments?           @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
-  reservations      reservations?       @relation(fields: [reservation_id], references: [id], onUpdate: NoAction)
   maintenance_tasks maintenance_tasks[]
+  reservations      reservations?       @relation(fields: [reservation_id], references: [id], onUpdate: NoAction)
 }
 
 model cleaning_records {
@@ -100,22 +99,23 @@ model notification_read_status {
 }
 
 model notifications {
-  id                       Int                          @id @default(autoincrement())
+  id                       Int                         @id @default(autoincrement())
   sender_id                Int
   target_role_id           Int?
-  title                    String                       @db.VarChar(120)
+  title                    String                      @db.VarChar(120)
   message                  String
-  category                 notification_category_enum?  @default(general)
-  sent_at                  DateTime?                    @default(now()) @db.Timestamp(6)
+  category                 notification_category_enum? @default(general)
+  sent_at                  DateTime?                   @default(now()) @db.Timestamp(6)
   notification_read_status notification_read_status[]
-  users                    users                        @relation(fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  roles                    roles?                       @relation(fields: [target_role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                    users                       @relation(fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles                    roles?                      @relation(fields: [target_role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model payments {
   id               Int                  @id @default(autoincrement())
   reservation_id   Int
   payment_method   payment_method_enum?
+  payment_type     payment_type_enum?   @default(full)
   status           payment_status_enum? @default(pending)
   amount           Int
   is_deposit       Boolean?             @default(false)
@@ -124,9 +124,8 @@ model payments {
   transaction_id   String?              @db.VarChar(255)
   created_at       DateTime?            @default(now()) @db.Timestamp(6)
   deleted_at       DateTime?            @db.Timestamp(6)
-  
-  alerts           alerts[]
-  reservations     reservations         @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  reservations reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model promotions {
@@ -141,13 +140,13 @@ model promotions {
 }
 
 model reservation_guests {
-  id             Int          @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   reservation_id Int
   guest_id       Int
-  deleted_at     DateTime?    @db.Timestamp(6)
-  
-  users          users        @relation(fields: [guest_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deleted_at     DateTime? @db.Timestamp(6)
+
+  users        users        @relation(fields: [guest_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reservations reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model reservation_promotions {
@@ -160,15 +159,15 @@ model reservation_promotions {
 }
 
 model reservation_rooms {
-  id                     Int                      @id @default(autoincrement())
-  reservation_id         Int
-  room_id                Int
-  start_date             DateTime                 @db.Timestamp(6)
-  end_date               DateTime                 @db.Timestamp(6)
-  unit_price             Int
-  subtotal               Int
-  deleted_at             DateTime?                @db.Timestamp(6)
-  
+  id             Int       @id @default(autoincrement())
+  reservation_id Int
+  room_id        Int
+  start_date     DateTime  @db.Timestamp(6)
+  end_date       DateTime  @db.Timestamp(6)
+  unit_price     Int
+  subtotal       Int
+  deleted_at     DateTime? @db.Timestamp(6)
+
   reservations           reservations             @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   rooms                  rooms                    @relation(fields: [room_id], references: [id], onUpdate: NoAction)
   room_service_daily     room_service_daily[]
@@ -176,7 +175,7 @@ model reservation_rooms {
 }
 
 model reservation_services {
-  id             Int          @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   reservation_id Int
   service_id     Int
   quantity       Int
@@ -184,40 +183,43 @@ model reservation_services {
   subtotal       Int
   specific_dates String?
   daily_rate     Int?
-  deleted_at     DateTime?    @db.Timestamp(6)
-  
-  reservations   reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  services       services     @relation(fields: [service_id], references: [id], onUpdate: NoAction)
+  deleted_at     DateTime? @db.Timestamp(6)
+
+  reservations reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  services     services     @relation(fields: [service_id], references: [id], onUpdate: NoAction)
 }
 
 model reservations {
-  id                                        Int                       @id @default(autoincrement())
-  code                                      String                    @unique @db.VarChar(20)
-  main_guest_id                             Int
-  channel                                   reservation_channel_enum?
-  status                                    reservation_status_enum?  @default(pending)
-  check_in_date                             DateTime                  @db.Timestamp(6)
-  check_out_date                            DateTime                  @db.Timestamp(6)
-  guest_count                               Int
-  total_amount                              Int?
-  paid_amount                               Int?                      @default(0)
-  receptionist_id                           Int?
-  booking_type                              String?                   @db.VarChar(20) @default("individual")
-  booking_group_id                          Int?
-  stay_type                                 String?                   @db.VarChar(20) @default("short")
-  created_at                                DateTime?                 @default(now()) @db.Timestamp(6)
-  updated_at                                DateTime?                 @default(now()) @db.Timestamp(6)
-  deleted_at                                DateTime?                 @db.Timestamp(6)
-  
+  id               Int                       @id @default(autoincrement())
+  code             String                    @unique @db.VarChar(20)
+  main_guest_id    Int
+  channel          reservation_channel_enum?
+  status           reservation_status_enum?  @default(pending)
+  check_in_date    DateTime                  @db.Timestamp(6)
+  check_out_date   DateTime                  @db.Timestamp(6)
+  guest_count      Int
+  total_amount     Int?
+  paid_amount      Int?                      @default(0)
+  payment_blocked  Boolean?                  @default(false)
+  receptionist_id  Int?
+  booking_type     String?                   @default("individual") @db.VarChar(20)
+  booking_group_id Int?
+  stay_type        String?                   @default("short") @db.VarChar(20)
+  created_at       DateTime?                 @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?                 @default(now()) @db.Timestamp(6)
+  deleted_at       DateTime?                 @db.Timestamp(6)
+
   alerts                                    alerts[]
   payments                                  payments[]
   reservation_guests                        reservation_guests[]
   reservation_promotions                    reservation_promotions[]
   reservation_rooms                         reservation_rooms[]
   reservation_services                      reservation_services[]
-  users_reservations_main_guest_idTousers   users                     @relation("reservations_main_guest_idTousers", fields: [main_guest_id], references: [id], onUpdate: NoAction)
-  users_reservations_receptionist_idTousers users?                    @relation("reservations_receptionist_idTousers", fields: [receptionist_id], references: [id], onUpdate: NoAction)
-  booking_groups                            booking_groups?           @relation(fields: [booking_group_id], references: [id], onDelete: SetNull)
+  additional_charges                        additional_charges[]
+  users_reservations_main_guest_idTousers   users                    @relation("reservations_main_guest_idTousers", fields: [main_guest_id], references: [id], onUpdate: NoAction)
+  users_reservations_receptionist_idTousers users?                   @relation("reservations_receptionist_idTousers", fields: [receptionist_id], references: [id], onUpdate: NoAction)
+  booking_groups                            booking_groups?          @relation(fields: [booking_group_id], references: [id], onDelete: SetNull)
+  reservation_history                       reservation_history[]
 }
 
 model roles {
@@ -240,22 +242,23 @@ model room_types {
 }
 
 model rooms {
-  id                Int                 @id @default(autoincrement())
-  room_number       String              @unique @db.VarChar(10)
-  floor             Int?
-  room_type_id      Int
-  capacity          Int
-  base_price        Int
-  status            room_status_enum?   @default(available)
-  description       String?
-  is_active         Boolean?            @default(true)
-  created_at        DateTime?           @default(now()) @db.Timestamp(6)
-  updated_at        DateTime?           @default(now()) @db.Timestamp(6)
-  
-  cleaning_records  cleaning_records[]
-  maintenance_tasks maintenance_tasks[]
-  reservation_rooms reservation_rooms[]
-  room_types        room_types          @relation(fields: [room_type_id], references: [id], onUpdate: NoAction)
+  id           Int               @id @default(autoincrement())
+  room_number  String            @unique @db.VarChar(10)
+  floor        Int?
+  room_type_id Int
+  capacity     Int
+  base_price   Int
+  status       room_status_enum? @default(available)
+  description  String?
+  is_active    Boolean?          @default(true)
+  created_at   DateTime?         @default(now()) @db.Timestamp(6)
+  updated_at   DateTime?         @default(now()) @db.Timestamp(6)
+
+  cleaning_records   cleaning_records[]
+  maintenance_tasks  maintenance_tasks[]
+  reservation_rooms  reservation_rooms[]
+  additional_charges additional_charges[]
+  room_types         room_types           @relation(fields: [room_type_id], references: [id], onUpdate: NoAction)
 }
 
 model seasons {
@@ -268,16 +271,17 @@ model seasons {
 }
 
 model services {
-  id                   Int                    @id @default(autoincrement())
-  name                 String                 @unique @db.VarChar(80)
-  description          String?
-  unit                 service_unit_enum
-  price                Int
-  allows_custom_price  Boolean?               @default(false)
-  is_active            Boolean?               @default(true)
-  
+  id                  Int               @id @default(autoincrement())
+  name                String            @unique @db.VarChar(80)
+  description         String?
+  unit                service_unit_enum
+  price               Int
+  allows_custom_price Boolean?          @default(false)
+  is_active           Boolean?          @default(true)
+
   reservation_services reservation_services[]
   room_service_daily   room_service_daily[]
+  additional_charges   additional_charges[]
 }
 
 model system_errors {
@@ -321,10 +325,9 @@ model users {
   created_at                                       DateTime?                  @default(now()) @db.Timestamp(6)
   updated_at                                       DateTime?                  @default(now()) @db.Timestamp(6)
   deleted_at                                       DateTime?                  @db.Timestamp(6)
-  
+
   activity_logs                                    activity_logs[]
   alert_read_status                                alert_read_status[]
-  alerts                                           alerts[]
   cleaning_records                                 cleaning_records[]
   guest_details                                    guest_details?
   maintenance_tasks                                maintenance_tasks[]
@@ -340,6 +343,9 @@ model users {
   reservation_drafts                               reservation_drafts[]
   room_guest_assignments                           room_guest_assignments[]
   room_guest_assignments_changed_by                room_guest_assignments[]   @relation("changed_by_user")
+  system_settings_updated_by                       system_settings[]
+  reservation_history                              reservation_history[]
+  additional_charges                               additional_charges[]
 }
 
 model LoginHistory {
@@ -355,31 +361,31 @@ model LoginHistory {
 }
 
 model user_preferences {
-  id                    Int      @id @default(autoincrement())
-  user_id               Int      @unique
-  default_theme         String   @default("system") @db.VarChar(20)
-  default_dashboard     String?  @db.VarChar(50)
-  created_at            DateTime @default(now()) @db.Timestamp(6)
-  updated_at            DateTime @updatedAt @db.Timestamp(6)
-  
-  users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id                Int      @id @default(autoincrement())
+  user_id           Int      @unique
+  default_theme     String   @default("system") @db.VarChar(20)
+  default_dashboard String?  @db.VarChar(50)
+  created_at        DateTime @default(now()) @db.Timestamp(6)
+  updated_at        DateTime @updatedAt @db.Timestamp(6)
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model booking_groups {
-  id                Int      @id @default(autoincrement())
-  group_name        String   @db.VarChar(150)
+  id                Int                    @id @default(autoincrement())
+  group_name        String                 @db.VarChar(150)
   organization_type organization_type_enum
-  tax_id            String?  @db.VarChar(20)
-  contact_name      String   @db.VarChar(150)
-  contact_email     String   @db.VarChar(150)
-  contact_phone     String?  @db.VarChar(30)
+  tax_id            String?                @db.VarChar(20)
+  contact_name      String                 @db.VarChar(150)
+  contact_email     String                 @db.VarChar(150)
+  contact_phone     String?                @db.VarChar(30)
   billing_address   String?
   special_terms     String?
-  created_at        DateTime @default(now()) @db.Timestamp(6)
-  updated_at        DateTime @updatedAt @db.Timestamp(6)
-  deleted_at        DateTime? @db.Timestamp(6)
-  
-  reservations      reservations[]
+  created_at        DateTime               @default(now()) @db.Timestamp(6)
+  updated_at        DateTime               @updatedAt @db.Timestamp(6)
+  deleted_at        DateTime?              @db.Timestamp(6)
+
+  reservations reservations[]
 }
 
 model breakfast_menu_items {
@@ -392,48 +398,107 @@ model breakfast_menu_items {
 }
 
 model room_service_daily {
-  id                  Int              @id @default(autoincrement())
+  id                  Int      @id @default(autoincrement())
   reservation_room_id Int
   service_id          Int
-  service_date        DateTime         @db.Date
+  service_date        DateTime @db.Date
   unit_price          Int
   quantity            Int
   subtotal            Int
-  created_at          DateTime         @default(now()) @db.Timestamp(6)
-  
-  reservation_rooms   reservation_rooms @relation(fields: [reservation_room_id], references: [id], onDelete: Cascade)
-  services            services          @relation(fields: [service_id], references: [id])
+  created_at          DateTime @default(now()) @db.Timestamp(6)
+
+  reservation_rooms reservation_rooms @relation(fields: [reservation_room_id], references: [id], onDelete: Cascade)
+  services          services          @relation(fields: [service_id], references: [id])
 }
 
 model reservation_drafts {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   user_id      Int
   draft_data   Json
-  current_step Int      @default(1)
-  created_at   DateTime @default(now()) @db.Timestamp(6)
+  current_step Int       @default(1)
+  created_at   DateTime  @default(now()) @db.Timestamp(6)
   expires_at   DateTime? @db.Timestamp(6)
-  
-  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model room_guest_assignments {
-  id                  Int               @id @default(autoincrement())
+  id                  Int       @id @default(autoincrement())
   reservation_room_id Int
   guest_id            Int
-  assigned_at         DateTime          @default(now()) @db.Timestamp(6)
-  valid_from          DateTime          @default(now()) @db.Timestamp(6)
-  valid_to            DateTime?         @db.Timestamp(6)
-  change_reason       String?           @db.VarChar(100)
+  assigned_at         DateTime  @default(now()) @db.Timestamp(6)
+  valid_from          DateTime  @default(now()) @db.Timestamp(6)
+  valid_to            DateTime? @db.Timestamp(6)
+  change_reason       String?   @db.VarChar(100)
   changed_by_user_id  Int?
-  deleted_at          DateTime?         @db.Timestamp(6)
-  created_at          DateTime          @default(now()) @db.Timestamp(6)
-  updated_at          DateTime          @updatedAt @db.Timestamp(6)
-  
-  reservation_rooms   reservation_rooms @relation(fields: [reservation_room_id], references: [id], onDelete: Cascade)
-  users               users             @relation(fields: [guest_id], references: [id], onDelete: Cascade)
-  changed_by_user     users?            @relation("changed_by_user", fields: [changed_by_user_id], references: [id])
-  
+  deleted_at          DateTime? @db.Timestamp(6)
+  created_at          DateTime  @default(now()) @db.Timestamp(6)
+  updated_at          DateTime  @updatedAt @db.Timestamp(6)
+
+  reservation_rooms reservation_rooms @relation(fields: [reservation_room_id], references: [id], onDelete: Cascade)
+  users             users             @relation(fields: [guest_id], references: [id], onDelete: Cascade)
+  changed_by_user   users?            @relation("changed_by_user", fields: [changed_by_user_id], references: [id])
+
   @@index([reservation_room_id, guest_id, deleted_at, valid_to])
+}
+
+model system_settings {
+  id            Int      @id @default(autoincrement())
+  setting_key   String   @unique @db.VarChar(100)
+  setting_value String   @db.Text
+  description   String?  @db.Text
+  data_type     String   @default("string") @db.VarChar(20)
+  category      String?  @db.VarChar(50)
+  is_editable   Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @updatedAt @db.Timestamp(6)
+  updated_by_id Int?
+
+  updated_by_user users? @relation(fields: [updated_by_id], references: [id], onUpdate: NoAction)
+
+  @@map("system_settings")
+}
+
+model reservation_history {
+  id                 Int      @id @default(autoincrement())
+  reservation_id     Int
+  change_type        String   @db.VarChar(50)
+  field_changed      String?  @db.VarChar(100)
+  old_value          String?  @db.Text
+  new_value          String?  @db.Text
+  changed_by_user_id Int?
+  change_reason      String?  @db.Text
+  metadata           Json?
+  created_at         DateTime @default(now()) @db.Timestamp(6)
+
+  reservations    reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  changed_by_user users?       @relation(fields: [changed_by_user_id], references: [id], onUpdate: NoAction)
+
+  @@index([reservation_id, created_at])
+  @@index([change_type])
+  @@map("reservation_history")
+}
+
+model additional_charges {
+  id             Int                    @id @default(autoincrement())
+  reservation_id Int
+  room_id        Int?
+  service_id     Int?
+  charge_type    additional_charge_enum
+  description    String                 @db.VarChar(250)
+  amount         Int
+  quantity       Int                    @default(1)
+  subtotal       Int
+  charged_by_id  Int
+  created_at     DateTime               @default(now()) @db.Timestamp(6)
+  deleted_at     DateTime?              @db.Timestamp(6)
+
+  reservations reservations @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms        rooms?       @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  services     services?    @relation(fields: [service_id], references: [id], onUpdate: NoAction)
+  charged_by   users        @relation(fields: [charged_by_id], references: [id], onUpdate: NoAction)
+
+  @@map("additional_charges")
 }
 
 enum alert_status_enum {
@@ -442,12 +507,20 @@ enum alert_status_enum {
   ignored
 }
 
+enum alert_priority_enum {
+  low
+  medium
+  high
+  critical
+}
+
 enum alert_type_enum {
   reservation
   payment
   maintenance
   guest
   booking_request
+  checkout
 }
 
 enum error_severity_enum {
@@ -532,7 +605,9 @@ enum reservation_channel_enum {
 enum reservation_status_enum {
   pending
   confirmed
+  ready_for_checkin
   in_progress
+  pending_checkout
   canceled
   completed
   no_show
@@ -581,6 +656,11 @@ enum action_type_enum {
   COMPLETE_CLEANING
   CREATE_PAYMENT
   UPDATE_PAYMENT
+  CONFIRM_PAYMENT
+  REJECT_PAYMENT
+  ANNUL_PAYMENT
+  RETRY_PAYMENT
+  REQUEST_PAYMENT_ANNULMENT
   CREATE_USER
   UPDATE_USER
   UPDATE_PROFILE
@@ -596,4 +676,18 @@ enum organization_type_enum {
   agencia_viajes
   evento_corporativo
   otro
+}
+
+enum payment_type_enum {
+  full
+  half_upfront
+  daily
+}
+
+enum additional_charge_enum {
+  minibar
+  room_damage
+  extra_service
+  penalty
+  other
 }

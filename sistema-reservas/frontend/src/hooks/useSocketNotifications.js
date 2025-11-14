@@ -72,12 +72,32 @@ export function useSocketNotifications() {
     });
 
     // ⭐ Evento: Recibir actualización de checkouts
-    socketInstance.on("checkout:update", (data) => {
+    socketInstance.on("checkout:update", async (data) => {
       console.log("📬 Notificación de checkout recibida:", data);
-      console.log("📬 Contador recibido del backend:", data.count);
-      
-      // Actualizar el contador directamente
-      setCheckoutCount(data.count || 0);
+      console.log("📬 Contador total recibido:", data.count);
+
+      // Solicitar el count filtrado para este usuario desde el backend
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'}/notifications/checkout-count`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("✅ Count filtrado para usuario:", result.count);
+          setCheckoutCount(result.count || 0);
+        } else {
+          console.error("❌ Error al obtener count de checkouts");
+          setCheckoutCount(0);
+        }
+      } catch (error) {
+        console.error("❌ Error al solicitar count de checkouts:", error);
+        setCheckoutCount(0);
+      }
     });
 
     // ⭐ Evento: Recibir actualización de WhatsApp
@@ -128,38 +148,89 @@ export function useSocketNotifications() {
 
     setSocket(socketInstance);
 
-    // ⭐ Listener para evento personalizado: alertas marcadas como vistas
-    const handleAlertsViewed = () => {
-      console.log("📖 Alertas marcadas como vistas, actualizando contador...");
-      
+    // ⭐ Listener para evento personalizado: alertas de WhatsApp marcadas como vistas
+    const handleWhatsAppAlertsViewed = () => {
+      console.log("📖 Alertas de WhatsApp marcadas como vistas, actualizando contador...");
+
       // Solicitar actualización del contador
       socketInstance.emit("whatsapp:requestUpdate");
     };
 
-    window.addEventListener('whatsappAlertsViewed', handleAlertsViewed);
+    // ⭐ Listener para evento personalizado: alertas de checkout limpiadas
+    const handleCheckoutAlertsCleared = async () => {
+      console.log("📖 Alertas de checkout limpiadas, actualizando contador...");
+
+      // Limpiar el contador localmente (el marcado en BD ya se hizo en AlertsBell)
+      setCheckoutCount(0);
+
+      console.log("✅ Checkouts marcados como vistos para hoy");
+    };
+
+    window.addEventListener('whatsappAlertsViewed', handleWhatsAppAlertsViewed);
+    window.addEventListener('checkoutAlertsCleared', handleCheckoutAlertsCleared);
 
     // Cleanup al desmontar el componente
     return () => {
       console.log("🔌 Cerrando conexión WebSocket...");
-      window.removeEventListener('whatsappAlertsViewed', handleAlertsViewed);
+      window.removeEventListener('whatsappAlertsViewed', handleWhatsAppAlertsViewed);
+      window.removeEventListener('checkoutAlertsCleared', handleCheckoutAlertsCleared);
       socketInstance.disconnect();
     };
   }, [token, user]);
 
   // Función para solicitar actualización manual
-  const requestUpdate = useCallback(() => {
-    if (socket && isConnected) {
+  const requestUpdate = useCallback(async () => {
+    if (socket && isConnected && token) {
       console.log("🔄 Solicitando actualización manual de notificaciones...");
-      socket.emit("checkout:requestUpdate");
+
+      // Solicitar count de checkouts actualizado
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'}/notifications/checkout-count`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setCheckoutCount(result.count || 0);
+        }
+      } catch (error) {
+        console.error("❌ Error al solicitar actualización de checkouts:", error);
+      }
+
+      // Solicitar actualización de WhatsApp via socket
       socket.emit("whatsapp:requestUpdate");
     } else {
       console.warn(
         "⚠️ No se puede solicitar actualización: WebSocket no conectado"
       );
     }
-  }, [socket, isConnected]);
+  }, [socket, isConnected, token]);
 
   const totalCount = checkoutCount + whatsappCount;
+
+  // Cargar el count inicial de checkouts filtrado por usuario
+  useEffect(() => {
+    if (token && user && user.role === 'receptionist') {
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'}/notifications/checkout-count`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+        .then((response) => response.json())
+        .then((result) => {
+          console.log("✅ Count inicial de checkouts para usuario:", result.count);
+          setCheckoutCount(result.count || 0);
+        })
+        .catch((error) => {
+          console.error("❌ Error al cargar count inicial de checkouts:", error);
+        });
+    }
+  }, [token, user]);
 
   // Debug: Log cuando cambien los contadores
   useEffect(() => {

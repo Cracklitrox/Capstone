@@ -128,9 +128,172 @@ async function updateRoomStatus(req, res) {
   }
 }
 
+/**
+ * Controlador para obtener habitaciones listas para limpieza
+ */
+async function getRoomsReadyForCleaning(req, res) {
+  try {
+    const rooms = await roomsService.getRoomsReadyForCleaning();
+    res.json({ rooms });
+  } catch (error) {
+    console.error('Error al obtener habitaciones listas para limpieza:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener habitaciones listas para limpieza: ${error.message}`,
+      originModule: 'rooms.controller - getRoomsReadyForCleaning',
+      severity: 'low',
+      errorObject: error,
+    });
+
+    res.status(500).json({
+      message: 'Error al obtener habitaciones listas para limpieza',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Controlador para obtener habitaciones en limpieza
+ */
+async function getRoomsInCleaning(req, res) {
+  try {
+    const rooms = await roomsService.getRoomsInCleaning();
+    res.json({ rooms });
+  } catch (error) {
+    console.error('Error al obtener habitaciones en limpieza:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al obtener habitaciones en limpieza: ${error.message}`,
+      originModule: 'rooms.controller - getRoomsInCleaning',
+      severity: 'low',
+      errorObject: error,
+    });
+
+    res.status(500).json({
+      message: 'Error al obtener habitaciones en limpieza',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Controlador para completar limpieza de una habitación
+ */
+async function completeCleaning(req, res) {
+  try {
+    const { id } = req.params;
+    const { observations } = req.body;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    const result = await roomsService.completeCleaning(
+      id,
+      observations,
+      userId,
+      userRole
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error al completar limpieza:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al completar limpieza de habitación ${req.params.id}: ${error.message}`,
+      originModule: 'rooms.controller - completeCleaning',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    res.status(500).json({
+      message: error.message || 'Error al completar limpieza',
+    });
+  }
+}
+
+/**
+ * Controlador para actualizar observaciones de limpieza
+ */
+async function updateCleaningObservations(req, res) {
+  try {
+    const { id } = req.params;
+    const { observations } = req.body;
+    const userId = req.user?.id;
+
+    if (!observations) {
+      return res.status(400).json({
+        message: 'Las observaciones son requeridas',
+      });
+    }
+
+    const result = await roomsService.updateCleaningObservations(
+      id,
+      observations,
+      userId
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error al actualizar observaciones:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al actualizar observaciones de habitación ${req.params.id}: ${error.message}`,
+      originModule: 'rooms.controller - updateCleaningObservations',
+      severity: 'low',
+      errorObject: error,
+    });
+
+    res.status(500).json({
+      message: error.message || 'Error al actualizar observaciones',
+    });
+  }
+}
+
+/**
+ * Controlador para iniciar limpieza manual de una habitación
+ */
+async function startCleaning(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    const result = await roomsService.startCleaning(id, userId, userRole);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error al iniciar limpieza:', error);
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al iniciar limpieza de habitación ${req.params.id}: ${error.message}`,
+      originModule: 'rooms.controller - startCleaning',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    res.status(500).json({
+      message: error.message || 'Error al iniciar limpieza',
+    });
+  }
+}
+
 module.exports = {
   getAllRooms,
   getRoomDetails,
   getAllRoomTypes,
   updateRoomStatus,
+  getRoomsReadyForCleaning,
+  getRoomsInCleaning,
+  completeCleaning,
+  updateCleaningObservations,
+  startCleaning,
 };

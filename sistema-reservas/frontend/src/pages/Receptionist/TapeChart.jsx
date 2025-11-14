@@ -245,7 +245,7 @@ function TapeChart() {
 
         const paymentPercentage =
           reservation.totalAmount > 0
-            ? (reservation.paidAmount / reservation.totalAmount) * 100
+            ? Math.min((reservation.paidAmount / reservation.totalAmount) * 100, 100)
             : 0;
 
         cells.push(
@@ -272,7 +272,7 @@ function TapeChart() {
                   )}
                 >
                   <p className="font-bold truncate">{reservation.guestName}</p>
-                  <p className="opacity-80 text-[10px]">{statusConfig.label}</p>
+                  <p className="opacity-90 text-[10px] font-semibold">{statusConfig.label}</p>
                 </div>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
@@ -307,7 +307,11 @@ function TapeChart() {
                       💰 ${reservation.paidAmount.toLocaleString("es-CL")} / $
                       {reservation.totalAmount.toLocaleString("es-CL")}
                     </p>
-                    <Progress value={paymentPercentage} className="h-1 mt-1" />
+                    <Progress
+                      value={paymentPercentage}
+                      className="h-1 mt-1"
+                      aria-label={`Estado de pago: ${paymentPercentage.toFixed(0)}% pagado`}
+                    />
                     <p className="text-[10px] opacity-75 mt-0.5">
                       {paymentPercentage.toFixed(0)}% pagado
                     </p>
@@ -387,7 +391,11 @@ function TapeChart() {
                   <p className="text-sm text-muted-foreground">/ {stats.totalRooms}</p>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <Progress value={stats.occupancyRate} className="h-1 flex-1" />
+                  <Progress
+                    value={stats.occupancyRate}
+                    className="h-1 flex-1"
+                    aria-label={`Tasa de ocupación: ${stats.occupancyRate}%`}
+                  />
                   <p className="text-xs text-muted-foreground whitespace-nowrap">
                     {stats.occupancyRate}%
                   </p>
@@ -567,7 +575,7 @@ function TapeChart() {
             value={filters.type}
             onValueChange={(v) => handleFilterChange("type", v)}
           >
-            <SelectTrigger className="w-[160px] h-8">
+            <SelectTrigger className="w-[160px] h-8" aria-label="Filtrar por tipo de habitación">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -584,7 +592,7 @@ function TapeChart() {
             value={filters.floor}
             onValueChange={(v) => handleFilterChange("floor", v)}
           >
-            <SelectTrigger className="w-[120px] h-8">
+            <SelectTrigger className="w-[120px] h-8" aria-label="Filtrar por piso">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -603,7 +611,12 @@ function TapeChart() {
 
       {/* 📊 TABLA */}
       <TooltipProvider>
-        <div className="flex-grow overflow-auto border rounded-lg bg-card shadow-sm">
+        <div
+          className="flex-grow overflow-auto border rounded-lg bg-card shadow-sm"
+          role="region"
+          aria-label="Tabla de planificación de habitaciones"
+          tabIndex={0}
+        >
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">

@@ -175,6 +175,32 @@ router.get(
 );
 
 /**
+ * @route POST /api/v1/notifications/checkout-alerts/mark-viewed
+ * @desc Marca las alertas de checkout de hoy como vistas
+ * @access Recepcionista y Administrador
+ */
+router.post(
+  "/checkout-alerts/mark-viewed",
+  notificationsLimiter,
+  authenticate,
+  authorize(["receptionist", "administrator"]),
+  notificationsController.markCheckoutAlertsAsViewed
+);
+
+/**
+ * @route GET /api/v1/notifications/checkout-alerts/has-viewed
+ * @desc Verifica si el usuario ya vio los checkouts de hoy
+ * @access Recepcionista y Administrador
+ */
+router.get(
+  "/checkout-alerts/has-viewed",
+  notificationsLimiter,
+  authenticate,
+  authorize(["receptionist", "administrator"]),
+  notificationsController.hasViewedCheckoutsToday
+);
+
+/**
  * @route GET /api/v1/notifications/past-checkouts
  * @desc Obtiene check-outs de días pasados
  * @query days - Número de días hacia atrás (default: 7)
@@ -200,6 +226,19 @@ router.get(
   authenticate,
   authorize(["receptionist", "administrator"]),
   notificationsController.getFutureCheckouts
+);
+
+/**
+ * @route DELETE /api/v1/notifications/checkout-alerts/:id
+ * @desc Elimina (soft delete) una alerta de checkout para el usuario actual
+ * @access Recepcionista y Administrador
+ */
+router.delete(
+  "/checkout-alerts/:id",
+  notificationsLimiter,
+  authenticate,
+  authorize(["receptionist", "administrator"]),
+  notificationsController.deleteCheckoutAlert
 );
 
 module.exports = router;

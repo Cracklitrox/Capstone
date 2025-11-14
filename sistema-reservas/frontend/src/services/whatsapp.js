@@ -95,3 +95,48 @@ export async function confirmWhatsAppBookingAlert(token, alertId) {
     throw error;
   }
 }
+
+/**
+ * Eliminar una alerta de WhatsApp confirmada o rechazada
+ * @param {string} token - Token de autenticación
+ * @param {number} alertId - ID de la alerta a eliminar
+ */
+export async function deleteWhatsAppBookingAlert(token, alertId) {
+  try {
+    const response = await axios.delete(
+      `${API_URL}/whatsapp/booking-alerts/${alertId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error al eliminar alerta de WhatsApp:', error);
+    throw error;
+  }
+}
+
+/**
+ * Eliminar múltiples alertas de WhatsApp confirmadas o rechazadas
+ * @param {string} token - Token de autenticación
+ * @param {number[]} alertIds - Array de IDs de las alertas a eliminar
+ */
+export async function deleteMultipleWhatsAppBookingAlerts(token, alertIds) {
+  try {
+    const response = await axios.post(
+      `${API_URL}/whatsapp/booking-alerts/bulk-delete`,
+      { alertIds },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error al eliminar múltiples alertas de WhatsApp:', error);
+    throw error;
+  }
+}

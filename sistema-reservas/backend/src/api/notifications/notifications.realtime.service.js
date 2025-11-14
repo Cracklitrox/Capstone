@@ -219,7 +219,28 @@ async function getUserNotifications(userId, filters = {}) {
           name: true,
         },
       },
+      notification_read_status: {
+        select: {
+          deleted_at: true,
+        },
+      },
     },
+  });
+
+  // ✅ Filtrar notificaciones enviadas que han sido eliminadas
+  // Una notificación enviada se considera eliminada si TODOS sus notification_read_status tienen deleted_at
+  const activeSentNotifications = sentNotifications.filter((notification) => {
+    // Si no tiene ningún read_status, mostrarla (caso edge)
+    if (!notification.notification_read_status || notification.notification_read_status.length === 0) {
+      return true;
+    }
+
+    // Verificar si al menos un receptor NO tiene la notificación eliminada
+    const hasActiveRecipient = notification.notification_read_status.some(
+      (status) => status.deleted_at === null
+    );
+
+    return hasActiveRecipient;
   });
 
   // Formatear notificaciones recibidas
@@ -252,8 +273,8 @@ async function getUserNotifications(userId, filters = {}) {
     },
   }));
 
-  // Formatear notificaciones enviadas
-  const formattedSent = sentNotifications.map((notification) => ({
+  // Formatear notificaciones enviadas (usando activeSentNotifications filtradas)
+  const formattedSent = activeSentNotifications.map((notification) => ({
     id: notification.id,
     title: notification.title,
     message: notification.message,

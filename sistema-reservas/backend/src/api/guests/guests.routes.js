@@ -16,7 +16,7 @@ const {
 // Define rate limiters
 const guestUpdateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50, // Aumentado de 10 a 50 para permitir pruebas con múltiples colecciones
   message: "Too many update requests from this IP, please try again later.",
 });
 
@@ -28,7 +28,7 @@ const guestSearchLimiter = rateLimit({
 
 const guestCreateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50, // Aumentado de 10 a 50 para permitir pruebas con múltiples colecciones
   message: "Too many create requests from this IP, please try again later.",
 });
 

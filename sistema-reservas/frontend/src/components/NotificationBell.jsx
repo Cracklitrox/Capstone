@@ -70,7 +70,12 @@ export function NotificationBell({
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={`Notificaciones. ${unreadCount > 0 ? `${unreadCount} no leídas` : 'No hay notificaciones nuevas'}`}
+        >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge
@@ -140,6 +145,7 @@ export function NotificationBell({
                           size="icon"
                           className="h-6 w-6 flex-shrink-0"
                           onClick={(e) => handleArchive(e, notification.id)}
+                          aria-label="Archivar notificación"
                         >
                           <Archive className="h-3 w-3" />
                         </Button>

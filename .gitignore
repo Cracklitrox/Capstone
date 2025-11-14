@@ -37,13 +37,16 @@ frontend/build/
 # --- Carpetas de editores de código ---
 .vscode/
 .idea/
-
-# --- Archivos de documentación ---
 .claude/
-CLAUDE.md
-
-# Ignorar todos los archivos Markdown
-**/*.md
-
-# Ignorar archivos de respaldo de Claude AI
 .claude_backup.json
+
+# --- Archivos de documentación de Claude ---
+CLAUDE.md
+CAMBIOS_IMPLEMENTADOS.md
+
+# Documentos Carlos
+sistema-reservas/docs/
+
+# --- Colecciones de Postman ---
+# Contienen datos de prueba y tokens locales
+postman/

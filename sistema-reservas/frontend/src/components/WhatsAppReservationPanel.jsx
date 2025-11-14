@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { MessageSquare, Phone, Calendar, Users, Bed, DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, User, Mail, Hash, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageSquare, Phone, Calendar, Users, Bed, DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, User, Mail, Hash, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Separator } from './ui/Separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
+import { Checkbox } from './ui/Checkbox';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { io } from 'socket.io-client';
-import { getWhatsAppBookingAlerts, rejectWhatsAppBookingAlert, confirmWhatsAppBookingAlert } from '../services/whatsapp';
+import { getWhatsAppBookingAlerts, rejectWhatsAppBookingAlert, confirmWhatsAppBookingAlert, deleteWhatsAppBookingAlert, deleteMultipleWhatsAppBookingAlerts } from '../services/whatsapp';
 import { ConfirmReservationDialog } from './ConfirmReservationDialog';
 import { RejectReservationDialog } from './RejectReservationDialog';
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:3001';
 
@@ -22,11 +24,25 @@ export function WhatsAppReservationPanel() {
   const [loading, setLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState(new Set());
   const [activeTab, setActiveTab] = useState('pending');
-  
+
   // Estados para los diálogos
   const [confirmDialog, setConfirmDialog] = useState({ open: false, alertId: null, guestName: '' });
   const [rejectDialog, setRejectDialog] = useState({ open: false, alertId: null, guestName: '' });
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Estados para selección múltiple
+  const [selectedAlerts, setSelectedAlerts] = useState(new Set());
+  const [deletingMultiple, setDeletingMultiple] = useState(false);
+
+  // Estados para el diálogo de eliminación
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    alertId: null,
+    guestName: null,
+    count: 1,
+    isDeleting: false,
+    isMultiple: false
+  });
 
   // Función para alternar expansión de cards
   const toggleCardExpansion = (id) => {
@@ -172,6 +188,142 @@ export function WhatsAppReservationPanel() {
     }
   };
 
+  // Handler para eliminar alerta (soft delete)
+  const handleDelete = async (alertId, guestName) => {
+    // Abrir diálogo de confirmación
+    setDeleteDialog({
+      open: true,
+      alertId,
+      guestName,
+      count: 1,
+      isDeleting: false,
+      isMultiple: false
+    });
+  };
+
+  // Confirmación de eliminación individual
+  const confirmDelete = async () => {
+    setDeleteDialog(prev => ({ ...prev, isDeleting: true }));
+
+    try {
+      const token = localStorage.getItem('token');
+      await deleteWhatsAppBookingAlert(token, deleteDialog.alertId);
+
+      // Eliminar del estado local
+      setReservations((prev) => prev.filter((res) => res.id !== deleteDialog.alertId));
+
+      console.log(`✅ Alerta ${deleteDialog.alertId} eliminada correctamente`);
+
+      // Cerrar diálogo
+      setDeleteDialog({
+        open: false,
+        alertId: null,
+        guestName: null,
+        count: 1,
+        isDeleting: false,
+        isMultiple: false
+      });
+    } catch (error) {
+      console.error('Error al eliminar alerta:', error);
+      alert('Error al eliminar la alerta. Intente nuevamente.');
+      setDeleteDialog(prev => ({ ...prev, isDeleting: false }));
+    }
+  };
+
+  // Función para alternar selección de una alerta
+  const toggleAlertSelection = (alertId) => {
+    setSelectedAlerts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(alertId)) {
+        newSet.delete(alertId);
+      } else {
+        newSet.add(alertId);
+      }
+      return newSet;
+    });
+  };
+
+  // Función para seleccionar/deseleccionar todas las alertas del tab actual
+  const toggleSelectAll = () => {
+    const currentAlerts = activeTab === 'confirmed' ? confirmedReservations : rejectedReservations;
+    const currentIds = currentAlerts.map(r => r.id);
+
+    // Si todas están seleccionadas, deseleccionar todas
+    const allSelected = currentIds.every(id => selectedAlerts.has(id));
+
+    if (allSelected) {
+      setSelectedAlerts(prev => {
+        const newSet = new Set(prev);
+        currentIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+    } else {
+      // Seleccionar todas
+      setSelectedAlerts(prev => {
+        const newSet = new Set(prev);
+        currentIds.forEach(id => newSet.add(id));
+        return newSet;
+      });
+    }
+  };
+
+  // Función para eliminar múltiples alertas seleccionadas
+  const handleDeleteSelected = async () => {
+    if (selectedAlerts.size === 0) return;
+
+    const count = selectedAlerts.size;
+
+    // Abrir diálogo de confirmación para eliminación múltiple
+    setDeleteDialog({
+      open: true,
+      alertId: null,
+      guestName: null,
+      count,
+      isDeleting: false,
+      isMultiple: true
+    });
+  };
+
+  // Confirmación de eliminación múltiple
+  const confirmDeleteMultiple = async () => {
+    setDeleteDialog(prev => ({ ...prev, isDeleting: true }));
+
+    try {
+      const token = localStorage.getItem('token');
+      const alertIds = Array.from(selectedAlerts);
+      const count = selectedAlerts.size;
+
+      await deleteMultipleWhatsAppBookingAlerts(token, alertIds);
+
+      // Eliminar del estado local
+      setReservations((prev) => prev.filter((res) => !selectedAlerts.has(res.id)));
+
+      // Limpiar selección
+      setSelectedAlerts(new Set());
+
+      console.log(`✅ ${count} alerta${count !== 1 ? 's' : ''} eliminada${count !== 1 ? 's' : ''} correctamente`);
+
+      // Cerrar diálogo
+      setDeleteDialog({
+        open: false,
+        alertId: null,
+        guestName: null,
+        count: 1,
+        isDeleting: false,
+        isMultiple: false
+      });
+    } catch (error) {
+      console.error('Error al eliminar alertas:', error);
+      alert('Error al eliminar las alertas. Intente nuevamente.');
+      setDeleteDialog(prev => ({ ...prev, isDeleting: false }));
+    }
+  };
+
+  // Limpiar selección al cambiar de tab
+  useEffect(() => {
+    setSelectedAlerts(new Set());
+  }, [activeTab]);
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'pending':
@@ -196,7 +348,7 @@ export function WhatsAppReservationPanel() {
   }
 
   // Componente para renderizar una tarjeta compacta
-  const ReservationCard = ({ reservation }) => {
+  const ReservationCard = ({ reservation, showCheckbox = false }) => {
     const { summary } = reservation;
     const guest = summary.guest_principal;
     const res = summary.reservation;
@@ -205,12 +357,20 @@ export function WhatsAppReservationPanel() {
     const payment = summary.payment || {};
     const additionalGuests = summary.additional_guests || [];
     const isExpanded = expandedCards.has(reservation.id);
+    const isSelected = selectedAlerts.has(reservation.id);
 
     return (
-      <Card key={reservation.id} className="border-l-4 border-l-green-500 dark:border-l-green-400 dark:bg-slate-800">
+      <Card key={reservation.id} className={`border-l-4 border-l-green-500 dark:border-l-green-400 dark:bg-slate-800 ${isSelected ? 'ring-2 ring-primary' : ''}`}>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3 flex-1">
+              {showCheckbox && (
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => toggleAlertSelection(reservation.id)}
+                  className="mt-1"
+                />
+              )}
               <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                 <MessageSquare className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
@@ -484,25 +644,37 @@ export function WhatsAppReservationPanel() {
 
             {/* Acciones */}
             <div className="flex gap-2 pt-2">
-              <Button 
-                className="flex-1" 
-                variant="default" 
-                size="sm"
-                onClick={() => openConfirmDialog(reservation.id, guest.name)}
-                disabled={reservation.status === 'resolved' || reservation.status === 'ignored'}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                {reservation.status === 'resolved' ? 'Confirmada' : 'Confirmar'}
-              </Button>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => openRejectDialog(reservation.id, guest.name)}
-                disabled={reservation.status === 'ignored' || reservation.status === 'resolved'}
-              >
-                <XCircle className="h-4 w-4 mr-1" />
-                {reservation.status === 'ignored' ? 'Rechazada' : 'Rechazar'}
-              </Button>
+              {reservation.status === 'pending' ? (
+                <>
+                  <Button
+                    className="flex-1"
+                    variant="default"
+                    size="sm"
+                    onClick={() => openConfirmDialog(reservation.id, guest.name)}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    Confirmar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => openRejectDialog(reservation.id, guest.name)}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Rechazar
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                  onClick={() => handleDelete(reservation.id, guest.name)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Eliminar
+                </Button>
+              )}
             </div>
           </CardContent>
         )}
@@ -575,11 +747,48 @@ export function WhatsAppReservationPanel() {
             <p className="text-sm">No hay solicitudes confirmadas</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {confirmedReservations.map((reservation) => (
-              <ReservationCard key={reservation.id} reservation={reservation} />
-            ))}
-          </div>
+          <>
+            {/* Barra de acciones para selección múltiple */}
+            <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={confirmedReservations.length > 0 && confirmedReservations.every(r => selectedAlerts.has(r.id))}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-sm font-medium">
+                  {selectedAlerts.size > 0
+                    ? `${selectedAlerts.size} seleccionada${selectedAlerts.size !== 1 ? 's' : ''}`
+                    : 'Seleccionar todas'}
+                </span>
+              </div>
+              {selectedAlerts.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteSelected}
+                  disabled={deletingMultiple}
+                >
+                  {deletingMultiple ? (
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Eliminar seleccionadas
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {confirmedReservations.map((reservation) => (
+                <ReservationCard key={reservation.id} reservation={reservation} showCheckbox={true} />
+              ))}
+            </div>
+          </>
         )}
       </TabsContent>
 
@@ -590,11 +799,48 @@ export function WhatsAppReservationPanel() {
             <p className="text-sm">No hay solicitudes rechazadas</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {rejectedReservations.map((reservation) => (
-              <ReservationCard key={reservation.id} reservation={reservation} />
-            ))}
-          </div>
+          <>
+            {/* Barra de acciones para selección múltiple */}
+            <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={rejectedReservations.length > 0 && rejectedReservations.every(r => selectedAlerts.has(r.id))}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-sm font-medium">
+                  {selectedAlerts.size > 0
+                    ? `${selectedAlerts.size} seleccionada${selectedAlerts.size !== 1 ? 's' : ''}`
+                    : 'Seleccionar todas'}
+                </span>
+              </div>
+              {selectedAlerts.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteSelected}
+                  disabled={deletingMultiple}
+                >
+                  {deletingMultiple ? (
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Eliminar seleccionadas
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {rejectedReservations.map((reservation) => (
+                <ReservationCard key={reservation.id} reservation={reservation} showCheckbox={true} />
+              ))}
+            </div>
+          </>
         )}
       </TabsContent>
     </Tabs>
@@ -615,6 +861,16 @@ export function WhatsAppReservationPanel() {
       guestName={rejectDialog.guestName}
       onReject={handleReject}
       loading={actionLoading}
+    />
+
+    {/* Diálogo de confirmación de eliminación */}
+    <DeleteConfirmationDialog
+      open={deleteDialog.open}
+      onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}
+      onConfirm={deleteDialog.isMultiple ? confirmDeleteMultiple : confirmDelete}
+      count={deleteDialog.count}
+      guestName={deleteDialog.guestName}
+      isDeleting={deleteDialog.isDeleting}
     />
     </>
   );

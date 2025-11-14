@@ -1,27 +1,56 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import { NotificationsProvider } from "./contexts/NotificationsContext.jsx";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Profile from "./components/Profile";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import { Loader2 } from "lucide-react";
 
-// --- Páginas Principales ---
+// --- Páginas con Lazy Loading ---
 import Login from "./pages/Login.jsx";
-import AdminDashboard from "./pages/Admin/Dashboard.jsx";
-import RoomsCrud from "./pages/Admin/RoomsCrud.jsx";
-import RoomTypesCrud from "./pages/Admin/RoomTypesCrud.jsx";
-import ReceptionistDashboard from "./pages/Receptionist/Dashboard.jsx";
-import TapeChart from "./pages/Receptionist/TapeChart.jsx";
-import ReservationHistory from "./pages/Receptionist/ReservationHistory.jsx";
-import CheckoutAlertsImproved from "./pages/Receptionist/CheckoutAlerts.jsx";
-import GuestHistory from "./pages/Receptionist/GuestHistory.jsx";
-import NewReservation from "./pages/Reservations/NewReservation.jsx";
-import NotificationsPage from "./pages/NotificationsPage.jsx";
-import ChatbotPage from "./pages/ChatbotPage.jsx";
-import Reports from "./pages/Reports.jsx";
+
+// Admin pages (lazy)
+const AdminDashboard = lazy(() => import("./pages/Admin/Dashboard.jsx"));
+const RoomsCrud = lazy(() => import("./pages/Admin/RoomsCrud.jsx"));
+const RoomTypesCrud = lazy(() => import("./pages/Admin/RoomTypesCrud.jsx"));
+const RoomStatusBoard = lazy(() => import("./pages/Admin/RoomStatusBoard.jsx"));
+const DashboardAdmin = lazy(() => import("./pages/DashboardAdmin.jsx"));
+
+// Rooms pages (lazy)
+const RoomsPending = lazy(() => import("./pages/Rooms/RoomsPending.jsx"));
+
+// Receptionist pages (lazy)
+const ReceptionistDashboard = lazy(() => import("./pages/Receptionist/Dashboard.jsx"));
+const TapeChart = lazy(() => import("./pages/Receptionist/TapeChart.jsx"));
+const ReservationHistory = lazy(() => import("./pages/Receptionist/ReservationHistory.jsx"));
+const CheckoutAlertsImproved = lazy(() => import("./pages/Receptionist/CheckoutAlerts.jsx"));
+const GuestHistory = lazy(() => import("./pages/Receptionist/GuestHistory.jsx"));
+
+// Reservations pages (lazy)
+const NewReservation = lazy(() => import("./pages/Reservations/NewReservation.jsx"));
+const ManageReservations = lazy(() => import("./pages/Reservations/ManageReservations.jsx"));
+const CheckinsToday = lazy(() => import("./pages/Reservations/CheckinsToday.jsx"));
+const CheckoutsToday = lazy(() => import("./pages/Reservations/CheckoutsToday.jsx"));
+const InProgress = lazy(() => import("./pages/Reservations/InProgress.jsx"));
+
+// Other pages (lazy)
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage.jsx"));
+const ChatbotPage = lazy(() => import("./pages/ChatbotPage.jsx"));
+const Reports = lazy(() => import("./pages/Reports.jsx"));
 
 import "./index.css";
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="w-12 h-12 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Cargando página...</p>
+    </div>
+  </div>
+);
 
 // --- Páginas de Contenido (Placeholder) ---
 const ReservationsPage = () => (
@@ -60,38 +89,58 @@ const AppRoutes = () => {
 
   return (
     <NotificationsProvider token={token}>
-      <Routes>
-        <Route path="/login" element={<Login />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
 
-        {/* Rutas Protegidas */}
-        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route index element={<DashboardSelector />} />
-          <Route path="planning" element={<TapeChart />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="notifications/checkouts" element={<CheckoutAlertsImproved />} />
-          <Route path="notifications/chatbot" element={<ChatbotPage />} />
-          <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} /> {/* Redirect legacy */}
-          <Route path="reservations" element={<ReservationsPage />} />
-          <Route path="history" element={<ReservationHistory />} />
-          <Route path="guests" element={<GuestHistory />} />
-          <Route path="reservations/new" element={<NewReservation />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="admin/rooms-crud" element={<RoomsCrud />} />
-          <Route path="admin/room-types-crud" element={<RoomTypesCrud />} />
-          <Route path="reports" element={<Reports />} />
-        </Route>
+          {/* Rutas Protegidas */}
+          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            <Route index element={<DashboardSelector />} />
+            <Route path="planning" element={<TapeChart />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="notifications/checkouts" element={<CheckoutAlertsImproved />} />
+            <Route path="notifications/chatbot" element={<ChatbotPage />} />
+            <Route path="checkout-alerts" element={<CheckoutAlertsImproved />} /> {/* Redirect legacy */}
+            <Route path="reservations" element={<ReservationsPage />} />
+            <Route path="history" element={<ReservationHistory />} />
+            <Route path="guests" element={<GuestHistory />} />
+            <Route path="reservations/new" element={<NewReservation />} />
+            <Route path="reservations/manage" element={<ManageReservations />} />
+            <Route path="reservations/checkins-today" element={<CheckinsToday />} />
+            <Route path="reservations/checkouts-today" element={<CheckoutsToday />} />
+            <Route path="reservations/in-progress" element={<InProgress />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="rooms/pending" element={<RoomsPending />} />
+            <Route path="admin/rooms-crud" element={<RoomsCrud />} />
+            <Route path="admin/room-types-crud" element={<RoomTypesCrud />} />
+            <Route path="admin/room-status-board" element={<RoomStatusBoard />} />
+            <Route path="reports" element={<Reports />} />
+            <Route
+              path="admin-reports"
+              element={
+                <ProtectedRoute allowedRoles={['administrator']}>
+                  <DashboardAdmin />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
 
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
     </NotificationsProvider>
   );
 };
 
 // --- Componente Principal ---
 function App() {
-  return <AppRoutes />;
+  return (
+    <ErrorBoundary>
+      <AppRoutes />
+    </ErrorBoundary>
+  );
 }
 
 export default App;

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import Step1SearchAvailability from "./reservation-steps/Step1SearchAvailability";
 import Step2SelectRooms from "./reservation-steps/Step2SelectRooms";
+import Step2_5GuestAssignment from "./reservation-steps/Step2_5GuestAssignment"; // ✅ NUEVO
 import Step3AdditionalServices from "./reservation-steps/Step3AdditionalServices";
 import Step4MainGuest from "./reservation-steps/Step4MainGuest";
 import Step5AdditionalGuests from "./reservation-steps/Step5AdditionalGuests";
@@ -20,10 +21,11 @@ import { guestsService } from "@/services/guests";
 const STEPS = [
   { id: 1, name: "Búsqueda", description: "Fechas y huéspedes" },
   { id: 2, name: "Habitaciones", description: "Selección" },
-  { id: 3, name: "Servicios", description: "Adicionales" },
-  { id: 4, name: "Huésped Principal", description: "Datos" },
-  { id: 5, name: "Huéspedes", description: "Adicionales" },
-  { id: 6, name: "Resumen", description: "Confirmar" },
+  { id: 3, name: "Asignar Huéspedes", description: "A habitaciones" }, // ✅ NUEVO Step 2.5
+  { id: 4, name: "Servicios", description: "Adicionales" }, // ✅ Antes era step 3
+  { id: 5, name: "Huésped Principal", description: "Datos" }, // ✅ Antes era step 4
+  { id: 6, name: "Huéspedes", description: "Adicionales" }, // ✅ Antes era step 5
+  { id: 7, name: "Resumen", description: "Confirmar" }, // ✅ Antes era step 6
 ];
 
 const ReservationStepper = () => {
@@ -46,19 +48,22 @@ const ReservationStepper = () => {
     pricing: null,
     paymentMethod: "",
     paymentAmount: 0,
+    paymentType: "full", // Nuevo: tipo de pago (full, half_upfront, daily)
     isDeposit: false,
+    multiplePayments: null, // Nuevo: para pagos mixtos
   });
 
   const updateStepData = (stepData) => {
     setReservationData((prev) => ({ ...prev, ...stepData }));
-    
+
     const criticalFieldsByStep = {
       1: ['checkInDate', 'checkOutDate', 'guests'], // Step 1: Búsqueda
       2: ['selectedRooms', 'availableRooms'], // Step 2: Habitaciones
-      3: ['selectedServices'], // Step 3: Servicios
-      4: ['mainGuest'], // Step 4: Huésped Principal
-      5: ['additionalGuests'], // Step 5: Huéspedes Adicionales
-      6: ['paymentMethod', 'paymentAmount'], // Step 6: Resumen
+      3: ['roomGuestAssignments'], // Step 3: Asignar Huéspedes a Habitaciones
+      4: ['roomServiceAssignments'], // Step 4: Servicios por Habitación
+      5: ['mainGuest'], // Step 5: Huésped Principal
+      6: ['additionalGuests'], // Step 6: Huéspedes Adicionales
+      7: ['paymentMethod', 'paymentAmount'], // Step 7: Resumen
     };
 
     // Detectar qué step se está modificando
@@ -93,10 +98,12 @@ const ReservationStepper = () => {
           isDeposit: false,
         }));
       } else if (modifiedStep === 2) {
-        // Si cambian habitaciones, limpiar desde step 3
+        // Si cambian habitaciones, limpiar desde step 3 (asignación de huéspedes)
         setReservationData(prev => ({
           ...prev,
           ...stepData,
+          roomGuestAssignments: [],
+          roomServiceAssignments: [],
           selectedServices: [],
           mainGuest: null,
           additionalGuests: [],
@@ -106,7 +113,21 @@ const ReservationStepper = () => {
           isDeposit: false,
         }));
       } else if (modifiedStep === 3) {
-        // Si cambian servicios, limpiar desde step 4
+        // Si cambia asignación de huéspedes a habitaciones, limpiar desde step 4 (servicios)
+        setReservationData(prev => ({
+          ...prev,
+          ...stepData,
+          roomServiceAssignments: [],
+          selectedServices: [],
+          mainGuest: null,
+          additionalGuests: [],
+          pricing: null,
+          paymentMethod: "",
+          paymentAmount: 0,
+          isDeposit: false,
+        }));
+      } else if (modifiedStep === 4) {
+        // Si cambian servicios, limpiar desde step 5 (huésped principal)
         setReservationData(prev => ({
           ...prev,
           ...stepData,
@@ -117,8 +138,8 @@ const ReservationStepper = () => {
           paymentAmount: 0,
           isDeposit: false,
         }));
-      } else if (modifiedStep === 4) {
-        // Si cambia huésped principal, limpiar desde step 5
+      } else if (modifiedStep === 5) {
+        // Si cambia huésped principal, limpiar desde step 6 (huéspedes adicionales)
         setReservationData(prev => ({
           ...prev,
           ...stepData,
@@ -128,8 +149,8 @@ const ReservationStepper = () => {
           paymentAmount: 0,
           isDeposit: false,
         }));
-      } else if (modifiedStep === 5) {
-        // Si cambian huéspedes adicionales, limpiar solo step 6
+      } else if (modifiedStep === 6) {
+        // Si cambian huéspedes adicionales, limpiar solo step 7 (resumen/pago)
         setReservationData(prev => ({
           ...prev,
           ...stepData,
@@ -138,7 +159,19 @@ const ReservationStepper = () => {
           paymentAmount: 0,
           isDeposit: false,
         }));
+      } else {
+        // ✅ Para Step 7 (resumen) o cualquier otro, solo actualizar sin limpiar
+        setReservationData(prev => ({
+          ...prev,
+          ...stepData,
+        }));
       }
+    } else {
+      // ✅ Si no se detecta cambio en steps críticos, solo actualizar
+      setReservationData(prev => ({
+        ...prev,
+        ...stepData,
+      }));
     }
   };
 
@@ -192,13 +225,15 @@ const ReservationStepper = () => {
         );
       case 2:
         return reservationData.selectedRooms.length > 0;
-      case 3:
-        return true; // Servicios son opcionales
-      case 4:
+      case 3: // ✅ NUEVO: Step 2.5 - Asignar huéspedes
+        return reservationData.roomGuestAssignments && reservationData.roomGuestAssignments.length > 0;
+      case 4: // ✅ Servicios son opcionales
+        return true;
+      case 5: // ✅ Huésped principal
         return reservationData.mainGuest !== null;
-      case 5:
-        return true; // Huéspedes adicionales son opcionales
-      case 6:
+      case 6: // ✅ Huéspedes adicionales son opcionales
+        return true;
+      case 7: // ✅ Resumen y pago
         return (
           reservationData.paymentMethod && reservationData.paymentAmount > 0
         );
@@ -207,42 +242,50 @@ const ReservationStepper = () => {
     }
   };
 
-  const handleCreateReservation = async () => {
+  const handleCreateReservation = async (paymentData = {}) => {
     try {
+      // ✅ VALIDACIÓN: Verificar que hay datos de huéspedes
+      if (!reservationData.mainGuest) {
+        toast.error('Error: No hay datos del huésped principal');
+        console.error('❌ reservationData.mainGuest es null/undefined');
+        return;
+      }
+
+      if (!reservationData.roomGuestAssignments || reservationData.roomGuestAssignments.length === 0) {
+        toast.error('Error: No hay asignaciones de huéspedes a habitaciones');
+        console.error('❌ reservationData.roomGuestAssignments está vacío');
+        return;
+      }
+
       // PASO 1: Obtener/Crear huésped principal
       let mainGuestId;
 
       if (reservationData.mainGuest.id) {
         // ✅ El huésped YA EXISTE
         mainGuestId = reservationData.mainGuest.id;
-        console.log("✅ Usando huésped existente ID:", mainGuestId);
       } else {
         // ✅ El huésped NO EXISTE, crear uno nuevo
-        console.log("➕ Creando nuevo huésped principal...");
         try {
           const mainGuestPayload = {
             ...reservationData.mainGuest,
             isMainGuest: true,
           };
           const response = await guestsService.createGuest(mainGuestPayload);
-          
+
           // ✅ FIX CRÍTICO: Acceder a response.data (Axios envuelve la respuesta)
           const guestData = response.data?.guest || response.guest || response;
           mainGuestId = guestData.id;
-          
+
           if (!mainGuestId) {
             console.error("❌ Respuesta completa del backend:", response);
             throw new Error("No se pudo obtener el ID del huésped principal creado");
           }
-          
-          console.log("✅ Huésped principal creado con ID:", mainGuestId);
         } catch (createError) {
           // ✅ Si da 409, significa que ya existe
           if (createError.response?.status === 409) {
             const existingGuest = createError.response?.data?.guest;
             if (existingGuest && existingGuest.id) {
               mainGuestId = existingGuest.id;
-              console.log("⚠️ Huésped ya existía, usando ID:", mainGuestId);
             } else {
               throw new Error("No se pudo determinar el ID del huésped existente");
             }
@@ -259,35 +302,31 @@ const ReservationStepper = () => {
         if (guestData.id) {
           // ✅ El huésped YA EXISTE
           additionalGuestIds.push(guestData.id);
-          console.log("✅ Usando huésped adicional existente ID:", guestData.id);
         } else {
           // ✅ El huésped NO EXISTE, crear uno nuevo
-          console.log("➕ Creando huésped adicional...");
           try {
             const payload = {
               ...guestData,
               isMainGuest: false,
             };
             const response = await guestsService.createGuest(payload);
-            
+
             // ✅ FIX CRÍTICO: Acceder a response.data (Axios envuelve la respuesta)
             const newGuestData = response.data?.guest || response.guest || response;
             const newGuestId = newGuestData.id;
-            
+
             if (!newGuestId) {
               console.error("❌ Respuesta completa del backend:", response);
               throw new Error("No se pudo obtener el ID del huésped adicional creado");
             }
-            
+
             additionalGuestIds.push(newGuestId);
-            console.log("✅ Huésped adicional creado con ID:", newGuestId);
           } catch (createError) {
             // ✅ Si da 409, usar el ID del existente
             if (createError.response?.status === 409) {
               const existingGuest = createError.response?.data?.guest;
               if (existingGuest && existingGuest.id) {
                 additionalGuestIds.push(existingGuest.id);
-                console.log("⚠️ Huésped adicional ya existía, usando ID:", existingGuest.id);
               } else {
                 throw new Error("No se pudo determinar el ID del huésped adicional existente");
               }
@@ -304,27 +343,81 @@ const ReservationStepper = () => {
         throw new Error("Algunos huéspedes adicionales no tienen ID válido");
       }
 
-      // PASO 3: Crear reserva
+      // PASO 3: Construir roomGuestAssignments y mapear IDs temporales
+      // ✅ USAR ASIGNACIONES MANUALES DEL STEP 6 (no automáticas)
+      const rawRoomGuestAssignments = reservationData.roomGuestAssignments || [];
+
+      if (rawRoomGuestAssignments.length === 0) {
+        throw new Error("No se han asignado huéspedes a las habitaciones");
+      }
+
+      // ✅ FIX CRÍTICO: Mapear IDs temporales a IDs reales
+      // Crear mapa: ID temporal → ID real
+      const guestIdMap = {
+        'guest-1': mainGuestId, // Main guest siempre es guest-1
+      };
+
+      // Mapear huéspedes adicionales (siempre usar IDs temporales como clave)
+      reservationData.additionalGuests.forEach((guestData, index) => {
+        const temporalId = `guest-${index + 2}`; // guest-2, guest-3, etc.
+        const realId = additionalGuestIds[index];
+        guestIdMap[temporalId] = realId;
+      });
+
+      // Mapear asignaciones
+      const roomGuestAssignments = rawRoomGuestAssignments.map(assignment => {
+        const mappedGuestIds = assignment.guestIds.map(guestId => {
+          const realId = guestIdMap[guestId];
+          if (!realId || typeof realId !== 'number') {
+            console.error(`❌ No se pudo mapear ID "${guestId}" a ID real`);
+            console.error(`Mapa disponible:`, guestIdMap);
+            throw new Error(`ID de huésped inválido: ${guestId}`);
+          }
+          return realId;
+        });
+
+        return {
+          roomId: assignment.roomId,
+          guestIds: mappedGuestIds,
+        };
+      });
+
+      // PASO 4: Construir roomServiceAssignments
+      // ✅ USAR ASIGNACIONES MANUALES DEL STEP 6 (no automáticas)
+      const rawRoomServiceAssignments = reservationData.roomServiceAssignments || [];
+
+      // ✅ FIX CRÍTICO: Filtrar servicios sin fechas (dates vacío causa error en backend)
+      const roomServiceAssignments = rawRoomServiceAssignments.filter(rsa => {
+        if (!rsa.dates || rsa.dates.length === 0) {
+          console.warn(`⚠️ Servicio ID ${rsa.serviceId} en habitación ${rsa.roomId} no tiene fechas, se omitirá`);
+          return false;
+        }
+        return true;
+      });
+
+      // Nota: roomServiceAssignments puede estar vacío si no se seleccionaron servicios
+      // o si el usuario no asignó ningún servicio a habitaciones (es opcional)
+
+      // PASO 5: Crear reserva con nuevo modelo
+      // ✅ FILTRAR: Solo enviar habitaciones que tienen huéspedes asignados
+      const roomIdsWithGuests = roomGuestAssignments.map(rga => rga.roomId);
+
+      // ✅ Usar datos de pago del parámetro si están disponibles, sino de reservationData
       const payload = {
         mainGuestId: mainGuestId,
         additionalGuestIds: additionalGuestIds,
-        roomIds: reservationData.selectedRooms.map((r) => r.id),
-        services: reservationData.selectedServices.map((s) => ({
-          serviceId: s.id,
-          quantity: s.quantity,
-          customPrice: s.customPrice,
-        })),
+        roomIds: roomIdsWithGuests, // ← Solo habitaciones con huéspedes
+        roomGuestAssignments: roomGuestAssignments,
+        roomServiceAssignments: roomServiceAssignments,
         checkInDate: reservationData.checkInDate,
         checkOutDate: reservationData.checkOutDate,
         guestCount: reservationData.guests,
-        channel: reservationData.channel,
-        paymentMethod: reservationData.paymentMethod,
-        paymentAmount: reservationData.paymentAmount,
-        isDeposit: reservationData.isDeposit,
-        multiplePayments: reservationData.multiplePayments,
+        channel: paymentData.channel || reservationData.channel || 'reception',
+        paymentMethod: paymentData.paymentMethod || reservationData.paymentMethod,
+        paymentAmount: paymentData.paymentAmount || reservationData.paymentAmount,
+        paymentType: paymentData.paymentType || reservationData.paymentType || 'full',
+        multiplePayments: paymentData.multiplePayments || reservationData.multiplePayments,
       };
-
-      console.log("📝 Creando reserva con payload:", payload);
 
       const result = await reservationsService.createReservation(payload);
 
@@ -353,6 +446,9 @@ const ReservationStepper = () => {
                 Grupo/Empresa (Próximamente)
               </TabsTrigger>
             </TabsList>
+            {/* TabsContent requeridos por Radix UI para ARIA validity */}
+            <TabsContent value="individual" className="hidden" />
+            <TabsContent value="corporate" className="hidden" />
           </Tabs>
         </CardContent>
       </Card>
@@ -367,6 +463,9 @@ const ReservationStepper = () => {
               const isLocked =
                 !canAccessStep(step.id) && !isCurrent && !isCompleted;
 
+              // ✅ Mostrar check verde si el step actual puede proceder
+              const showCheckmark = isCompleted || (isCurrent && canProceed());
+
               return (
                 <React.Fragment key={step.id}>
                   <div className="flex flex-col items-center">
@@ -374,8 +473,9 @@ const ReservationStepper = () => {
                       onClick={() => goToStep(step.id)}
                       disabled={isLocked}
                       className="flex items-center justify-center mb-2 disabled:cursor-not-allowed"
+                      aria-label={`${isLocked ? 'Paso bloqueado' : isCurrent ? 'Paso actual' : 'Ir al paso'}: ${step.name}`}
                     >
-                      {isCompleted ? (
+                      {showCheckmark ? (
                         <CheckCircle2 className="h-8 w-8 text-green-500" />
                       ) : isCurrent ? (
                         <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
@@ -395,7 +495,7 @@ const ReservationStepper = () => {
                           isCurrent
                             ? "text-foreground"
                             : isLocked
-                              ? "text-muted-foreground/50"
+                              ? "text-muted-foreground"
                               : "text-muted-foreground"
                         }`}
                       >
@@ -439,7 +539,7 @@ const ReservationStepper = () => {
             />
           )}
           {currentStep === 3 && (
-            <Step3AdditionalServices
+            <Step2_5GuestAssignment
               data={reservationData}
               onUpdate={updateStepData}
               onNext={nextStep}
@@ -447,7 +547,7 @@ const ReservationStepper = () => {
             />
           )}
           {currentStep === 4 && (
-            <Step4MainGuest
+            <Step3AdditionalServices
               data={reservationData}
               onUpdate={updateStepData}
               onNext={nextStep}
@@ -455,7 +555,7 @@ const ReservationStepper = () => {
             />
           )}
           {currentStep === 5 && (
-            <Step5AdditionalGuests
+            <Step4MainGuest
               data={reservationData}
               onUpdate={updateStepData}
               onNext={nextStep}
@@ -463,6 +563,14 @@ const ReservationStepper = () => {
             />
           )}
           {currentStep === 6 && (
+            <Step5AdditionalGuests
+              data={reservationData}
+              onUpdate={updateStepData}
+              onNext={nextStep}
+              onBack={prevStep}
+            />
+          )}
+          {currentStep === 7 && (
             <Step6Summary
               data={reservationData}
               onUpdate={updateStepData}

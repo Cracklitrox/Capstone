@@ -6,7 +6,15 @@ import { Input } from '@/components/ui/Input';
 import { Separator } from '@/components/ui/Separator';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Calendar, Users, Home, DollarSign, AlertCircle, Receipt, CreditCard, Banknote } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/Select';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Calendar, Users, Home, DollarSign, AlertCircle, Receipt, CreditCard, Banknote, UserPlus, X, Plus, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -30,6 +38,7 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
   const [paymentMethod, setPaymentMethod] = useState(data.paymentMethod || '');
   const [paymentAmount, setPaymentAmount] = useState(data.paymentAmount || 0);
   const [paymentPreset, setPaymentPreset] = useState(PAYMENT_PRESETS.FULL);
+  const [paymentType, setPaymentType] = useState(data.paymentType || 'full');
   const [pricing, setPricing] = useState(data.pricing || null);
   const [loading, setLoading] = useState(!data.pricing);
   const [creating, setCreating] = useState(false);
@@ -39,37 +48,135 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
   const [multiplePayments, setMultiplePayments] = useState([]);
   const [showMultiplePayments, setShowMultiplePayments] = useState(false);
 
-  useEffect(() => {
-    if (creating && data.paymentMethod && data.paymentAmount > 0) {
-      onCreate();
-    }
-  }, [data.paymentMethod, data.paymentAmount, creating, onCreate]);
+  // ✅ SIMPLIFICADO: Cargar asignaciones YA HECHAS en steps anteriores
+  const [roomGuestAssignments, setRoomGuestAssignments] = useState(
+    data.roomGuestAssignments || []
+  );
 
+  // ✅ SIMPLIFICADO: Cargar servicios YA ASIGNADOS en Step 4
+  const [roomServiceAssignments, setRoomServiceAssignments] = useState(
+    data.roomServiceAssignments || []
+  );
+  const [tempRoomServiceAssignments, setTempRoomServiceAssignments] = useState([]); // ✅ Estado temporal para edición
+  const [isEditingServices, setIsEditingServices] = useState(false); // ✅ Modo edición activo
+  const [showServiceAssignments, setShowServiceAssignments] = useState(false); // Nuevo: controla expansión del panel
+
+  // ✅ Sincronizar estado local con datos que llegan de steps anteriores
   useEffect(() => {
-    if (!data.pricing) {
+    if (data.roomGuestAssignments && data.roomGuestAssignments.length > 0) {
+      setRoomGuestAssignments(data.roomGuestAssignments);
+    }
+    if (data.roomServiceAssignments && data.roomServiceAssignments.length > 0) {
+      setRoomServiceAssignments(data.roomServiceAssignments);
+    }
+  }, [data.roomGuestAssignments, data.roomServiceAssignments]);
+
+  // ✅ REMOVIDO: useEffect que podría causar renders innecesarios
+  // useEffect(() => {
+  //   if (creating && data.paymentMethod && data.paymentAmount > 0) {
+  //     onCreate();
+  //   }
+  // }, [data.paymentMethod, data.paymentAmount, creating, onCreate]);
+
+  // ✅ SIMPLIFICADO: Siempre calcular pricing desde el backend (tiene precios correctos)
+  useEffect(() => {
+    if (!data.pricing && roomGuestAssignments.length > 0) {
       calculatePricing();
     }
-  }, []);
+  }, [roomGuestAssignments, roomServiceAssignments]);
 
   const calculatePricing = async () => {
     setLoading(true);
     try {
+      // ✅ Filtrar solo habitaciones con huéspedes asignados
+      const roomsWithGuests = data.selectedRooms.filter(room =>
+        roomGuestAssignments.some(a => a.roomId === room.id)
+      );
+
+      const roomIds = roomsWithGuests.map(r => r.id);
+
+      // ✅ Calcular servicios totales desde roomServiceAssignments
+      const servicesForAPI = roomServiceAssignments.reduce((acc, assignment) => {
+        const existing = acc.find(s => s.serviceId === assignment.serviceId);
+        const totalQuantity = assignment.quantity * assignment.dates.length;
+
+        if (existing) {
+          existing.quantity += totalQuantity;
+        } else {
+          acc.push({
+            serviceId: assignment.serviceId,
+            quantity: totalQuantity,
+            customPrice: assignment.unitPrice
+          });
+        }
+        return acc;
+      }, []);
+
       const result = await reservationsService.calculatePrice(
-        data.selectedRooms.map(r => r.id),
-        data.selectedServices.map(s => ({ 
-          serviceId: s.id, 
-          quantity: s.quantity,
-          customPrice: s.customPrice || s.price
-        })),
+        roomIds,
+        servicesForAPI,
         data.checkInDate,
         data.checkOutDate,
         data.guests
       );
+
       setPricing(result);
       onUpdate({ pricing: result });
     } catch (error) {
       console.error('Error al calcular precio:', error);
       toast.error('Error al calcular el precio total');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ NUEVA: Calcular pricing desde asignaciones ya hechas (más preciso)
+  const calculatePricingFromAssignments = () => {
+    setLoading(true);
+    try {
+      const nights = calculateNights();
+
+      // ✅ Filtrar solo habitaciones que tienen huéspedes asignados
+      const roomsWithGuests = data.selectedRooms.filter(room => {
+        return roomGuestAssignments.some(assignment => assignment.roomId === room.id);
+      });
+
+      // ✅ Generar roomsBreakdown solo para habitaciones con huéspedes
+      const roomsBreakdown = roomsWithGuests.map(room => ({
+        roomNumber: room.number,
+        roomType: room.type,
+        pricePerNight: room.price || 0,
+        nights: nights,
+        subtotal: (room.price || 0) * nights,
+        seasonApplied: room.seasonName || null
+      }));
+
+      // Calcular total de habitaciones
+      const roomsTotal = roomsBreakdown.reduce((sum, room) => sum + room.subtotal, 0);
+
+      // Calcular total de servicios desde roomServiceAssignments
+      const servicesTotal = roomServiceAssignments.reduce((sum, assignment) => {
+        const assignmentTotal = assignment.unitPrice * assignment.quantity * assignment.dates.length;
+        return sum + assignmentTotal;
+      }, 0);
+
+      const total = roomsTotal + servicesTotal;
+
+      const calculatedPricing = {
+        roomsTotal,
+        roomsSubtotal: roomsTotal, // ✅ Alias para compatibilidad
+        servicesTotal,
+        total,
+        nights: nights,
+        rooms: roomsWithGuests.length, // ✅ Solo contar habitaciones con huéspedes
+        roomsBreakdown // ✅ Agregar breakdown para el UI
+      };
+
+      setPricing(calculatedPricing);
+      onUpdate({ pricing: calculatedPricing });
+    } catch (error) {
+      console.error('Error al calcular pricing:', error);
+      toast.error('Error al calcular el precio');
     } finally {
       setLoading(false);
     }
@@ -86,6 +193,350 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
   };
 
   const nights = calculateNights();
+
+  // ==================== FUNCIONES DE ASIGNACIÓN DE HUÉSPEDES ====================
+
+  // ==================== NUEVA LÓGICA SIMPLIFICADA ====================
+
+  // Obtener lista de TODOS los huéspedes (main + additional)
+  const getAllGuests = () => {
+    const guests = [];
+    let idCounter = 1;
+
+    // Main guest
+    if (data.mainGuest && data.mainGuest.firstName) {
+      guests.push({
+        id: data.mainGuest.id || `guest-${idCounter++}`,
+        name: `${data.mainGuest.firstName} ${data.mainGuest.paternalLastName || ''}`.trim(),
+        isMain: true,
+        fullData: data.mainGuest
+      });
+    }
+
+    // Additional guests
+    if (data.additionalGuests && data.additionalGuests.length > 0) {
+      data.additionalGuests.forEach((guest) => {
+        if (guest && guest.firstName) {
+          guests.push({
+            id: guest.id || `guest-${idCounter++}`,
+            name: `${guest.firstName} ${guest.paternalLastName || ''}`.trim(),
+            isMain: false,
+            fullData: guest
+          });
+        }
+      });
+    }
+
+    return guests;
+  };
+
+  // Obtener TODOS los IDs de huéspedes ya asignados (en TODAS las habitaciones)
+  const getAllAssignedGuestIds = () => {
+    return roomGuestAssignments.flatMap(room => room.guestIds);
+  };
+
+  // Obtener huéspedes NO asignados a NINGUNA habitación
+  const getUnassignedGuests = () => {
+    const allGuests = getAllGuests();
+    const assignedIds = getAllAssignedGuestIds();
+    return allGuests.filter(guest => !assignedIds.includes(guest.id));
+  };
+
+  // Agregar huésped a una habitación (CON VALIDACIONES ESTRICTAS)
+  const addGuestToRoom = (roomId, guestId) => {
+    // VALIDACIÓN 1: Verificar que el huésped NO esté asignado en NINGUNA habitación
+    const assignedIds = getAllAssignedGuestIds();
+    if (assignedIds.includes(guestId)) {
+      toast.error('Este huésped ya está asignado a otra habitación');
+      return;
+    }
+
+    setRoomGuestAssignments(prev =>
+      prev.map(room => {
+        if (room.roomId === roomId) {
+          // VALIDACIÓN 2: Verificar capacidad
+          if (room.guestIds.length >= room.capacity) {
+            toast.error(`Habitación ${room.roomNumber} llena (capacidad: ${room.capacity})`);
+            return room;
+          }
+
+          // ✅ Agregar huésped
+          return {
+            ...room,
+            guestIds: [...room.guestIds, guestId]
+          };
+        }
+        return room;
+      })
+    );
+  };
+
+  // Remover huésped de una habitación
+  const removeGuestFromRoom = (roomId, guestId) => {
+    setRoomGuestAssignments(prev =>
+      prev.map(room => {
+        if (room.roomId === roomId) {
+          return {
+            ...room,
+            guestIds: room.guestIds.filter(id => id !== guestId)
+          };
+        }
+        return room;
+      })
+    );
+  };
+
+  // Verificar si todas las asignaciones están completas
+  // ✅ ACTUALIZADO: Verificar que haya asignaciones Y datos de huéspedes
+  const areAssignmentsValid = () => {
+    // 1. Verificar que hay asignaciones de habitaciones con huéspedes
+    const totalAssigned = roomGuestAssignments.reduce((sum, room) => sum + room.guestIds.length, 0);
+    if (totalAssigned === 0 || roomGuestAssignments.length === 0) {
+      return false;
+    }
+
+    // 2. Verificar que hay datos del huésped principal
+    if (!data.mainGuest || !data.mainGuest.firstName) {
+      return false;
+    }
+
+    // 3. Si hay más de 1 huésped, verificar que hay datos de huéspedes adicionales
+    if (data.guests > 1 && (!data.additionalGuests || data.additionalGuests.length === 0)) {
+      return false;
+    }
+
+    return true;
+  };
+
+  // ✅ AUTO-ASIGNAR: Distribuir huéspedes equitativamente
+  const autoAssignGuestsByCapacity = () => {
+    const allGuests = getAllGuests();
+    const rooms = data.selectedRooms;
+
+    if (allGuests.length === 0) {
+      toast.error('No hay huéspedes para asignar');
+      return;
+    }
+
+    // ESTRATEGIA SIMPLE: 1 huésped por habitación primero, luego distribuir el resto
+    const newAssignments = [];
+    let guestIndex = 0;
+
+    // PASO 1: Asignar 1 huésped a cada habitación
+    for (const room of rooms) {
+      const assignment = {
+        roomId: room.id,
+        roomNumber: room.number,
+        roomType: room.type,
+        capacity: room.capacity || 2,
+        guestIds: []
+      };
+
+      if (guestIndex < allGuests.length) {
+        assignment.guestIds.push(allGuests[guestIndex].id);
+        guestIndex++;
+      }
+
+      newAssignments.push(assignment);
+    }
+
+    // PASO 2: Distribuir huéspedes restantes según capacidad
+    for (const assignment of newAssignments) {
+      while (assignment.guestIds.length < assignment.capacity && guestIndex < allGuests.length) {
+        assignment.guestIds.push(allGuests[guestIndex].id);
+        guestIndex++;
+      }
+    }
+
+    setRoomGuestAssignments(newAssignments);
+    toast.success(`${allGuests.length} huéspedes asignados automáticamente`);
+
+    // ✅ Ya no es necesario aplicar servicios - vienen del Step 4
+  };
+
+  // ==================== FUNCIONES DE ASIGNACIÓN DE SERVICIOS ====================
+
+  // Generar array de fechas entre check-in y check-out
+  const getServiceDates = () => {
+    if (!data.checkInDate || !data.checkOutDate) return [];
+
+    const startDate = new Date(data.checkInDate);
+    const endDate = new Date(data.checkOutDate);
+    const dates = [];
+
+    const currentDate = new Date(startDate);
+    while (currentDate < endDate) {
+      dates.push(currentDate.toISOString().split('T')[0]); // Formato YYYY-MM-DD
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return dates;
+  };
+
+  // Agregar servicio a una habitación
+  const addServiceToRoom = (roomId, serviceId) => {
+    const service = data.selectedServices.find(s => s.id === serviceId);
+    if (!service) return;
+
+    // Verificar si ya existe
+    const exists = roomServiceAssignments.some(
+      rsa => rsa.roomId === roomId && rsa.serviceId === serviceId
+    );
+
+    if (exists) {
+      toast.error('Este servicio ya está asignado a esta habitación');
+      return;
+    }
+
+    const allDates = getServiceDates();
+
+    setRoomServiceAssignments(prev => [
+      ...prev,
+      {
+        roomId: roomId,
+        serviceId: serviceId,
+        serviceName: service.name,
+        dates: allDates, // Por defecto, todas las fechas
+        quantity: service.quantity || 1,
+        unitPrice: service.customPrice || service.price,
+      }
+    ]);
+
+    toast.success(`${service.name} agregado a la habitación`);
+  };
+
+  // ========== FUNCIONES DE EDICIÓN DE SERVICIOS ==========
+
+  // Activar modo edición
+  const startEditingServices = () => {
+    setTempRoomServiceAssignments([...roomServiceAssignments]); // Copiar estado actual
+    setIsEditingServices(true);
+  };
+
+  // Confirmar cambios (guardar tempRoomServiceAssignments → roomServiceAssignments)
+  const confirmServiceChanges = () => {
+    setRoomServiceAssignments([...tempRoomServiceAssignments]);
+    setIsEditingServices(false);
+    recalculateServicesPricing(tempRoomServiceAssignments); // ✅ Recalcular precio
+    toast.success('Cambios en servicios guardados');
+  };
+
+  // Cancelar cambios (descartar tempRoomServiceAssignments)
+  const cancelServiceChanges = () => {
+    setTempRoomServiceAssignments([]);
+    setIsEditingServices(false);
+    toast.info('Cambios cancelados');
+  };
+
+  // Recalcular precio total de servicios
+  const recalculateServicesPricing = (assignments) => {
+    const servicesTotal = assignments.reduce((sum, rsa) => {
+      const totalForService = rsa.unitPrice * rsa.quantity * rsa.dates.length;
+      return sum + totalForService;
+    }, 0);
+
+    // Actualizar pricing
+    if (pricing) {
+      const newTotal = pricing.roomsTotal + servicesTotal;
+      setPricing(prev => ({
+        ...prev,
+        servicesTotal,
+        total: newTotal
+      }));
+    }
+  };
+
+  // Remover servicio de una habitación
+  const removeServiceFromRoom = (roomId, serviceId) => {
+    const setter = isEditingServices ? setTempRoomServiceAssignments : setRoomServiceAssignments;
+    setter(prev =>
+      prev.filter(rsa => !(rsa.roomId === roomId && rsa.serviceId === serviceId))
+    );
+  };
+
+  // Actualizar cantidad de un servicio
+  const updateServiceQuantity = (roomId, serviceId, quantity) => {
+    const setter = isEditingServices ? setTempRoomServiceAssignments : setRoomServiceAssignments;
+    setter(prev =>
+      prev.map(rsa => {
+        if (rsa.roomId === roomId && rsa.serviceId === serviceId) {
+          return { ...rsa, quantity: parseInt(quantity) || 1 };
+        }
+        return rsa;
+      })
+    );
+  };
+
+  // Actualizar fechas de un servicio
+  const updateServiceDates = (roomId, serviceId, dates) => {
+    const setter = isEditingServices ? setTempRoomServiceAssignments : setRoomServiceAssignments;
+    setter(prev =>
+      prev.map(rsa => {
+        if (rsa.roomId === roomId && rsa.serviceId === serviceId) {
+          return { ...rsa, dates: dates };
+        }
+        return rsa;
+      })
+    );
+  };
+
+  // Toggle fecha específica
+  const toggleServiceDate = (roomId, serviceId, date) => {
+    setRoomServiceAssignments(prev =>
+      prev.map(rsa => {
+        if (rsa.roomId === roomId && rsa.serviceId === serviceId) {
+          const currentDates = rsa.dates || [];
+          const dateExists = currentDates.includes(date);
+
+          return {
+            ...rsa,
+            dates: dateExists
+              ? currentDates.filter(d => d !== date)
+              : [...currentDates, date].sort()
+          };
+        }
+        return rsa;
+      })
+    );
+  };
+
+  // Obtener servicios disponibles para una habitación (no asignados aún)
+  const getAvailableServices = (roomId) => {
+    if (!data.selectedServices || data.selectedServices.length === 0) return [];
+
+    const assignedServiceIds = roomServiceAssignments
+      .filter(rsa => rsa.roomId === roomId)
+      .map(rsa => rsa.serviceId);
+
+    return data.selectedServices.filter(service => !assignedServiceIds.includes(service.id));
+  };
+
+  // Aplicar servicio a TODAS las habitaciones
+  const applyServiceToAllRooms = (serviceId) => {
+    const service = data.selectedServices.find(s => s.id === serviceId);
+    if (!service) return;
+
+    const allDates = getServiceDates();
+
+    const newAssignments = data.selectedRooms.map(room => ({
+      roomId: room.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      dates: allDates,
+      quantity: service.quantity || 1,
+      unitPrice: service.customPrice || service.price,
+    }));
+
+    setRoomServiceAssignments(prev => {
+      // Filtrar duplicados (remover asignaciones previas de este servicio)
+      const filtered = prev.filter(rsa => rsa.serviceId !== service.id);
+      return [...filtered, ...newAssignments];
+    });
+
+    toast.success(`${service.name} aplicado a ${data.selectedRooms.length} habitaciones`);
+  };
+
+  // ==================== FIN FUNCIONES DE SERVICIOS ====================
 
   const handlePaymentMethodChange = (method) => {
     setPaymentMethod(method);
@@ -111,7 +562,8 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
         break;
       case PAYMENT_PRESETS.FIRST_NIGHT:
         // Calcular precio de primera noche
-        const firstNightPrice = Math.ceil(pricing.roomsSubtotal / nights);
+        const roomsSubtotal = pricing.roomsSubtotal || pricing.roomsTotal || 0;
+        const firstNightPrice = Math.ceil(roomsSubtotal / nights);
         setPaymentAmount(firstNightPrice);
         break;
       case PAYMENT_PRESETS.CUSTOM:
@@ -179,6 +631,22 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
   const handleConfirm = () => {
     const totalPaid = getTotalPaid();
 
+    // Validar asignación de huéspedes
+    if (!areAssignmentsValid()) {
+      toast.error('Debe asignar todos los huéspedes a las habitaciones');
+      return;
+    }
+
+    // Validar asignación de servicios (ya no es necesario porque se auto-aplican)
+    // Si el usuario eliminó manualmente TODAS las asignaciones, advertir
+    if (data.selectedServices && data.selectedServices.length > 0 && roomServiceAssignments.length === 0) {
+      const confirmProceed = window.confirm(
+        'Ha eliminado todas las asignaciones de servicios.\n\n' +
+        '¿Desea continuar sin servicios? Los servicios seleccionados no se aplicarán a la reserva.'
+      );
+      if (!confirmProceed) return;
+    }
+
     if (showMultiplePayments) {
       if (multiplePayments.length === 0) {
         toast.error('Debe agregar al menos un método de pago');
@@ -206,16 +674,59 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
       return;
     }
 
+    // ✅ FILTRAR habitaciones sin huéspedes asignados
+    const roomsWithGuests = roomGuestAssignments.filter(room => room.guestIds.length > 0);
+
+    if (roomsWithGuests.length === 0) {
+      toast.error('Debe asignar al menos un huésped a una habitación');
+      return;
+    }
+
+    // Si se filtraron habitaciones, advertir al usuario
+    if (roomsWithGuests.length < roomGuestAssignments.length) {
+      const removedRooms = roomGuestAssignments.length - roomsWithGuests.length;
+      toast.warning(
+        `Se excluyeron ${removedRooms} habitación(es) sin huéspedes asignados`,
+        { duration: 4000 }
+      );
+    }
+
+    // ✅ FILTRAR servicios de habitaciones excluidas
+    const validRoomIds = roomsWithGuests.map(r => r.roomId);
+    const filteredRoomServiceAssignments = roomServiceAssignments.filter(rsa =>
+      validRoomIds.includes(rsa.roomId) && rsa.dates && rsa.dates.length > 0
+    );
+
+    // Nota: El mapeo de IDs temporales a IDs reales se hace en ReservationStepper
+    // Aquí solo enviamos las asignaciones tal cual (con IDs temporales o reales)
     const paymentData = {
       paymentMethod: showMultiplePayments ? 'multiple' : paymentMethod,
       paymentAmount: totalPaid,
+      paymentType: paymentType,
       isDeposit: pricing ? totalPaid < pricing.total : false,
       multiplePayments: showMultiplePayments ? multiplePayments : undefined,
       channel: channel,
+      roomGuestAssignments: roomsWithGuests.map(room => ({
+        roomId: room.roomId,
+        guestIds: room.guestIds
+      })),
+      roomServiceAssignments: filteredRoomServiceAssignments.map(rsa => ({
+        roomId: rsa.roomId,
+        serviceId: rsa.serviceId,
+        dates: rsa.dates,
+        quantity: rsa.quantity,
+        unitPrice: rsa.unitPrice
+      })),
     };
 
+    // Actualizar datos primero
     onUpdate(paymentData);
+
+    // Llamar a onCreate inmediatamente con los datos de pago
     setCreating(true);
+
+    // ✅ Llamar directamente a onCreate pasando los datos de pago
+    onCreate(paymentData);
   };
 
   if (loading) {
@@ -387,18 +898,114 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
         </CardContent>
       </Card>
 
+      {/* ✅ SIMPLIFICADO: Distribución de Huéspedes (Solo Lectura) */}
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <UserPlus className="h-5 w-5" />
+            Distribución de Huéspedes
+          </h3>
+
+          {/* ⚠️ Verificar si hay datos de huéspedes */}
+          {!data.mainGuest || (data.guests > 1 && (!data.additionalGuests || data.additionalGuests.length === 0)) ? (
+            <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-orange-800 dark:text-orange-200">
+                <p className="font-medium">Datos de huéspedes incompletos</p>
+                <p className="mt-1">
+                  Debes completar los pasos "Huésped Principal" y "Huéspedes Adicionales" antes de continuar.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {roomGuestAssignments.map((room, roomIndex) => {
+                // ✅ Obtener lista de todos los huéspedes en orden
+                const allGuestsInOrder = [];
+                if (data.mainGuest && data.mainGuest.firstName) {
+                  allGuestsInOrder.push({
+                    id: `guest-1`,
+                    name: `${data.mainGuest.firstName} ${data.mainGuest.paternalLastName || ''}`.trim(),
+                    isMain: true
+                  });
+                }
+                if (data.additionalGuests && data.additionalGuests.length > 0) {
+                  data.additionalGuests.forEach((guest, index) => {
+                    if (guest && guest.firstName) {
+                      allGuestsInOrder.push({
+                        id: `guest-${index + 2}`,
+                        name: `${guest.firstName} ${guest.paternalLastName || ''}`.trim(),
+                        isMain: false
+                      });
+                    }
+                  });
+                }
+
+              // ✅ Mapear IDs de la habitación a huéspedes
+              const roomGuests = room.guestIds
+                .map(guestId => {
+                  const found = allGuestsInOrder.find(g => g.id === guestId);
+                  return found;
+                })
+                .filter(Boolean);
+
+              return (
+                <div key={room.roomId} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Habitación {room.roomNumber} - {room.roomType}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {roomGuests.length} huésped(es) · Capacidad {room.capacity}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Lista de huéspedes (solo lectura) */}
+                  {roomGuests.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {roomGuests.map((guest, idx) => (
+                        <Badge key={`${room.roomId}-${idx}`} variant="outline" className="text-xs">
+                          {guest.name}
+                          {guest.isMain && ' ⭐'}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">Sin huéspedes asignados</p>
+                  )}
+                </div>
+              );
+            })}
+            </div>
+          )}
+
+          {/* ℹ️ Mensaje informativo solo si hay datos */}
+          {data.mainGuest && (
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                Para modificar la distribución de huéspedes, vuelva al Paso 3 (Asignar Huéspedes).
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Rooms */}
       <Card>
         <CardContent className="pt-6 space-y-4">
           <h3 className="font-semibold text-foreground flex items-center gap-2">
             <Home className="h-5 w-5" />
-            Habitaciones
+            Habitaciones ({roomGuestAssignments.length})
           </h3>
-          
-          {data.selectedRooms.map((room) => {
-            const roomPricing = pricing?.roomsBreakdown.find(
-              r => r.roomNumber === room.number
-            );
+
+          {/* ✅ Solo mostrar habitaciones que tienen huéspedes asignados */}
+          {data.selectedRooms
+            .filter(room => roomGuestAssignments.some(a => a.roomId === room.id))
+            .map((room) => {
+              const roomPricing = pricing?.roomsBreakdown?.find(
+                r => r.roomNumber === room.number
+              );
             return (
               <div key={room.id} className="flex justify-between items-start text-sm">
                 <div>
@@ -423,10 +1030,241 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
           
           <div className="flex justify-between font-semibold">
             <span>Subtotal Habitaciones</span>
-            <span>${pricing?.roomsSubtotal.toLocaleString()}</span>
+            <span>${(pricing?.roomsSubtotal || pricing?.roomsTotal || 0).toLocaleString()}</span>
           </div>
         </CardContent>
       </Card>
+
+      {/* Room Service Assignments */}
+      {data.selectedServices && data.selectedServices.length > 0 && (
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Servicios Aplicados
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!showServiceAssignments) {
+                    // Al abrir panel, activar modo edición
+                    startEditingServices();
+                  }
+                  setShowServiceAssignments(!showServiceAssignments);
+                }}
+              >
+                {showServiceAssignments ? 'Ocultar detalles' : 'Editar asignaciones'}
+              </Button>
+            </div>
+
+            {/* ✅ SIMPLIFICADO: Solo mostrar resumen de servicios ya asignados */}
+            {!showServiceAssignments && roomServiceAssignments.length > 0 && (
+              <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 rounded-lg space-y-2">
+                <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                  ✅ {roomServiceAssignments.length} servicio(s) asignado(s) a habitaciones
+                </p>
+                <p className="text-xs text-green-700 dark:text-green-300">
+                  Haga clic en "Editar asignaciones" para ver o modificar los detalles
+                </p>
+              </div>
+            )}
+
+            {/* ✅ SIMPLIFICADO: Si no hay servicios, solo informar */}
+            {!showServiceAssignments && roomServiceAssignments.length === 0 && (
+              <div className="p-3 bg-muted/50 border border-dashed rounded-lg">
+                <p className="text-sm text-muted-foreground text-center">
+                  No se asignaron servicios adicionales
+                </p>
+              </div>
+            )}
+
+            {/* Panel expandido - Solo se muestra si showServiceAssignments es true */}
+            {showServiceAssignments && (
+              <>
+                {/* Aplicar a todas las habitaciones */}
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+              <div className="flex-1">
+                <p className="text-sm font-medium">Atajo rápido:</p>
+                <p className="text-xs text-muted-foreground">
+                  Aplica un servicio a todas las habitaciones simultáneamente
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {data.selectedServices.map(service => (
+                  <Button
+                    key={service.id}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyServiceToAllRooms(service.id)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    {service.name} a todas
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="font-medium">¿Cómo funciona?</p>
+                <p className="mt-1">
+                  Seleccione qué servicios aplicarán a cada habitación y en qué fechas.
+                  Por defecto, se asignan todas las noches de la estadía.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {data.selectedRooms.map((room) => {
+                const availableServices = getAvailableServices(room.id);
+                // ✅ Usar estado temporal si está en modo edición
+                const currentAssignments = isEditingServices ? tempRoomServiceAssignments : roomServiceAssignments;
+                const assignedServices = currentAssignments.filter(rsa => rsa.roomId === room.id);
+                const serviceDates = getServiceDates();
+
+                return (
+                  <div key={room.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Habitación {room.number} - {room.type}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {assignedServices.length} servicio(s) asignado(s)
+                        </p>
+                      </div>
+                      {availableServices.length > 0 && (
+                        <Select onValueChange={(value) => addServiceToRoom(room.id, parseInt(value))}>
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="+ Agregar servicio" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableServices.map(service => (
+                              <SelectItem key={service.id} value={service.id.toString()}>
+                                {service.name} (${service.customPrice || service.price})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+
+                    {/* Lista de servicios asignados */}
+                    {assignedServices.length > 0 ? (
+                      <div className="space-y-3">
+                        {assignedServices.map(rsa => (
+                          <div
+                            key={`${rsa.roomId}-${rsa.serviceId}`}
+                            className="border rounded-md p-3 space-y-3 bg-muted/30"
+                          >
+                            {/* Encabezado del servicio */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Receipt className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">{rsa.serviceName}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  ${rsa.unitPrice.toLocaleString()}
+                                </Badge>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeServiceFromRoom(room.id, rsa.serviceId)}
+                                className="h-7 w-7 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Cantidad */}
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs">Cantidad por día:</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={rsa.quantity}
+                                onChange={(e) => updateServiceQuantity(room.id, rsa.serviceId, e.target.value)}
+                                className="w-20 h-8 text-sm"
+                              />
+                            </div>
+
+                            {/* Selector de fechas */}
+                            <div className="space-y-2">
+                              <Label className="text-xs">Fechas:</Label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {serviceDates.map(date => {
+                                  const isSelected = rsa.dates.includes(date);
+                                  const dateObj = new Date(date + 'T12:00:00'); // Evitar problemas de timezone
+                                  const formattedDate = format(dateObj, 'EEE d MMM', { locale: es });
+
+                                  return (
+                                    <div
+                                      key={date}
+                                      className="flex items-center space-x-2 p-2 border rounded-md hover:bg-muted/50 cursor-pointer"
+                                      onClick={() => toggleServiceDate(room.id, rsa.serviceId, date)}
+                                    >
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() => toggleServiceDate(room.id, rsa.serviceId, date)}
+                                      />
+                                      <Label className="text-xs cursor-pointer flex-1">
+                                        {formattedDate}
+                                      </Label>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {rsa.dates.length} de {serviceDates.length} noches seleccionadas
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-sm text-muted-foreground border-2 border-dashed rounded-md">
+                        No hay servicios asignados a esta habitación
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ✅ BOTONES CONFIRMAR/CANCELAR - Solo si está en modo edición */}
+            {isEditingServices && (
+              <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 border-t">
+                <div className="flex-1 text-sm text-blue-800 dark:text-blue-200">
+                  <p className="font-medium">Modo Edición Activo</p>
+                  <p className="text-xs">Los cambios no se guardarán hasta que confirme</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={cancelServiceChanges}
+                    className="border-gray-300"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={confirmServiceChanges}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Confirmar Cambios
+                  </Button>
+                </div>
+              </div>
+            )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Services */}
       {data.selectedServices && data.selectedServices.length > 0 && (
@@ -484,7 +1322,7 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-foreground flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Forma de Pago
+              Configuración de Pago
             </h3>
             <Button
               variant="ghost"
@@ -494,6 +1332,8 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
               {showMultiplePayments ? 'Pago simple' : 'Pago mixto'}
             </Button>
           </div>
+
+          {/* ❌ ELIMINADO: Esquema de Pago duplicado - Solo usar "Monto a pagar ahora" */}
 
           {showMultiplePayments ? (
             // Pagos múltiples
@@ -664,6 +1504,102 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
         </CardContent>
       </Card>
 
+      {/* Assignment Summary */}
+      {areAssignmentsValid() && (
+        <Card className="bg-green-50 dark:bg-green-950/20 border-green-200">
+          <CardContent className="pt-6 space-y-4">
+            <h3 className="font-semibold text-green-900 dark:text-green-100 flex items-center gap-2">
+              ✅ Resumen de Asignaciones
+            </h3>
+
+            {/* Huéspedes por habitación */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-green-900 dark:text-green-100">
+                Distribución de Huéspedes:
+              </Label>
+              <div className="space-y-1.5">
+                {roomGuestAssignments.map(rga => {
+                  const room = data.selectedRooms.find(r => r.id === rga.roomId);
+                  const guests = rga.guestIds.map(gId =>
+                    getAllGuests().find(g => g.id === gId)
+                  ).filter(Boolean);
+
+                  if (guests.length === 0) return null;
+
+                  return (
+                    <div
+                      key={rga.roomId}
+                      className="flex items-start gap-2 p-2 bg-white dark:bg-green-950/40 rounded-md text-sm"
+                    >
+                      <Home className="h-4 w-4 mt-0.5 text-green-700 dark:text-green-400 flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="font-medium text-green-900 dark:text-green-100">
+                          Hab. {room?.number}:
+                        </span>
+                        <span className="ml-2 text-green-800 dark:text-green-200">
+                          {guests.map(g => g.name).join(', ')}
+                        </span>
+                        <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                          ({guests.length}/{room?.capacity || 2})
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Servicios por habitación */}
+            {roomServiceAssignments.length > 0 && (
+              <>
+                <Separator className="bg-green-200" />
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-green-900 dark:text-green-100">
+                    Servicios Asignados:
+                  </Label>
+                  <div className="space-y-1.5">
+                    {roomServiceAssignments.map(rsa => {
+                      const room = data.selectedRooms.find(r => r.id === rsa.roomId);
+
+                      return (
+                        <div
+                          key={`${rsa.roomId}-${rsa.serviceId}`}
+                          className="flex items-start gap-2 p-2 bg-white dark:bg-green-950/40 rounded-md text-sm"
+                        >
+                          <Receipt className="h-4 w-4 mt-0.5 text-green-700 dark:text-green-400 flex-shrink-0" />
+                          <div className="flex-1">
+                            <span className="font-medium text-green-900 dark:text-green-100">
+                              Hab. {room?.number}:
+                            </span>
+                            <span className="ml-2 text-green-800 dark:text-green-200">
+                              {rsa.serviceName} × {rsa.quantity}
+                            </span>
+                            <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                              ({rsa.dates.length} {rsa.dates.length === 1 ? 'día' : 'días'})
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {roomServiceAssignments.length === 0 && data.selectedServices && data.selectedServices.length > 0 && (
+              <>
+                <Separator className="bg-green-200" />
+                <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 rounded-md">
+                  <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                    ⚠️ Nota: Hay servicios seleccionados pero no asignados a habitaciones
+                  </p>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Buttons */}
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
@@ -671,7 +1607,7 @@ const Step6Summary = ({ data, onUpdate, onBack, onCreate }) => {
         </Button>
         <Button
           onClick={handleConfirm}
-          disabled={getTotalPaid() <= 0 || creating}
+          disabled={getTotalPaid() <= 0 || creating || !areAssignmentsValid()}
           size="lg"
         >
           {creating ? 'Creando Reserva...' : '✓ Confirmar Reserva'}
