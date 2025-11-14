@@ -4966,7 +4966,7 @@ const Reports = () => {
           {/* KPI de Ingresos Totales (Ancho completo) */}
           <Card className="border-green-200 dark:border-green-900">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-bold">Ingresos del Año {new Date().getFullYear()}</CardTitle>
+              <CardTitle className="text-lg font-bold">Ingresos Totales</CardTitle>
               <DollarSign className="h-6 w-6 text-green-600" />
             </CardHeader>
             <CardContent>
@@ -4976,7 +4976,7 @@ const Reports = () => {
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Desde 1 de enero hasta hoy
+                Total histórico de reservas completadas
               </p>
             </CardContent>
           </Card>
