@@ -141,10 +141,23 @@ const navLinks = [
     roles: ["administrator", "receptionist"],
   },
   {
-    href: "/reports",
     label: "Reportes",
     icon: ChartBarIcon,
     roles: ["administrator"],
+    submenu: [
+      {
+        href: "/admin-reports",
+        label: "Dashboard Administrativo",
+        icon: ChartBarIcon,
+        roles: ["administrator"],
+      },
+      {
+        href: "/reports",
+        label: "Reportes Detallados",
+        icon: ChartBarIcon,
+        roles: ["administrator"],
+      },
+    ],
   },
   {
     href: "/profile",
@@ -200,6 +213,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const [roomsOpen, setRoomsOpen] = useState(false);
   const [reservationsOpen, setReservationsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   // ⭐ Usar WebSocket en lugar de polling
   const { checkoutCount, whatsappCount, isConnected } = useSocketNotifications();
@@ -244,18 +258,22 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                             setReservationsOpen((open) => !open);
                           } else if (link.label === "Notificaciones") {
                             setNotificationsOpen((open) => !open);
+                          } else if (link.label === "Reportes") {
+                            setReportsOpen((open) => !open);
                           }
                         }}
                         aria-expanded={
                           link.label === "Gestionar Habitaciones" ? roomsOpen
                           : link.label === "Gestión de Reservas" ? reservationsOpen
                           : link.label === "Notificaciones" ? notificationsOpen
+                          : link.label === "Reportes" ? reportsOpen
                           : false
                         }
                         aria-controls={
                           link.label === "Gestionar Habitaciones" ? "submenu-habitaciones"
                           : link.label === "Gestión de Reservas" ? "submenu-reservas"
                           : link.label === "Notificaciones" ? "submenu-notificaciones"
+                          : link.label === "Reportes" ? "submenu-reportes"
                           : ""
                         }
                         style={{ minHeight: "40px" }}
@@ -268,7 +286,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                           className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${
                             (link.label === "Gestionar Habitaciones" && roomsOpen) ||
                             (link.label === "Gestión de Reservas" && reservationsOpen) ||
-                            (link.label === "Notificaciones" && notificationsOpen)
+                            (link.label === "Notificaciones" && notificationsOpen) ||
+                            (link.label === "Reportes" && reportsOpen)
                               ? "rotate-90"
                               : ""
                           }`}
@@ -289,12 +308,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                           link.label === "Gestionar Habitaciones" ? "submenu-habitaciones"
                           : link.label === "Gestión de Reservas" ? "submenu-reservas"
                           : link.label === "Notificaciones" ? "submenu-notificaciones"
+                          : link.label === "Reportes" ? "submenu-reportes"
                           : ""
                         }
                         className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${
                           (link.label === "Gestionar Habitaciones" && roomsOpen) ||
                           (link.label === "Gestión de Reservas" && reservationsOpen) ||
-                          (link.label === "Notificaciones" && notificationsOpen)
+                          (link.label === "Notificaciones" && notificationsOpen) ||
+                          (link.label === "Reportes" && reportsOpen)
                             ? "max-h-96 opacity-100"
                             : "max-h-0 opacity-0"
                         }`}
@@ -302,7 +323,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                           maxHeight:
                             (link.label === "Gestionar Habitaciones" && roomsOpen) ||
                             (link.label === "Gestión de Reservas" && reservationsOpen) ||
-                            (link.label === "Notificaciones" && notificationsOpen)
+                            (link.label === "Notificaciones" && notificationsOpen) ||
+                            (link.label === "Reportes" && reportsOpen)
                               ? "400px"
                               : "0px",
                         }}

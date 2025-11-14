@@ -16,6 +16,7 @@ const AdminDashboard = lazy(() => import("./pages/Admin/Dashboard.jsx"));
 const RoomsCrud = lazy(() => import("./pages/Admin/RoomsCrud.jsx"));
 const RoomTypesCrud = lazy(() => import("./pages/Admin/RoomTypesCrud.jsx"));
 const RoomStatusBoard = lazy(() => import("./pages/Admin/RoomStatusBoard.jsx"));
+const DashboardAdmin = lazy(() => import("./pages/DashboardAdmin.jsx"));
 
 // Rooms pages (lazy)
 const RoomsPending = lazy(() => import("./pages/Rooms/RoomsPending.jsx"));
@@ -116,6 +117,14 @@ const AppRoutes = () => {
             <Route path="admin/room-types-crud" element={<RoomTypesCrud />} />
             <Route path="admin/room-status-board" element={<RoomStatusBoard />} />
             <Route path="reports" element={<Reports />} />
+            <Route
+              path="admin-reports"
+              element={
+                <ProtectedRoute allowedRoles={['administrator']}>
+                  <DashboardAdmin />
+                </ProtectedRoute>
+              }
+            />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

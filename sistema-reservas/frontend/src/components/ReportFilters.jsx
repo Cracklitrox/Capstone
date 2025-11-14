@@ -36,8 +36,7 @@ const ReportFilters = ({
     { value: '14days', label: '14 días', days: 14 },
     { value: '30days', label: '30 días', days: 30 },
     { value: 'trimester', label: 'Trimestre', days: 90 },
-    { value: 'annual', label: 'Anual', days: 365 },
-    { value: 'forever', label: 'Desde siempre', days: null }
+    { value: 'annual', label: 'Anual', days: 365 }
   ];
 
   // Rangos de edad predefinidos
@@ -60,20 +59,16 @@ const ReportFilters = ({
   ];
 
   // Manejar cambio de período rápido
-  const handleQuickPeriodChange = (days) => {
-    const end = new Date();
-    let start;
+  const handleQuickPeriodChange = (periodValue, days) => {
+    // Usar AYER como fecha final (no HOY) para coincidir con la lógica del dashboard
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
     
-    if (days === null) {
-      // Desde siempre
-      start = new Date('2000-01-01');
-    } else {
-      start = new Date();
-      start.setDate(end.getDate() - days);
-    }
+    const start = new Date(yesterday);
+    start.setDate(yesterday.getDate() - (days - 1)); // -1 porque ya incluye ayer
     
-    onDateRangeChange({ from: start, to: end });
-    onFilterChange?.('quickPeriod', days === null ? 'forever' : `${days}days`);
+    onDateRangeChange({ from: start, to: yesterday });
+    onFilterChange?.('quickPeriod', periodValue);
   };
 
   // Limpiar un filtro específico
@@ -95,7 +90,7 @@ const ReportFilters = ({
                     key={period.value}
                     variant={filterValues.quickPeriod === period.value ? "default" : "outline"}
                     size="sm"
-                    onClick={() => handleQuickPeriodChange(period.days)}
+                    onClick={() => handleQuickPeriodChange(period.value, period.days)}
                     className="text-xs"
                   >
                     {period.label}
@@ -142,9 +137,11 @@ const ReportFilters = ({
                     onSelect={(range) => {
                       if (range?.from && range?.to) {
                         onDateRangeChange(range);
+                        onFilterChange?.('quickPeriod', null); // Limpiar período rápido al usar calendario
                         setShowDatePicker(false);
                       } else if (range?.from) {
                         onDateRangeChange(range);
+                        onFilterChange?.('quickPeriod', null); // Limpiar período rápido al usar calendario
                       }
                     }}
                     numberOfMonths={2}

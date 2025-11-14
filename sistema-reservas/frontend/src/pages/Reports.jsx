@@ -3680,9 +3680,16 @@ const Reports = () => {
   } = useReportsApi();
 
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [dateRange, setDateRange] = useState({
-    from: new Date(new Date().setDate(new Date().getDate() - 30)),
-    to: new Date(),
+  const [dateRange, setDateRange] = useState(() => {
+    // Usar AYER como fecha final para coincidir con DashboardAdmin
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startDate = new Date(yesterday);
+    startDate.setDate(yesterday.getDate() - 29); // 29 días atrás + ayer = 30 días totales
+    return {
+      from: startDate,
+      to: yesterday,
+    };
   });
   const [reportData, setReportData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -3781,7 +3788,11 @@ const Reports = () => {
       weekStartDate7.setDate(yesterday.getDate() - 6); // 7 días total incluyendo ayer
       const weekStart = format(weekStartDate7, 'yyyy-MM-dd');
 
-      const [weeklyRev, dailyOcc, dailyRev, roomTypes, monthlyRev, totalPaid] = await Promise.all([
+      // Para "Ingresos Totales": Todo el año actual (desde 1 de enero hasta hoy)
+      const yearStart = format(new Date(today.getFullYear(), 0, 1), 'yyyy-MM-dd');
+      const todayDate = format(today, 'yyyy-MM-dd');
+
+      const [weeklyRev, dailyOcc, dailyRev, roomTypes, monthlyRev, yearlyRev] = await Promise.all([
         getWeeklyRevenue(startDate, endDate),
         getDailyOccupancy(weekStart, weekEndDate),
         getDailyRevenue(weekStart, weekEndDate),
@@ -3791,7 +3802,7 @@ const Reports = () => {
           return { data: [] };
         }),
         getMonthlyRevenue(monthStartFor30Days, endDate),
-        getTotalPaidAmount(),
+        getMonthlyRevenue(yearStart, todayDate), // Ingresos del año actual
       ]);
 
       // Procesar ingresos semanales
@@ -3883,9 +3894,10 @@ const Reports = () => {
       console.log('💰 Ingresos del mes (últimos 30 días desde ayer):', monthlyRevenueTotal);
       console.log('📊 Datos mensuales recibidos:', monthlyRev);
 
-      // Obtener total de paid_amount
-      const totalPaidAmount = totalPaid?.data?.totalPaidAmount || 0;
-      console.log('💵 Total pagado efectivo:', totalPaidAmount);
+      // Calcular total de ingresos del año actual (2025)
+      const yearlyRevenueTotal = yearlyRev?.data?.reduce((sum, item) => sum + (item.totalRevenue || 0), 0) || 0;
+      console.log('💵 Ingresos totales del año 2025:', yearlyRevenueTotal);
+      console.log('📊 Datos anuales recibidos:', yearlyRev);
 
       // Procesar ingresos diarios (últimos 7 días)
       const revenueByDayData = dailyRev?.data?.map((item) => ({
@@ -3899,7 +3911,7 @@ const Reports = () => {
         roomTypeStats: roomTypeStatsData,
         revenueByDay: revenueByDayData,
         monthlyRevenueTotal: monthlyRevenueTotal,
-        totalPaidAmount: totalPaidAmount,
+        totalPaidAmount: yearlyRevenueTotal, // Ahora muestra ingresos del año actual (2025)
       });
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
@@ -4963,6 +4975,9 @@ const Reports = () => {
                   dashboardData.totalPaidAmount || 0
                 )}
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Total histórico de reservas completadas
+              </p>
             </CardContent>
           </Card>
 
