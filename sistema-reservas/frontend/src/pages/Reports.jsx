@@ -811,8 +811,8 @@ const CustomReportsSection = () => {
   const loadRoomsByFloor = async (floor = null) => {
     try {
       const url = floor 
-        ? `http://localhost:3001/api/v1/admin/rooms?floor=${floor}`
-        : 'http://localhost:3001/api/v1/admin/rooms';
+        ? `http://localhost:3001/api/v1/rooms?floor=${floor}`
+        : 'http://localhost:3001/api/v1/rooms';
       
       const roomsResponse = await fetch(url, {
         headers: {
@@ -849,7 +849,7 @@ const CustomReportsSection = () => {
   useEffect(() => {
     const loadAvailableFloors = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/v1/admin/rooms', {
+        const response = await fetch('http://localhost:3001/api/v1/rooms', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
@@ -948,7 +948,7 @@ const CustomReportsSection = () => {
         }
 
         // Cargar habitaciones activas desde el endpoint de admin que incluye relaciones
-        const roomsResponse = await fetch('http://localhost:3001/api/v1/admin/rooms', {
+        const roomsResponse = await fetch('http://localhost:3001/api/v1/rooms', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
@@ -973,7 +973,7 @@ const CustomReportsSection = () => {
         }
 
         // Cargar tipos de habitación activos
-        const typesResponse = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types?isActive=true', {
+        const typesResponse = await fetch('http://localhost:3001/api/v1/rooms/types?isActive=true', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
@@ -3996,7 +3996,7 @@ const Reports = () => {
   const loadRoomsAndClients = async () => {
     try {
       // Cargar habitaciones
-      const roomsResponse = await fetch('http://localhost:3001/api/v1/admin/rooms', {
+      const roomsResponse = await fetch('http://localhost:3001/api/v1/rooms', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
@@ -4827,7 +4827,7 @@ const Reports = () => {
   useEffect(() => {
     const loadRoomTypes = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types?isActive=true', {
+        const response = await fetch('http://localhost:3001/api/v1/rooms/types?isActive=true', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
@@ -4856,7 +4856,7 @@ const Reports = () => {
   useEffect(() => {
     const loadAvailableFloors = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/v1/admin/rooms', {
+        const response = await fetch('http://localhost:3001/api/v1/rooms', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'

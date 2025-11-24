@@ -582,6 +582,21 @@ async function createGuests(faker, guestRole) {
       });
     } while (existingUser);
 
+    // País y ciudad variada para reportes por país
+    const countryData = faker.helpers.arrayElement([
+      { country: "Chile", region: "Metropolitana", city: "Santiago" },
+      { country: "Chile", region: "Valparaíso", city: "Viña del Mar" },
+      { country: "Chile", region: "Biobío", city: "Concepción" },
+      { country: "Argentina", region: "Buenos Aires", city: "Buenos Aires" },
+      { country: "Argentina", region: "Mendoza", city: "Mendoza" },
+      { country: "Perú", region: "Lima", city: "Lima" },
+      { country: "Brasil", region: "São Paulo", city: "São Paulo" },
+      { country: "Colombia", region: "Bogotá", city: "Bogotá" },
+      { country: "México", region: "Ciudad de México", city: "Ciudad de México" },
+      { country: "España", region: "Madrid", city: "Madrid" },
+      { country: "Estados Unidos", region: "California", city: "Los Angeles" },
+    ]);
+
     const guest = await prisma.users.create({
       data: {
         identification_number: identNumber,
@@ -590,19 +605,11 @@ async function createGuests(faker, guestRole) {
         maternal_last_name: faker.person.lastName(),
         email: faker.internet.email().toLowerCase(),
         phone_number: `+569${faker.string.numeric(8)}`,
-        birth_date: faker.date.birthdate({ min: 18, max: 65, mode: "age" }),
+        birth_date: faker.date.birthdate({ min: 18, max: 70, mode: "age" }),
         gender: faker.helpers.arrayElement(["male", "female", "other"]),
-        country: "Chile",
-        region: faker.helpers.arrayElement([
-          "Metropolitana",
-          "Valparaíso",
-          "Biobío",
-        ]),
-        city: faker.helpers.arrayElement([
-          "Santiago",
-          "Viña del Mar",
-          "Concepción",
-        ]),
+        country: countryData.country,
+        region: countryData.region,
+        city: countryData.city,
         password_hash: password,
         status: "active",
         is_fully_registered: true,
@@ -904,9 +911,51 @@ async function createRooms(roomTypes) {
   return allRooms;
 }
 
+async function createLoginHistory(faker, users) {
+  console.log("🔐 Creando historial de logins...");
+
+  for (const user of users) {
+    // Crear entre 3 y 10 logins por usuario
+    const loginCount = faker.number.int({ min: 3, max: 10 });
+    for (let i = 0; i < loginCount; i++) {
+      await prisma.LoginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: faker.internet.ipv4(),
+          userAgent: faker.internet.userAgent(),
+          timestamp: faker.date.recent({ days: 30 }),
+        },
+      });
+    }
+  }
+
+  console.log("✅ Historial de logins creado");
+}
+
+async function createUserPreferences(faker, users) {
+  console.log("⚙️  Creando preferencias de usuarios...");
+
+  for (const user of users) {
+    await prisma.user_preferences.create({
+      data: {
+        user_id: user.id,
+        default_theme: faker.helpers.arrayElement(["light", "dark", "system"]),
+        default_dashboard: faker.helpers.arrayElement([
+          "reservations",
+          "rooms",
+          "reports",
+          null,
+        ]),
+      },
+    });
+  }
+
+  console.log("✅ Preferencias de usuarios creadas");
+}
+
 async function createComplexScenarios(
   faker,
-  { completeGuests, incompleteGuests, receptionists, rooms, services }
+  { completeGuests, incompleteGuests, receptionists, rooms, services, allUsers }
 ) {
   console.log("🏨 Creando escenarios complejos...");
 
@@ -947,13 +996,17 @@ async function createComplexScenarios(
 
   let resCounter = 1;
 
-  // 1️⃣ COMPLETADAS (pasado - últimos 30 días): 6 reservas
-  console.log("  ↳ Completadas (pasado)...");
-  const cleaningRooms = rooms.filter(r => r.status === "cleaning");
-  for (let i = 0; i < Math.min(6, cleaningRooms.length); i++) {
-    const room = cleaningRooms[i];
-    const nights = faker.number.int({ min: 2, max: 5 });
-    const checkOut = faker.date.recent({ days: 30, refDate: today });
+  // 1️⃣ COMPLETADAS HISTÓRICAS (últimos 12 meses): 80 reservas para reportes
+  console.log("  ↳ Completadas históricas (últimos 12 meses)...");
+  const allRoomsForHistory = rooms.slice(0, 20); // Usar las primeras 20 habitaciones
+  for (let i = 0; i < 80; i++) {
+    const room = faker.helpers.arrayElement(allRoomsForHistory);
+    const nights = faker.number.int({ min: 1, max: 7 });
+
+    // Distribuir en los últimos 12 meses
+    const daysAgo = faker.number.int({ min: 30, max: 365 });
+    const checkOut = new Date(today);
+    checkOut.setDate(today.getDate() - daysAgo);
     const checkIn = new Date(checkOut);
     checkIn.setDate(checkOut.getDate() - nights);
     checkIn.setHours(14, 0, 0, 0);
@@ -967,7 +1020,7 @@ async function createComplexScenarios(
         code: `RES-${faker.string.alphanumeric(10).toUpperCase()}`,
         main_guest_id: mainGuest.id,
         receptionist_id: faker.helpers.arrayElement(receptionists).id,
-        channel: faker.helpers.arrayElement(["reception", "web", "chatbot"]),
+        channel: faker.helpers.arrayElement(["reception", "web", "chatbot", "in_person"]),
         status: "completed",
         check_in_date: checkIn,
         check_out_date: checkOut,
@@ -994,7 +1047,7 @@ async function createComplexScenarios(
         payments: {
           create: {
             amount: total,
-            payment_method: faker.helpers.arrayElement(["credit_card", "debit_card", "cash"]),
+            payment_method: faker.helpers.arrayElement(["credit_card", "debit_card", "cash", "bank_transfer"]),
             status: "confirmed",
             is_deposit: false,
           },
@@ -1327,7 +1380,7 @@ async function createComplexScenarios(
     });
   }
 
-  console.log("✅ 26 reservas inteligentes creadas (6 completadas + 6 checkout hoy + 2 en progreso + 2 checkin hoy + 5 confirmadas + 5 pendientes)");
+  console.log("✅ 100+ reservas inteligentes creadas (80 completadas históricas + 6 checkout hoy + 2 en progreso + 2 checkin hoy + 5 confirmadas + 5 pendientes)");
 
   // ALERTAS, MANTENIMIENTO, LIMPIEZA
   console.log("🔧 Creando mantenimiento y alertas...");
@@ -1382,6 +1435,499 @@ async function createComplexScenarios(
   console.log("✅ Mantenimiento y alertas creados");
 }
 
+async function createCleaningRecords(faker, receptionists) {
+  console.log("🧹 Creando registros de limpieza...");
+
+  // Crear registros de limpieza para habitaciones que ya completaron checkout
+  const completedReservations = await prisma.reservations.findMany({
+    where: { status: "completed" },
+    include: { reservation_rooms: { include: { rooms: true } } },
+  });
+
+  for (const reservation of completedReservations) {
+    for (const resRoom of reservation.reservation_rooms) {
+      await prisma.cleaning_records.create({
+        data: {
+          room_id: resRoom.room_id,
+          receptionist_id: faker.helpers.arrayElement(receptionists).id,
+          record_date: new Date(reservation.check_out_date),
+          observations: faker.helpers.arrayElement([
+            "Limpieza profunda realizada",
+            "Toallas y sábanas cambiadas",
+            "Baño desinfectado",
+            "Habitación en perfecto estado",
+            null,
+          ]),
+          is_completed: true,
+          completed_at: faker.date.between({
+            from: reservation.check_out_date,
+            to: new Date(reservation.check_out_date.getTime() + 3600000), // +1 hora
+          }),
+        },
+      });
+    }
+  }
+
+  console.log("✅ Registros de limpieza creados");
+}
+
+async function createRoomServiceDaily(faker, services) {
+  console.log("🍽️  Creando servicios diarios de habitación...");
+
+  // Obtener reservas en progreso y pending_checkout
+  const activeReservations = await prisma.reservations.findMany({
+    where: {
+      status: { in: ["in_progress", "pending_checkout"] },
+    },
+    include: {
+      reservation_rooms: true,
+      reservation_services: { include: { services: true } },
+    },
+  });
+
+  const desayunoService = services.find((s) => s.name === "Desayuno");
+
+  for (const reservation of activeReservations) {
+    // Solo crear para reservas que tienen desayuno
+    const hasBreakfast = reservation.reservation_services.some(
+      (rs) => rs.service_id === desayunoService?.id
+    );
+
+    if (hasBreakfast && desayunoService) {
+      for (const resRoom of reservation.reservation_rooms) {
+        // Crear registros diarios de desayuno
+        const checkIn = new Date(reservation.check_in_date);
+        const today = new Date();
+        const endDate = new Date(
+          Math.min(today.getTime(), new Date(reservation.check_out_date).getTime())
+        );
+
+        let currentDate = new Date(checkIn);
+        while (currentDate <= endDate) {
+          const guestCount = faker.number.int({ min: 1, max: 3 });
+          await prisma.room_service_daily.create({
+            data: {
+              reservation_room_id: resRoom.id,
+              service_id: desayunoService.id,
+              service_date: new Date(currentDate),
+              unit_price: desayunoService.price,
+              quantity: guestCount,
+              subtotal: desayunoService.price * guestCount,
+            },
+          });
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
+    }
+  }
+
+  console.log("✅ Servicios diarios de habitación creados");
+}
+
+async function createRoomGuestAssignments(faker) {
+  console.log("👥 Creando asignaciones de huéspedes a habitaciones...");
+
+  const activeReservations = await prisma.reservations.findMany({
+    where: {
+      status: { in: ["in_progress", "pending_checkout"] },
+    },
+    include: {
+      reservation_rooms: true,
+      reservation_guests: true,
+    },
+  });
+
+  for (const reservation of activeReservations) {
+    for (const resRoom of reservation.reservation_rooms) {
+      // Asignar huésped principal
+      await prisma.room_guest_assignments.create({
+        data: {
+          reservation_room_id: resRoom.id,
+          guest_id: reservation.main_guest_id,
+          assigned_at: reservation.check_in_date,
+          valid_from: reservation.check_in_date,
+          valid_to: null,
+        },
+      });
+
+      // Asignar huéspedes adicionales (algunos)
+      const additionalGuestsToAssign = reservation.reservation_guests.slice(
+        0,
+        faker.number.int({ min: 0, max: Math.min(2, reservation.reservation_guests.length) })
+      );
+
+      for (const resGuest of additionalGuestsToAssign) {
+        await prisma.room_guest_assignments.create({
+          data: {
+            reservation_room_id: resRoom.id,
+            guest_id: resGuest.guest_id,
+            assigned_at: reservation.check_in_date,
+            valid_from: reservation.check_in_date,
+            valid_to: null,
+          },
+        });
+      }
+    }
+  }
+
+  console.log("✅ Asignaciones de huéspedes a habitaciones creadas");
+}
+
+async function createReservationHistory(faker, receptionists) {
+  console.log("📜 Creando historial de cambios en reservas...");
+
+  const allReservations = await prisma.reservations.findMany({
+    where: {
+      status: { in: ["confirmed", "in_progress", "pending_checkout", "completed"] },
+    },
+  });
+
+  for (const reservation of allReservations) {
+    // Evento: Creación de reserva
+    await prisma.reservation_history.create({
+      data: {
+        reservation_id: reservation.id,
+        change_type: "created",
+        field_changed: null,
+        old_value: null,
+        new_value: null,
+        changed_by_user_id: reservation.receptionist_id,
+        change_reason: "Reserva creada en el sistema",
+        created_at: reservation.created_at,
+      },
+    });
+
+    // Evento: Confirmación de pago (si está confirmada o más)
+    if (["confirmed", "in_progress", "pending_checkout", "completed"].includes(reservation.status)) {
+      await prisma.reservation_history.create({
+        data: {
+          reservation_id: reservation.id,
+          change_type: "payment_confirmed",
+          field_changed: "status",
+          old_value: "pending",
+          new_value: "confirmed",
+          changed_by_user_id: reservation.receptionist_id,
+          change_reason: "Pago confirmado por recepcionista",
+          created_at: new Date(reservation.created_at.getTime() + 1800000), // +30 min
+        },
+      });
+    }
+
+    // Evento: Check-in (si está in_progress o más)
+    if (["in_progress", "pending_checkout", "completed"].includes(reservation.status)) {
+      await prisma.reservation_history.create({
+        data: {
+          reservation_id: reservation.id,
+          change_type: "checked_in",
+          field_changed: "status",
+          old_value: "ready_for_checkin",
+          new_value: "in_progress",
+          changed_by_user_id: faker.helpers.arrayElement(receptionists).id,
+          change_reason: "Check-in realizado",
+          created_at: reservation.check_in_date,
+        },
+      });
+    }
+
+    // Evento: Check-out (si está completed)
+    if (reservation.status === "completed") {
+      await prisma.reservation_history.create({
+        data: {
+          reservation_id: reservation.id,
+          change_type: "checked_out",
+          field_changed: "status",
+          old_value: "pending_checkout",
+          new_value: "completed",
+          changed_by_user_id: faker.helpers.arrayElement(receptionists).id,
+          change_reason: "Check-out completado",
+          created_at: reservation.check_out_date,
+        },
+      });
+    }
+
+    // Algunos tienen cambios adicionales (modificaciones aleatorias)
+    if (faker.datatype.boolean({ probability: 0.3 })) {
+      // Solo crear si created_at es antes de check_in_date
+      if (reservation.created_at < reservation.check_in_date) {
+        await prisma.reservation_history.create({
+          data: {
+            reservation_id: reservation.id,
+            change_type: "updated",
+            field_changed: "guest_count",
+            old_value: String(reservation.guest_count - 1),
+            new_value: String(reservation.guest_count),
+            changed_by_user_id: faker.helpers.arrayElement(receptionists).id,
+            change_reason: "Huésped adicional agregado",
+            created_at: faker.date.between({
+              from: reservation.created_at,
+              to: reservation.check_in_date,
+            }),
+          },
+        });
+      }
+    }
+  }
+
+  console.log("✅ Historial de cambios en reservas creado");
+}
+
+async function createNotificationsAndAlerts(faker, receptionists, allUsers, roles) {
+  console.log("🔔 Creando notificaciones y alertas...");
+
+  // Crear notificaciones generales
+  for (let i = 0; i < 8; i++) {
+    const sender = faker.helpers.arrayElement(receptionists);
+    const targetRole = faker.helpers.arrayElement([
+      roles.receptionistRole,
+      roles.adminRole,
+      null,
+    ]);
+
+    const notification = await prisma.notifications.create({
+      data: {
+        sender_id: sender.id,
+        target_role_id: targetRole?.id || null,
+        title: faker.helpers.arrayElement([
+          "Reunión de equipo programada",
+          "Actualización del sistema",
+          "Nueva política de cancelación",
+          "Revisión mensual de inventario",
+          "Capacitación sobre nuevo módulo",
+        ]),
+        message: faker.lorem.paragraph(),
+        category: faker.helpers.arrayElement([
+          "general",
+          "operational",
+          "administrative",
+        ]),
+        sent_at: faker.date.recent({ days: 15 }),
+      },
+    });
+
+    // Crear estados de lectura para usuarios
+    const targetUsers = targetRole
+      ? allUsers.filter((u) =>
+          u.user_roles.some((ur) => ur.role_id === targetRole.id)
+        )
+      : [faker.helpers.arrayElement(allUsers)];
+
+    for (const user of targetUsers) {
+      await prisma.notification_read_status.create({
+        data: {
+          notification_id: notification.id,
+          user_id: user.id,
+          status: faker.helpers.arrayElement(["read", "unread", "archived"]),
+          updated_at: faker.date.between({
+            from: notification.sent_at,
+            to: new Date(),
+          }),
+        },
+      });
+    }
+  }
+
+  // Crear alertas relacionadas con reservas
+  const pendingCheckoutReservations = await prisma.reservations.findMany({
+    where: { status: "pending_checkout" },
+    take: 3,
+  });
+
+  for (const reservation of pendingCheckoutReservations) {
+    const alert = await prisma.alerts.create({
+      data: {
+        type: "checkout",
+        status: faker.helpers.arrayElement(["pending", "resolved"]),
+        reservation_id: reservation.id,
+        detail: `Checkout pendiente para reserva ${reservation.code}`,
+        full_summary: {
+          reservation_code: reservation.code,
+          check_out_date: reservation.check_out_date,
+          guest_count: reservation.guest_count,
+        },
+        created_at: new Date(reservation.check_out_date),
+      },
+    });
+
+    // Crear estados de lectura de alertas
+    for (const receptionist of receptionists) {
+      await prisma.alert_read_status.create({
+        data: {
+          alert_id: alert.id,
+          user_id: receptionist.id,
+          status: faker.helpers.arrayElement(["pending", "resolved"]),
+          updated_at: faker.date.between({
+            from: alert.created_at,
+            to: new Date(),
+          }),
+        },
+      });
+    }
+  }
+
+  // Crear alertas de pago
+  const reservationsWithPending = await prisma.reservations.findMany({
+    where: {
+      status: { in: ["confirmed", "ready_for_checkin"] },
+      NOT: {
+        paid_amount: {
+          equals: prisma.reservations.fields.total_amount,
+        },
+      },
+    },
+    take: 3,
+  });
+
+  for (const reservation of reservationsWithPending) {
+    const alert = await prisma.alerts.create({
+      data: {
+        type: "payment",
+        status: "pending",
+        reservation_id: reservation.id,
+        detail: `Pago pendiente para reserva ${reservation.code}`,
+        full_summary: {
+          reservation_code: reservation.code,
+          total_amount: reservation.total_amount,
+          paid_amount: reservation.paid_amount,
+          pending_amount: reservation.total_amount - (reservation.paid_amount || 0),
+        },
+      },
+    });
+
+    for (const receptionist of receptionists) {
+      await prisma.alert_read_status.create({
+        data: {
+          alert_id: alert.id,
+          user_id: receptionist.id,
+          status: "pending",
+        },
+      });
+    }
+  }
+
+  console.log("✅ Notificaciones y alertas creadas");
+}
+
+async function createActivityLogs(faker, receptionists, allUsers) {
+  console.log("📋 Creando registros de actividad...");
+
+  const allReservations = await prisma.reservations.findMany({
+    where: {
+      status: { in: ["confirmed", "in_progress", "pending_checkout", "completed"] },
+    },
+  });
+
+  for (const reservation of allReservations) {
+    // Log de creación de reserva
+    await prisma.activity_logs.create({
+      data: {
+        user_id: reservation.receptionist_id,
+        user_role: "receptionist",
+        action: "CREATE_RESERVATION",
+        timestamp: reservation.created_at,
+        affected_table: "reservations",
+        record_id: reservation.id,
+        details: `Reserva ${reservation.code} creada`,
+      },
+    });
+
+    // Log de confirmación de pago
+    if (["confirmed", "in_progress", "pending_checkout", "completed"].includes(reservation.status)) {
+      await prisma.activity_logs.create({
+        data: {
+          user_id: reservation.receptionist_id,
+          user_role: "receptionist",
+          action: "CONFIRM_PAYMENT",
+          timestamp: new Date(reservation.created_at.getTime() + 1800000),
+          affected_table: "payments",
+          record_id: reservation.id,
+          details: `Pago confirmado para reserva ${reservation.code}`,
+        },
+      });
+    }
+
+    // Log de check-in
+    if (["in_progress", "pending_checkout", "completed"].includes(reservation.status)) {
+      await prisma.activity_logs.create({
+        data: {
+          user_id: faker.helpers.arrayElement(receptionists).id,
+          user_role: "receptionist",
+          action: "CHECK_IN",
+          timestamp: reservation.check_in_date,
+          affected_table: "reservations",
+          record_id: reservation.id,
+          details: `Check-in realizado para reserva ${reservation.code}`,
+        },
+      });
+    }
+
+    // Log de check-out
+    if (reservation.status === "completed") {
+      await prisma.activity_logs.create({
+        data: {
+          user_id: faker.helpers.arrayElement(receptionists).id,
+          user_role: "receptionist",
+          action: "CHECK_OUT",
+          timestamp: reservation.check_out_date,
+          affected_table: "reservations",
+          record_id: reservation.id,
+          details: `Check-out completado para reserva ${reservation.code}`,
+        },
+      });
+    }
+  }
+
+  // Logs de actualización de perfil para algunos usuarios
+  for (let i = 0; i < 5; i++) {
+    const user = faker.helpers.arrayElement(allUsers);
+    await prisma.activity_logs.create({
+      data: {
+        user_id: user.id,
+        user_role: user.user_roles[0]?.role_id === 1 ? "administrator" : user.user_roles[0]?.role_id === 2 ? "receptionist" : "guest",
+        action: "UPDATE_PROFILE",
+        timestamp: faker.date.recent({ days: 30 }),
+        affected_table: "users",
+        record_id: user.id,
+        details: `Usuario actualizó su perfil`,
+      },
+    });
+  }
+
+  console.log("✅ Registros de actividad creados");
+}
+
+async function createSystemErrors(faker, receptionists) {
+  console.log("⚠️  Creando errores del sistema...");
+
+  for (let i = 0; i < 5; i++) {
+    const userOrNull = faker.helpers.arrayElement([...receptionists, null]);
+    await prisma.system_errors.create({
+      data: {
+        timestamp: faker.date.recent({ days: 30 }),
+        user_id: userOrNull?.id || null,
+        user_role: faker.helpers.arrayElement(["receptionist", "administrator", null]),
+        description: faker.helpers.arrayElement([
+          "Error al procesar pago con tarjeta",
+          "Timeout en conexión a servicio externo",
+          "Error de validación en formulario de reserva",
+          "Fallo al enviar correo de confirmación",
+          "Error al generar reporte PDF",
+        ]),
+        origin_module: faker.helpers.arrayElement([
+          "payments",
+          "reservations",
+          "notifications",
+          "reports",
+          "authentication",
+        ]),
+        severity: faker.helpers.arrayElement(["low", "medium", "high", "critical"]),
+        status: faker.helpers.arrayElement(["pending", "in_review", "resolved"]),
+      },
+    });
+  }
+
+  console.log("✅ Errores del sistema creados");
+}
+
 async function main() {
   const faker = await getFaker();
   console.log("🚀 Iniciando seed del Hotel Don Teo...");
@@ -1392,15 +1938,71 @@ async function main() {
   const guests = await createGuests(faker, coreData.roles.guestRole);
   const rooms = await createRooms(coreData.roomTypes);
 
+  // Obtener todos los usuarios (incluyendo admin)
+  const allUsers = await prisma.users.findMany({
+    include: { user_roles: true },
+  });
+
+  // Crear LoginHistory para todos los usuarios
+  await createLoginHistory(faker, allUsers);
+
+  // Crear preferencias para todos los usuarios
+  await createUserPreferences(faker, allUsers);
+
+  // Crear reservas y escenarios complejos
   await createComplexScenarios(faker, {
     completeGuests: guests.completeGuests,
     incompleteGuests: guests.incompleteGuests,
     receptionists: [receptionists.carlos, receptionists.juan],
     rooms,
     services: coreData.services,
+    allUsers,
   });
 
+  // Crear registros de limpieza para reservas completadas
+  await createCleaningRecords(faker, [receptionists.carlos, receptionists.juan]);
+
+  // Crear servicios diarios de habitación (desayunos)
+  await createRoomServiceDaily(faker, coreData.services);
+
+  // Crear asignaciones de huéspedes a habitaciones
+  await createRoomGuestAssignments(faker);
+
+  // Crear historial de cambios en reservas
+  await createReservationHistory(faker, [receptionists.carlos, receptionists.juan]);
+
+  // Crear notificaciones y alertas
+  await createNotificationsAndAlerts(
+    faker,
+    [receptionists.carlos, receptionists.juan],
+    allUsers,
+    coreData.roles
+  );
+
+  // Crear registros de actividad
+  await createActivityLogs(faker, [receptionists.carlos, receptionists.juan], allUsers);
+
+  // Crear errores del sistema
+  await createSystemErrors(faker, [receptionists.carlos, receptionists.juan]);
+
   console.log("\n🎉 Seed completado exitosamente!");
+  console.log("\n📊 Resumen de datos creados:");
+  console.log("   ✓ Usuarios (staff + huéspedes)");
+  console.log("   ✓ Habitaciones y tipos de habitación");
+  console.log("   ✓ Servicios y menú de desayuno");
+  console.log("   ✓ Temporadas y promociones");
+  console.log("   ✓ Reservas en múltiples estados");
+  console.log("   ✓ Pagos y cargos adicionales");
+  console.log("   ✓ Registros de limpieza");
+  console.log("   ✓ Servicios diarios de habitación");
+  console.log("   ✓ Asignaciones de huéspedes a habitaciones");
+  console.log("   ✓ Historial de cambios en reservas");
+  console.log("   ✓ Tareas de mantenimiento");
+  console.log("   ✓ Notificaciones y alertas");
+  console.log("   ✓ Registros de actividad");
+  console.log("   ✓ Historial de logins");
+  console.log("   ✓ Preferencias de usuarios");
+  console.log("   ✓ Errores del sistema");
   console.log("\n🔑 Credenciales:");
   console.log("   Admin: super.admin@hotel.com / password123");
   console.log("   Recepcionista: carlos.recepcionista@hotel.com / password123");

@@ -36,13 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/Tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/Dialog.jsx";
+// Dialog no es necesario aquí ya que ReservationDetailsModal ya incluye su propio Dialog
 import {
   Select,
   SelectContent,
@@ -679,23 +673,43 @@ function TapeChart() {
       </TooltipProvider>
 
       {/* ✅ MODAL CORRECTO - Detalles de Reserva */}
-      <Dialog open={!!selectedReservation} onOpenChange={() => setSelectedReservation(null)}>
-        <DialogContent className="sm:max-w-xl max-h-[80vh] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="text-lg">Detalles de la Reserva</DialogTitle>
-          </DialogHeader>
-
-          <div className="flex-grow overflow-y-auto pr-2 -mr-2">
-            {selectedReservation && <ReservationDetailsModal reservation={selectedReservation} />}
-          </div>
-
-          <DialogFooter className="flex-shrink-0 mt-3 pt-3 border-t">
-            <Button variant="secondary" onClick={() => setSelectedReservation(null)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {selectedReservation && (
+        <ReservationDetailsModal
+          reservation={{
+            id: selectedReservation.reservationId,
+            code: selectedReservation.reservationCode,
+            check_in_date: selectedReservation.checkIn,
+            check_out_date: selectedReservation.checkOut,
+            total_amount: selectedReservation.totalAmount,
+            paid_amount: selectedReservation.paidAmount,
+            guest_count: selectedReservation.totalGuests,
+            status: selectedReservation.status,
+            channel: selectedReservation.channel,
+            booking_type: 'individual', // Por defecto, el planning no devuelve este campo
+            // Datos del huésped principal (obtenidos del guestName)
+            main_guest: {
+              first_name: selectedReservation.guestName?.split(' ')[0] || '',
+              last_name_father: selectedReservation.guestName?.split(' ').slice(1).join(' ') || '',
+              paternal_last_name: selectedReservation.guestName?.split(' ').slice(1).join(' ') || '',
+            },
+            // Servicios (si vienen del endpoint)
+            reservation_services: selectedReservation.services?.map((serviceName) => ({
+              services: { name: serviceName }
+            })) || [],
+            // Habitaciones - placeholder vacío (se cargarán con el endpoint completo)
+            reservation_rooms: [],
+            reservation_guests: [],
+            payments: [],
+          }}
+          isOpen={!!selectedReservation}
+          onClose={() => setSelectedReservation(null)}
+          onUpdate={() => {
+            // Recargar datos del planning después de actualizar la reserva
+            setSelectedReservation(null);
+            // Aquí podrías agregar lógica para recargar los datos si es necesario
+          }}
+        />
+      )}
     </div>
   );
 }
