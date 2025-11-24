@@ -1,24 +1,25 @@
 // Servicios para consumir los endpoints de administración de habitaciones y tipos de habitaciones
 
+// Funciones de lectura - usando rutas públicas (solo requieren autenticación)
 export async function fetchAdminRooms(token) {
-  const response = await fetch('http://localhost:3001/api/v1/admin/rooms', {
+  const response = await fetch('http://localhost:3001/api/v1/rooms', {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
   });
-  if (!response.ok) throw new Error('Error al obtener habitaciones (admin)');
+  if (!response.ok) throw new Error('Error al obtener habitaciones');
   return response.json();
 }
 
 export async function fetchAdminRoomTypes(token) {
-  const response = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types', {
+  const response = await fetch('http://localhost:3001/api/v1/rooms/types', {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
   });
-  if (!response.ok) throw new Error('Error al obtener tipos de habitación (admin)');
+  if (!response.ok) throw new Error('Error al obtener tipos de habitación');
   return response.json();
 }
 
