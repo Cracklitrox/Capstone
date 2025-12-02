@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Agregar un cargo manual a una reserva
@@ -298,7 +297,7 @@ function formatCLP(amount) {
   }).format(amount);
 }
 
-module.exports = {
+export default {
   addManualCharge,
   getManualCharges,
   removeManualCharge,

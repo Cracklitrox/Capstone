@@ -1,9 +1,9 @@
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // 1. FUNCIÓN AUTHENTICATE (sin cambios)
-const authenticate = async (req, res, next) => {
+export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -29,13 +29,12 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    console.error('Error al verificar el token:', error.message);
     return res.status(401).json({ message: 'Token inválido o expirado.' });
   }
 };
 
 // 2. AÑADE LA FUNCIÓN AUTHORIZE AQUÍ
-const authorize = (allowedRoles) => {
+export const authorize = (allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'No autenticado.' });
@@ -47,10 +46,4 @@ const authorize = (allowedRoles) => {
     }
     next();
   };
-};
-
-// 3. CAMBIA LA ÚLTIMA LÍNEA PARA EXPORTAR UN OBJETO
-module.exports = {
-  authenticate,
-  authorize,
 };

@@ -37,7 +37,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./backend/src/whatsapp/sessions:/app/src/whatsapp/sessions
+      - ./backend/src/whatsapp-bot/sessions:/app/src/whatsapp-bot/sessions
     command: npm run dev
     environment:
       DATABASE_URL: "postgresql://reservas_user:ReservasDevPass_2025@db:5432/reservas_db"

@@ -5,7 +5,7 @@
  * Reutiliza la conexión Redis existente del proyecto.
  */
 
-const IORedis = require('ioredis');
+import IORedis from 'ioredis';
 
 // Crear conexión Redis para BullMQ
 // BullMQ requiere ioredis, no el cliente redis estándar
@@ -15,11 +15,9 @@ const connection = new IORedis(process.env.REDIS_URL, {
 });
 
 connection.on('error', (err) => {
-  console.error('❌ BullMQ Redis Connection Error:', err);
 });
 
 connection.on('connect', () => {
-  console.log('✅ BullMQ Redis Connected');
 });
 
 // Nombres de queues
@@ -65,7 +63,15 @@ const DEFAULT_JOB_OPTIONS = {
   },
 };
 
-module.exports = {
+export default {
+  connection,
+  QUEUE_NAMES,
+  SCHEDULER_IDS,
+  CRON_PATTERNS,
+  DEFAULT_JOB_OPTIONS,
+};
+
+export {
   connection,
   QUEUE_NAMES,
   SCHEDULER_IDS,

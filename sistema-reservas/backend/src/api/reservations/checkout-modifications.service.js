@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-const statusService = require('./status.service');
+import prisma from '../../db/prisma.client.js';
+import statusService from './status.service.js';
 
 /**
  * Realizar early checkout (salida anticipada)
@@ -262,7 +261,7 @@ function formatCLP(amount) {
   }).format(amount);
 }
 
-module.exports = {
+export default {
   earlyCheckout,
   lateCheckout,
 };

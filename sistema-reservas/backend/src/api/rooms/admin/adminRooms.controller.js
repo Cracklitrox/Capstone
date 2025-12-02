@@ -1,9 +1,8 @@
 // Controlador para endpoints de administración de habitaciones y tipos de habitaciones
-const prisma = require('../../../db/prisma.client');
+import prisma from '../../../db/prisma.client.js';
 
-module.exports = {
-  // Listar habitaciones
-  async listRooms(req, res, next) {
+// Listar habitaciones
+export async function listRooms(req, res, next) {
     try {
       const rooms = await prisma.rooms.findMany({
         include: { room_types: true }
@@ -12,20 +11,20 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Listar tipos de habitaciones
-  async listRoomTypes(req, res, next) {
+  export async function listRoomTypes(req, res, next) {
     try {
       const roomTypes = await prisma.room_types.findMany();
       res.json(roomTypes);
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Crear habitación
-  async createRoom(req, res, next) {
+  export async function createRoom(req, res, next) {
     try {
       const { room_number, floor, room_type_id, capacity, base_price, status, description, is_active } = req.body;
       const newRoom = await prisma.rooms.create({
@@ -35,10 +34,10 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Crear tipo de habitación
-  async createRoomType(req, res, next) {
+  export async function createRoomType(req, res, next) {
     try {
       const { name, base_capacity, description, is_active } = req.body;
       const newType = await prisma.room_types.create({
@@ -48,10 +47,10 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Modificar habitación
-  async updateRoom(req, res, next) {
+  export async function updateRoom(req, res, next) {
     try {
       const { id } = req.params;
       const data = req.body;
@@ -63,10 +62,10 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Modificar tipo de habitación
-  async updateRoomType(req, res, next) {
+  export async function updateRoomType(req, res, next) {
     try {
       const { id } = req.params;
       const data = req.body;
@@ -78,10 +77,10 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Eliminar habitación
-  async deleteRoom(req, res, next) {
+  export async function deleteRoom(req, res, next) {
     try {
       const { id } = req.params;
       await prisma.rooms.delete({ where: { id: Number(id) } });
@@ -89,10 +88,10 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Eliminar tipo de habitación
-  async deleteRoomType(req, res, next) {
+  export async function deleteRoomType(req, res, next) {
     try {
       const { id } = req.params;
       await prisma.room_types.delete({ where: { id: Number(id) } });
@@ -100,10 +99,10 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Ver más habitación
-  async getRoomDetail(req, res, next) {
+  export async function getRoomDetail(req, res, next) {
     try {
       const { id } = req.params;
       const room = await prisma.rooms.findUnique({
@@ -114,10 +113,10 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
+  }
 
   // Ver más tipo de habitación
-  async getRoomTypeDetail(req, res, next) {
+  export async function getRoomTypeDetail(req, res, next) {
     try {
       const { id } = req.params;
       const type = await prisma.room_types.findUnique({
@@ -128,4 +127,3 @@ module.exports = {
       next(err);
     }
   }
-};

@@ -14,32 +14,32 @@ import {
 import { fetchRooms } from "@/services/rooms.js";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Card, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { Badge } from "@/components/ui/Badge";
-import { Progress } from "@/components/ui/Progress";
+import { Card, CardContent } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Label } from "../../components/ui/Label";
+import { Badge } from "../../components/ui/Badge";
+import { Progress } from "../../components/ui/Progress";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
+} from "../../components/ui/Select";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/Dialog";
+} from "../../components/ui/Dialog";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/Popover";
-import { Calendar } from "@/components/ui/Calendar";
+} from "../../components/ui/Popover";
+import { Calendar } from "../../components/ui/Calendar";
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -53,7 +53,7 @@ import {
   HashtagIcon,
   ClockIcon,
 } from "@heroicons/react/24/outline";
-import { ReservationDetailView } from "@/components/HistoryDetailViews";
+import { ReservationDetailView } from "@/components/rooms/HistoryDetailViews";
 
 const ReservationHistory = () => {
   const { token } = useAuth();
@@ -86,7 +86,6 @@ const ReservationHistory = () => {
     if (token) {
       fetchRooms(token)
         .then(setAllRooms)
-        .catch((err) => console.error("Error al cargar habitaciones:", err));
     }
   }, [token]);
 
@@ -505,11 +504,10 @@ const ReservationHistory = () => {
                               </span>
                             </div>
                             <span
-                              className={`text-xs font-semibold ${
-                                paymentProgress === 100
+                              className={`text-xs font-semibold ${paymentProgress === 100
                                   ? "text-green-700 dark:text-green-400"
                                   : "text-orange-700 dark:text-orange-400"
-                              }`}
+                                }`}
                             >
                               {paymentProgress.toFixed(0)}%
                             </span>

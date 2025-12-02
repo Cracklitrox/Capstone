@@ -14,16 +14,16 @@ import { toast } from "sonner";
 import { useDebounce } from "use-debounce";
 
 // Componentes UI
-import { Button } from "@/components/ui/button";
+import { Button } from "../../components/ui/Button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "../../components/ui/Card";
+import { Input } from "../../components/ui/Input";
+import { Label } from "../../components/ui/Label";
 import {
   Dialog,
   DialogContent,
@@ -31,19 +31,21 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+} from "../../components/ui/Dialog";
+import { Badge } from "../../components/ui/Badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import GuestProfileModal from "@/components/GuestProfileModal";
-import CreateGuestForm from "@/components/CreateGuestForm";
+} from "../../components/ui/Select";
+import { Separator } from "../../components/ui/Separator";
+import { Alert, AlertDescription } from "../../components/ui/Alert";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../../components/ui/Tooltip";
+import GuestProfileModal from "@/components/guests/GuestProfileModal";
+import CreateGuestForm from "@/components/guests/CreateGuestForm";
+import EditGuestForm from "@/components/guests/EditGuestForm";
 
 // Iconos
 import {
@@ -124,6 +126,7 @@ const GuestHistory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditGuestModalOpen, setIsEditGuestModalOpen] = useState(false); // NUEVO
 
   // Estados para edición
   const [editingStates, setEditingStates] = useState({});
@@ -296,15 +299,10 @@ const GuestHistory = () => {
     setIsEditingObservations(false);
   };
 
-  // Editar huésped
-  const handleEditGuest = async (guest) => {
+  // Editar huésped (NUEVO: Abre el modal de edición)
+  const handleEditGuest = (guest) => {
     setSelectedGuest(guest);
-    setIsModalOpen(true);
-    setActiveTab("profile");
-    setIsEditMode(true);
-    await loadGuestProfile(guest.id);
-    setEditedObservations("");
-    setIsEditingObservations(false);
+    setIsEditGuestModalOpen(true);
   };
 
   // Ver historial completo
@@ -712,8 +710,8 @@ const GuestHistory = () => {
   }, [searchGuests]);
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background">
+      <div className="w-full space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -767,6 +765,20 @@ const GuestHistory = () => {
                   <FunnelIcon className="h-4 w-4" />
                   Filtros
                 </Button>
+                {(showFilters && (filters.status !== "all" || filters.hasReservations !== "all")) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setFilters({ status: "all", hasReservations: "all" });
+                      setSearchTerm("");
+                      searchGuests(1);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <XCircleIcon className="h-4 w-4" />
+                    Limpiar
+                  </Button>
+                )}
                 <Button
                   onClick={() => searchGuests(1)}
                   disabled={searchLoading}
@@ -838,7 +850,7 @@ const GuestHistory = () => {
           </Card>
         ) : guests.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-4">
               {guests.map((guest) => (
                 <Card
                   key={guest.id}
@@ -847,9 +859,18 @@ const GuestHistory = () => {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base truncate">
-                          {guest.fullName}
-                        </CardTitle>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <CardTitle className="text-base truncate cursor-help">
+                                {guest.fullName}
+                              </CardTitle>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{guest.fullName}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <p className="text-xs text-muted-foreground font-mono mt-1">
                           {guest.identificationNumber}
                         </p>
@@ -867,16 +888,34 @@ const GuestHistory = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <EnvelopeIcon className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{guest.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <PhoneIcon className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">
-                          {guest.phone || "Sin teléfono"}
-                        </span>
-                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2 text-muted-foreground cursor-help">
+                              <EnvelopeIcon className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{guest.email}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{guest.email}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2 text-muted-foreground cursor-help">
+                              <PhoneIcon className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">
+                                {guest.phone || "Sin teléfono"}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{guest.phone || "Sin teléfono"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <CalendarIcon className="h-4 w-4 flex-shrink-0" />
                         <span>
@@ -962,17 +1001,19 @@ const GuestHistory = () => {
               </div>
             )}
           </>
-        ) : searchTerm && !searchLoading ? (
+        ) : (
           <Card>
             <CardContent className="pt-6">
               <p className="text-center text-muted-foreground py-8">
-                No se encontraron huéspedes con el término "{searchTerm}"
+                {searchTerm
+                  ? `No se encontraron huéspedes con el término "${searchTerm}"`
+                  : "No se encontraron huéspedes con los filtros seleccionados"}
               </p>
             </CardContent>
           </Card>
-        ) : null}
+        )}
 
-        {/* Modal de perfil */}
+        {/* Modal de perfil (Solo lectura) */}
         <GuestProfileModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
@@ -980,16 +1021,19 @@ const GuestHistory = () => {
           guestProfile={guestProfile}
           guestReservations={guestReservations}
           loading={loading}
-          isEditMode={isEditMode}
+          isEditMode={false} // Siempre falso, ya no usamos edición en línea
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          onEditField={handleEditField}
-          onSaveField={handleSaveField}
-          onCancelEditField={handleCancelEditField}
-          editingStates={editingStates}
-          editedValues={editedValues}
-          savingStates={savingStates}
-          fieldErrors={fieldErrors}
+          // Props de edición ya no son necesarios o se pueden pasar vacíos/nulos
+          onEditField={() => { }}
+          onSaveField={() => { }}
+          onCancelEditField={() => { }}
+          editingStates={{}}
+          setEditingStates={() => { }}
+          editedValues={{}}
+          setEditedValues={() => { }}
+          savingStates={{}}
+          fieldErrors={{}}
           onEditObservations={handleEditObservations}
           onSaveObservations={handleSaveObservations}
           onCancelEditObservations={handleCancelEditObservations}
@@ -998,8 +1042,16 @@ const GuestHistory = () => {
           savingObservations={savingObservations}
           onViewFullHistory={handleViewFullHistory}
           reservationsLoading={reservationsLoading}
-          canEditField={canEditField}
-          handleRutChange={handleRutChange}
+          canEditField={() => false} // Deshabilitar edición en el modal de perfil
+          handleRutChange={() => { }}
+        />
+
+        {/* Modal de Editar Huésped (Nuevo) */}
+        <EditGuestForm
+          isOpen={isEditGuestModalOpen}
+          onClose={() => setIsEditGuestModalOpen(false)}
+          onSuccess={() => searchGuests(guestsMeta.page)}
+          guestId={selectedGuest?.id}
         />
 
         <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

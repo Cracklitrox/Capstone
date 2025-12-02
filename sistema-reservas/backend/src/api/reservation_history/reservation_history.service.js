@@ -1,4 +1,4 @@
-const prisma = require("../../db/prisma.client");
+import prisma from "../../db/prisma.client.js";
 
 const getHistory = async (filters, pagination) => {
   const {
@@ -291,7 +291,7 @@ const updateObservation = async (id, observation) => {
   return reservation;
 };
 
-module.exports = {
+export default {
   getHistory,
   getHistoryDetailById,
   updateObservation,

@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Obtener habitaciones disponibles para upgrade
@@ -397,8 +396,8 @@ async function changeRoom(reservationId, { oldRoomId, newRoomId, reason, userId 
     const adjustmentText = priceAdjustment === 0
       ? ''
       : priceAdjustment > 0
-      ? ` (+${formatCLP(priceAdjustment)})`
-      : ` (${formatCLP(priceAdjustment)})`;
+        ? ` (+${formatCLP(priceAdjustment)})`
+        : ` (${formatCLP(priceAdjustment)})`;
 
     await tx.activity_logs.create({
       data: {
@@ -453,7 +452,7 @@ function formatCLP(amount) {
   }).format(amount);
 }
 
-module.exports = {
+export default {
   getAvailableUpgrades,
   upgradeRoom,
   changeRoom,

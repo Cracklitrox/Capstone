@@ -30,10 +30,9 @@ export function useNotifications(token) {
       try {
         setLoading(true);
         setError(null);
-        const response = await getUserNotifications(token, filters);
+        const response = await getUserNotifications(filters);
         setNotifications(response.data || []);
       } catch (err) {
-        console.error('Error al cargar notificaciones:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -47,10 +46,9 @@ export function useNotifications(token) {
     if (!token) return;
 
     try {
-      const response = await getUnreadCount(token);
+      const response = await getUnreadCount();
       setUnreadCount(response.count || 0);
     } catch (err) {
-      console.error('Error al cargar conteo:', err);
     }
   }, [token]);
 
@@ -68,11 +66,10 @@ export function useNotifications(token) {
 
     // Listener para nuevas notificaciones
     socketService.onNewNotification((notification) => {
-      console.log('📩 Nueva notificación recibida:', notification);
-      
+
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
-      
+
       // Mostrar notificación del navegador si está permitido
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(notification.title, {
@@ -84,8 +81,7 @@ export function useNotifications(token) {
 
     // Listener para actualizaciones de notificaciones
     socketService.onNotificationUpdated((data) => {
-      console.log('🔄 Notificación actualizada:', data);
-      
+
       setNotifications((prev) =>
         prev.map((notif) =>
           notif.id === data.notificationId
@@ -111,10 +107,9 @@ export function useNotifications(token) {
       if (!token) return;
 
       try {
-        const response = await createNotification(token, notificationData);
+        const response = await createNotification(notificationData);
         return response;
       } catch (err) {
-        console.error('Error al enviar notificación:', err);
         setError(err.message);
         throw err;
       }
@@ -128,11 +123,11 @@ export function useNotifications(token) {
       if (!token) return;
 
       try {
-        await markNotificationAsRead(token, notificationId);
-        
+        await markNotificationAsRead(notificationId);
+
         // Emitir por socket para sincronizar otras tabs
         socketService.markAsRead(notificationId);
-        
+
         // Actualizar estado local
         setNotifications((prev) =>
           prev.map((notif) =>
@@ -141,7 +136,6 @@ export function useNotifications(token) {
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
       } catch (err) {
-        console.error('Error al marcar como leída:', err);
         setError(err.message);
       }
     },
@@ -154,23 +148,22 @@ export function useNotifications(token) {
       if (!token) return;
 
       try {
-        await markNotificationAsArchived(token, notificationId);
-        
+        await markNotificationAsArchived(notificationId);
+
         // Emitir por socket
         socketService.markAsArchived(notificationId);
-        
+
         // Remover de la lista local
         setNotifications((prev) =>
           prev.filter((notif) => notif.id !== notificationId)
         );
-        
+
         // Reducir contador si no estaba leída
         const notification = notifications.find((n) => n.id === notificationId);
         if (notification?.status === 'unread') {
           setUnreadCount((prev) => Math.max(0, prev - 1));
         }
       } catch (err) {
-        console.error('Error al archivar:', err);
         setError(err.message);
       }
     },
@@ -183,12 +176,11 @@ export function useNotifications(token) {
       if (!token) return;
 
       try {
-        await unarchiveNotification(token, notificationId);
-        
+        await unarchiveNotification(notificationId);
+
         // Recargar notificaciones
         await loadNotifications({ archived: false });
       } catch (err) {
-        console.error('Error al desarchivar:', err);
         setError(err.message);
       }
     },
@@ -200,15 +192,14 @@ export function useNotifications(token) {
     if (!token) return;
 
     try {
-      await markAllAsRead(token);
-      
+      await markAllAsRead();
+
       // Actualizar estado local
       setNotifications((prev) =>
         prev.map((notif) => ({ ...notif, status: 'read' }))
       );
       setUnreadCount(0);
     } catch (err) {
-      console.error('Error al marcar todas como leídas:', err);
       setError(err.message);
     }
   }, [token]);
@@ -216,7 +207,6 @@ export function useNotifications(token) {
   // Solicitar permisos de notificaciones del navegador
   const requestNotificationPermission = useCallback(async () => {
     if (!('Notification' in window)) {
-      console.log('Este navegador no soporta notificaciones de escritorio');
       return false;
     }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import ReservationStepper from '@/components/ReservationStepper';
+import ReservationStepper from '@/components/reservations/ReservationStepper';
 
 const NewReservation = () => {
   return (

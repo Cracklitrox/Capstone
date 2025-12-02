@@ -1,5 +1,5 @@
-const roomsModificationService = require('./rooms-modification.service');
-const { logError } = require('../../utils/errorLogger');
+import roomsModificationService from './rooms-modification.service.js';
+import { logError } from '../../utils/errorLogger.js';
 
 /**
  * Obtener habitaciones disponibles para upgrade
@@ -21,7 +21,6 @@ async function getAvailableUpgrades(req, res) {
 
     return res.status(200).json({ upgrades });
   } catch (error) {
-    console.error('Error al obtener habitaciones para upgrade:', error);
 
     await logError({
       userId: req.user?.id,
@@ -66,7 +65,6 @@ async function upgradeRoom(req, res) {
       reservation,
     });
   } catch (error) {
-    console.error('Error al realizar upgrade de habitación:', error);
 
     await logError({
       userId: req.user?.id,
@@ -117,7 +115,6 @@ async function changeRoom(req, res) {
       reservation,
     });
   } catch (error) {
-    console.error('Error al cambiar habitación:', error);
 
     await logError({
       userId: req.user?.id,
@@ -134,7 +131,7 @@ async function changeRoom(req, res) {
   }
 }
 
-module.exports = {
+export default {
   getAvailableUpgrades,
   upgradeRoom,
   changeRoom,

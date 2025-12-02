@@ -1,8 +1,9 @@
-const express = require('express');
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import reportsController from './reports.controller.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+
 const router = express.Router();
-const rateLimit = require('express-rate-limit');
-const reportsController = require('./reports.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
 
 // Limitador de tasa para endpoints de reportes
 const reportsLimiter = rateLimit({
@@ -336,4 +337,4 @@ router.get(
   reportsController.getReportBySpending
 );
 
-module.exports = router;
+export default router;

@@ -1,9 +1,9 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
-const notificationsController = require("./notifications.controller");
-const realtimeController = require("./notifications.realtime.controller");
-const { authenticate, authorize } = require("../../middleware/auth.middleware");
-const rateLimit = require("express-rate-limit");
+import * as notificationsController from "./notifications.controller.js";
+import * as realtimeController from "./notifications.realtime.controller.js";
+import { authenticate, authorize } from "../../middleware/auth.middleware.js";
+import rateLimit from "express-rate-limit";
 
 // Configure a rate limiter: 2000 requests per 15 minutes (per IP) - Aumentado significativamente para desarrollo
 const notificationsLimiter = rateLimit({
@@ -241,4 +241,4 @@ router.delete(
   notificationsController.deleteCheckoutAlert
 );
 
-module.exports = router;
+export default router;

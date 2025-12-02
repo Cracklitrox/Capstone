@@ -2,14 +2,14 @@ import React, { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import { NotificationsProvider } from "./contexts/NotificationsContext.jsx";
-import Layout from "./components/Layout.jsx";
-import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import Profile from "./components/Profile";
-import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import Layout from "./components/layout/Layout.jsx";
+import ProtectedRoute from "./components/layout/ProtectedRoute.jsx";
+import Profile from "./components/profile/Profile";
+import ErrorBoundary from "./components/common/ErrorBoundary.jsx";
 import { Loader2 } from "lucide-react";
 
 // --- Páginas con Lazy Loading ---
-import Login from "./pages/Login.jsx";
+import Login from "./pages/login.jsx";
 
 // Admin pages (lazy)
 const AdminDashboard = lazy(() => import("./pages/Admin/Dashboard.jsx"));

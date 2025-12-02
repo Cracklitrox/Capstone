@@ -1,6 +1,5 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-const { logError } = require("../../utils/errorLogger");
+import prisma from '../../db/prisma.client.js';
+import { logError } from '../../utils/errorLogger.js';
 
 /**
  * Confirmar un pago pendiente
@@ -106,7 +105,6 @@ async function confirmPayment(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al confirmar pago:', error);
 
     await logError({
       userId: req.user?.id,
@@ -148,28 +146,31 @@ async function getReservationPayments(req, res) {
     });
 
     // Consultar alertas pendientes de anulación para estos pagos
-    const paymentIds = payments.map(p => p.id);
+    // NOTA: payment_id y action_type no existen en el modelo alerts, se deben buscar en full_summary o filtrar por reservation_id
     const pendingAnnulmentAlerts = await prisma.alerts.findMany({
       where: {
+        reservation_id: reservationId,
         type: 'payment',
-        action_type: 'approve_annulment',
-        status: 'pending',
-        payment_id: { in: paymentIds }
+        status: 'pending'
       },
       select: {
-        payment_id: true,
         id: true,
-        created_at: true
+        created_at: true,
+        full_summary: true
       }
     });
 
     // Crear un mapa de payment_id -> tiene alerta pendiente
     const alertsMap = new Map();
     pendingAnnulmentAlerts.forEach(alert => {
-      alertsMap.set(alert.payment_id, {
-        alertId: alert.id,
-        requestedAt: alert.created_at
-      });
+      // Verificar si la alerta es de tipo anulación y corresponde a uno de los pagos
+      const summary = alert.full_summary;
+      if (summary && summary.action_type === 'approve_annulment' && summary.payment_id) {
+        alertsMap.set(summary.payment_id, {
+          alertId: alert.id,
+          requestedAt: alert.created_at
+        });
+      }
     });
 
     return res.status(200).json({
@@ -194,7 +195,6 @@ async function getReservationPayments(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al obtener pagos:', error);
 
     return res.status(500).json({
       message: 'Error al obtener pagos de la reserva'
@@ -333,7 +333,6 @@ async function registerPayment(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al registrar pago:', error);
 
     await logError({
       userId: req.user?.id,
@@ -378,11 +377,11 @@ async function rejectPayment(req, res) {
     }
 
     const updatedPayment = await prisma.$transaction(async (tx) => {
-      // 1. Cambiar estado a failed
+      // 1. Cambiar estado a rejected
       const rejected = await tx.payments.update({
         where: { id: parseInt(paymentId) },
         data: {
-          status: 'failed',
+          status: 'rejected',
           notes: reason ? `${payment.notes || ''}\nRechazado: ${reason}`.trim() : payment.notes
         }
       });
@@ -413,7 +412,6 @@ async function rejectPayment(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al rechazar pago:', error);
 
     await logError({
       userId: req.user?.id,
@@ -517,7 +515,6 @@ async function annulPayment(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al anular pago:', error);
 
     await logError({
       userId: req.user?.id,
@@ -594,7 +591,6 @@ async function retryPayment(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al reintentar pago:', error);
 
     await logError({
       userId: req.user?.id,
@@ -671,10 +667,14 @@ Detalles del pago:
 - Fecha: ${payment.created_at.toLocaleString('es-CL')}
 - Estado actual: Confirmado`,
         target_role: 'administrator',
-        action_type: 'approve_annulment',
         origin_user_id: userId,
         reservation_id: payment.reservation_id,
-        payment_id: parseInt(paymentId)
+        full_summary: {
+          action_type: 'approve_annulment',
+          payment_id: parseInt(paymentId),
+          reason,
+          amount: payment.amount
+        }
       }
     });
 
@@ -700,7 +700,6 @@ Detalles del pago:
     });
 
   } catch (error) {
-    console.error('Error al solicitar anulación:', error);
 
     await logError({
       userId: req.user?.id,
@@ -718,7 +717,7 @@ Detalles del pago:
   }
 }
 
-module.exports = {
+export default {
   confirmPayment,
   getReservationPayments,
   registerPayment,

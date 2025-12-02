@@ -20,9 +20,10 @@ export const createTestUser = async (prisma, testId, role = 'administrator', ove
     }
   });
 
+  const rut = `${testId.slice(-7).padStart(8, '0')}`;
+  const rutDv = (parseInt(testId) % 10).toString();
   const userData = {
-    rut: `${testId.slice(-7).padStart(8, '0')}`,
-    rut_dv: (parseInt(testId) % 10).toString(),
+    identification_number: `${rut}-${rutDv}`,
     first_name: `Test`,
     paternal_last_name: `User`,
     email: `test.user.${testId}@test.com`,
@@ -62,15 +63,12 @@ export const cleanupTestData = async (prisma, testId) => {
       where: {
         OR: [
           { email: { contains: testId } },
-          { email: { contains: 'test.user' } },
-          { rut: testId.slice(-8) }
+          { email: { contains: 'test.user' } }
         ]
       }
     });
 
-    console.log(`✅ Datos de test limpiados: ${testId}`);
   } catch (error) {
-    console.warn(`⚠️ Error al limpiar datos de test ${testId}:`, error.message);
   }
 };
 

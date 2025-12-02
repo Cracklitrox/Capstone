@@ -1,15 +1,4 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:3001/api/v1';
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
-};
+import apiClient from '@/lib/apiClient';
 
 export const reservationsService = {
   // Buscar disponibilidad de habitaciones
@@ -23,48 +12,36 @@ export const reservationsService = {
     if (filters.roomTypeId) params.append('roomTypeId', filters.roomTypeId);
     if (filters.floor) params.append('floor', filters.floor);
 
-    const response = await axios.get(
-      `${API_URL}/reservations/search-availability?${params.toString()}`,
-      getAuthHeaders()
+    const response = await apiClient.get(
+      `/reservations/search-availability?${params.toString()}`
     );
     return response.data;
   },
 
   // Calcular precio de reserva
   calculatePrice: async (roomIds, services, checkInDate, checkOutDate, guests) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/calculate-price`,
-      { roomIds, services, checkInDate, checkOutDate, guests },
-      getAuthHeaders()
+    const response = await apiClient.post(
+      '/reservations/calculate-price',
+      { roomIds, services, checkInDate, checkOutDate, guests }
     );
     return response.data;
   },
 
   // Obtener servicios disponibles
   getAvailableServices: async () => {
-    const response = await axios.get(
-      `${API_URL}/reservations/services`,
-      getAuthHeaders()
-    );
+    const response = await apiClient.get('/reservations/services');
     return response.data;
   },
 
   // Crear reserva
   createReservation: async (reservationData) => {
-    const response = await axios.post(
-      `${API_URL}/reservations`,
-      reservationData,
-      getAuthHeaders()
-    );
+    const response = await apiClient.post('/reservations', reservationData);
     return response.data;
   },
 
   // Obtener menú de desayunos
   getBreakfastMenu: async () => {
-    const response = await axios.get(
-      `${API_URL}/reservations/breakfast-menu`,
-      getAuthHeaders()
-    );
+    const response = await apiClient.get('/reservations/breakfast-menu');
     return response.data;
   },
 
@@ -79,19 +56,15 @@ export const reservationsService = {
     if (filters.limit) params.append('limit', filters.limit);
     if (filters.offset) params.append('offset', filters.offset);
 
-    const response = await axios.get(
-      `${API_URL}/reservations?${params.toString()}`,
-      getAuthHeaders()
+    const response = await apiClient.get(
+      `/reservations?${params.toString()}`
     );
     return response.data;
   },
 
   // Obtener reserva por ID
   getReservationById: async (id) => {
-    const response = await axios.get(
-      `${API_URL}/reservations/${id}`,
-      getAuthHeaders()
-    );
+    const response = await apiClient.get(`/reservations/${id}`);
     return response.data;
   },
 
@@ -101,38 +74,32 @@ export const reservationsService = {
 
   // Check-in
   checkIn: async (id, data = {}) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/check-in`,
-      data,
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/check-in`,
+      data
     );
     return response.data;
   },
 
   // Check-out
   checkOut: async (id, data = {}) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/check-out`,
-      data,
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/check-out`,
+      data
     );
     return response.data;
   },
 
   // Historial de cambios
   getHistory: async (id) => {
-    const response = await axios.get(
-      `${API_URL}/reservations/${id}/history`,
-      getAuthHeaders()
-    );
+    const response = await apiClient.get(`/reservations/${id}/history`);
     return response.data;
   },
 
   // Transiciones válidas
   getValidTransitions: async (id) => {
-    const response = await axios.get(
-      `${API_URL}/reservations/${id}/valid-transitions`,
-      getAuthHeaders()
+    const response = await apiClient.get(
+      `/reservations/${id}/valid-transitions`
     );
     return response.data;
   },
@@ -143,19 +110,17 @@ export const reservationsService = {
 
   // Obtener pagos de una reserva
   getReservationPayments: async (reservationId) => {
-    const response = await axios.get(
-      `${API_URL}/reservations/${reservationId}/payments`,
-      getAuthHeaders()
+    const response = await apiClient.get(
+      `/reservations/${reservationId}/payments`
     );
     return response.data;
   },
 
   // Confirmar pago
   confirmPayment: async (paymentId) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/payments/${paymentId}/confirm`,
-      {},
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/payments/${paymentId}/confirm`,
+      {}
     );
     return response.data;
   },
@@ -166,28 +131,23 @@ export const reservationsService = {
 
   // Agregar cargo manual
   addManualCharge: async (id, chargeData) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/charges`,
-      chargeData,
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/charges`,
+      chargeData
     );
     return response.data;
   },
 
   // Obtener cargos manuales
   getManualCharges: async (id) => {
-    const response = await axios.get(
-      `${API_URL}/reservations/${id}/charges`,
-      getAuthHeaders()
-    );
+    const response = await apiClient.get(`/reservations/${id}/charges`);
     return response.data;
   },
 
   // Eliminar cargo manual
   removeManualCharge: async (id, chargeId) => {
-    const response = await axios.delete(
-      `${API_URL}/reservations/${id}/charges/${chargeId}`,
-      getAuthHeaders()
+    const response = await apiClient.delete(
+      `/reservations/${id}/charges/${chargeId}`
     );
     return response.data;
   },
@@ -198,44 +158,40 @@ export const reservationsService = {
 
   // Verificar disponibilidad para extensión
   checkExtensionAvailability: async (id, newCheckOutDate) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/check-availability-extension`,
-      { newCheckOutDate },
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/check-availability-extension`,
+      { newCheckOutDate }
     );
     return response.data;
   },
 
   // Extender estadía
   extendStay: async (id, newCheckOutDate) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/extend`,
-      { newCheckOutDate },
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/extend`,
+      { newCheckOutDate }
     );
     return response.data;
   },
 
   // ============================================
-  // MODIFICACIÓN DE HABITACIONES
+  // MODIFICACIÓN DE HAB ITACIONES
   // ============================================
 
   // Upgrade de habitación
   upgradeRoom: async (id, newRoomId) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/upgrade-room`,
-      { newRoomId },
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/upgrade-room`,
+      { newRoomId }
     );
     return response.data;
   },
 
   // Cambiar habitación (misma categoría)
   changeRoom: async (id, oldRoomId, newRoomId) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/change-room`,
-      { oldRoomId, newRoomId },
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/change-room`,
+      { oldRoomId, newRoomId }
     );
     return response.data;
   },
@@ -246,20 +202,18 @@ export const reservationsService = {
 
   // Checkout anticipado
   earlyCheckout: async (id, newCheckOutDate) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/early-checkout`,
-      { newCheckOutDate },
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/early-checkout`,
+      { newCheckOutDate }
     );
     return response.data;
   },
 
   // Checkout tardío
   lateCheckout: async (id, newCheckOutTime) => {
-    const response = await axios.post(
-      `${API_URL}/reservations/${id}/late-checkout`,
-      { newCheckOutTime },
-      getAuthHeaders()
+    const response = await apiClient.post(
+      `/reservations/${id}/late-checkout`,
+      { newCheckOutTime }
     );
     return response.data;
   },

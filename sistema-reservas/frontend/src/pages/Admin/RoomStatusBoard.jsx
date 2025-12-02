@@ -11,16 +11,16 @@ import {
   Sparkles,
   Wrench,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '../../components/ui/Button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/Select';
-import { Badge } from '@/components/ui/Badge';
-import { RoomCardSkeleton } from '@/components/ui/Skeleton';
+} from '../../components/ui/Select';
+import { Badge } from '../../components/ui/Badge';
+import { RoomCardSkeleton } from '../../components/ui/Skeleton';
 import { toast } from 'sonner';
 
 // Configuración de estados (fuera del componente para evitar recreación)
@@ -104,7 +104,6 @@ const RoomStatusBoard = () => {
       setRooms(roomsData.rooms || roomsData);
       setRoomTypes(typesData.roomTypes || typesData);
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cargar habitaciones');
     } finally {
       setLoading(false);
@@ -134,7 +133,6 @@ const RoomStatusBoard = () => {
       toast.success('Estado actualizado correctamente');
       fetchRooms();
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cambiar estado', {
         description: error.message,
       });

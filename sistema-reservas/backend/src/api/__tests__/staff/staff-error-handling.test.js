@@ -22,10 +22,10 @@ describe('Staff Error Handling', () => {
     });
 
     const adminPassword = await bcrypt.hash('adminpass', 10);
+    const adminRut = `${testId.slice(-7).padStart(8, '1')}`;
     adminUser = await prisma.users.create({
       data: {
-        rut: `${testId.slice(-7).padStart(8, '1')}`,
-        rut_dv: '1',
+        identification_number: `${adminRut}-1`,
         first_name: 'Admin',
         paternal_last_name: 'User',
         email: `error.admin.${testId}@test.com`,
@@ -55,7 +55,9 @@ describe('Staff Error Handling', () => {
     });
 
     await prisma.$disconnect();
-    await redisClient.disconnect();
+    if (redisClient.isOpen) {
+      await redisClient.disconnect();
+    }
   });
 
   describe('Service Error Simulation', () => {
@@ -63,10 +65,10 @@ describe('Staff Error Handling', () => {
       const uniqueId = Date.now();
       
       // Crear usuario inicial
+      const firstRut = `${uniqueId.toString().slice(-8)}`;
       await prisma.users.create({
         data: {
-          rut: `${uniqueId.toString().slice(-8)}`,
-          rut_dv: '5',
+          identification_number: `${firstRut}-5`,
           first_name: 'First',
           paternal_last_name: 'User',
           email: `first.${uniqueId}@test.com`,
@@ -76,9 +78,9 @@ describe('Staff Error Handling', () => {
       });
 
       // Intentar crear con mismo email (esto debería dar P2002)
+      const dupRut = `${(uniqueId + 1).toString().slice(-8)}`;
       const duplicateStaff = {
-        rut: `${(uniqueId + 1).toString().slice(-8)}`,
-        rut_dv: '6',
+        identification_number: `${dupRut}-6`,
         first_name: 'Duplicate',
         paternal_last_name: 'User',
         email: `first.${uniqueId}@test.com`, // Email duplicado
@@ -108,8 +110,7 @@ describe('Staff Error Handling', () => {
     it('debería manejar error genérico en createUser', async () => {
       // Datos inválidos que pueden causar error genérico
       const invalidStaff = {
-        rut: null, // RUT nulo puede causar error de BD
-        rut_dv: '7',
+        identification_number: null, // identification_number nulo puede causar error de BD
         first_name: 'Invalid',
         paternal_last_name: 'User',
         email: `invalid.${Date.now()}@test.com`,
@@ -147,10 +148,10 @@ describe('Staff Error Handling', () => {
     it('debería manejar error genérico en updateUser', async () => {
       // Crear usuario para actualizar
       const uniqueId = Date.now() + 1000;
+      const updateRut = `${uniqueId.toString().slice(-8)}`;
       const userToUpdate = await prisma.users.create({
         data: {
-          rut: `${uniqueId.toString().slice(-8)}`,
-          rut_dv: '8',
+          identification_number: `${updateRut}-8`,
           first_name: 'ToUpdate',
           paternal_last_name: 'User',
           email: `to.update.${uniqueId}@test.com`,
@@ -163,8 +164,8 @@ describe('Staff Error Handling', () => {
       const response = await request(app)
         .put(`/api/v1/staff/${userToUpdate.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ 
-          rut: null // Esto podría causar error genérico
+        .send({
+          identification_number: null // Esto podría causar error genérico
         });
 
       // Limpiar
@@ -183,8 +184,7 @@ describe('Staff Error Handling', () => {
       // Crear usuario con RUT específico
       await prisma.users.create({
         data: {
-          rut: rutDuplicado,
-          rut_dv: '9',
+          identification_number: `${rutDuplicado}-9`,
           first_name: 'RUT',
           paternal_last_name: 'Original',
           email: `rut.original.${uniqueId}@test.com`,
@@ -195,8 +195,7 @@ describe('Staff Error Handling', () => {
 
       // Intentar crear otro con mismo RUT
       const duplicateRutStaff = {
-        rut: rutDuplicado,
-        rut_dv: '9',
+        identification_number: `${rutDuplicado}-9`,
         first_name: 'RUT',
         paternal_last_name: 'Duplicate',
         email: `rut.duplicate.${uniqueId}@test.com`,
@@ -216,10 +215,10 @@ describe('Staff Error Handling', () => {
       const uniqueId = Date.now() + 3000;
       
       // Crear dos usuarios
+      const rut1 = `${uniqueId.toString().slice(-8)}`;
       const user1 = await prisma.users.create({
         data: {
-          rut: `${uniqueId.toString().slice(-8)}`,
-          rut_dv: '1',
+          identification_number: `${rut1}-1`,
           first_name: 'User1',
           paternal_last_name: 'Original',
           email: `user1.${uniqueId}@test.com`,
@@ -228,10 +227,10 @@ describe('Staff Error Handling', () => {
         }
       });
 
+      const rut2 = `${(uniqueId + 1).toString().slice(-8)}`;
       const user2 = await prisma.users.create({
         data: {
-          rut: `${(uniqueId + 1).toString().slice(-8)}`,
-          rut_dv: '2',
+          identification_number: `${rut2}-2`,
           first_name: 'User2',
           paternal_last_name: 'Original',
           email: `user2.${uniqueId}@test.com`,
@@ -240,11 +239,11 @@ describe('Staff Error Handling', () => {
         }
       });
 
-      // Intentar actualizar user2 con el RUT de user1
+      // Intentar actualizar user2 con el identification_number de user1
       const response = await request(app)
         .put(`/api/v1/staff/${user2.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ rut: user1.rut });
+        .send({ identification_number: user1.identification_number });
 
       expect(response.statusCode).toBe(409);
       expect(response.body.code).toBe('DUPLICATE_RUT');

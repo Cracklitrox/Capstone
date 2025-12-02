@@ -1,7 +1,7 @@
-const authService = require("./auth.service");
-const { logError } = require("../../utils/errorLogger");
+import * as authService from "./auth.service.js";
+import { logError } from "../../utils/errorLogger.js";
 
-const loginUser = async (req, res) => {
+export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -15,7 +15,6 @@ const loginUser = async (req, res) => {
     const result = await authService.login(email, password, req);
     res.status(200).json(result);
   } catch (error) {
-    console.error("Error de autenticación:", error.message);
 
     // Logging crítico - intentos de login fallidos
     await logError({
@@ -31,14 +30,13 @@ const loginUser = async (req, res) => {
   }
 };
 
-const logoutUser = async (req, res) => {
+export const logoutUser = async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     const token = authHeader.split(" ")[1];
     const result = await authService.logout(token);
     res.status(200).json(result);
   } catch (error) {
-    console.error("Error al cerrar sesión:", error);
 
     await logError({
       userId: req.user?.id,
@@ -53,7 +51,7 @@ const logoutUser = async (req, res) => {
   }
 };
 
-const getUserProfile = async (req, res) => {
+export const getUserProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const userProfile = await authService.getProfile(userId);
@@ -64,7 +62,6 @@ const getUserProfile = async (req, res) => {
     }
     res.status(200).json(userProfile);
   } catch (error) {
-    console.error("Error al obtener el perfil:", error);
 
     await logError({
       userId: req.user?.id,
@@ -79,7 +76,7 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-const updateProfile = async (req, res) => {
+export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const profileData = req.body;
@@ -87,7 +84,6 @@ const updateProfile = async (req, res) => {
     const updatedProfile = await authService.updateProfile(userId, profileData);
     res.status(200).json(updatedProfile);
   } catch (error) {
-    console.error("Error al actualizar el perfil:", error.message);
 
     await logError({
       userId: req.user?.id,
@@ -110,7 +106,7 @@ const updateProfile = async (req, res) => {
   }
 };
 
-const changePassword = async (req, res) => {
+export const changePassword = async (req, res) => {
   try {
     const userId = req.user.id;
     const { currentPassword, newPassword, confirmPassword } = req.body;
@@ -124,7 +120,6 @@ const changePassword = async (req, res) => {
 
     res.status(200).json(result);
   } catch (error) {
-    console.error("Error al cambiar la contraseña:", error.message);
 
     await logError({
       userId: req.user?.id,
@@ -152,13 +147,12 @@ const changePassword = async (req, res) => {
   }
 };
 
-const getLoginHistory = async (req, res) => {
+export const getLoginHistory = async (req, res) => {
   try {
     const userId = req.user.id;
     const history = await authService.getLoginHistory(userId);
     res.status(200).json(history);
   } catch (error) {
-    console.error("Error al obtener el historial de login:", error);
 
     await logError({
       userId: req.user?.id,
@@ -171,13 +165,4 @@ const getLoginHistory = async (req, res) => {
 
     res.status(500).json({ message: "Error interno al obtener el historial." });
   }
-};
-
-module.exports = {
-  loginUser,
-  logoutUser,
-  getUserProfile,
-  updateProfile,
-  changePassword,
-  getLoginHistory,
 };

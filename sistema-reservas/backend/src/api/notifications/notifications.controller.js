@@ -1,11 +1,11 @@
-const notificationsService = require('./notifications.service');
+import * as notificationsService from './notifications.service.js';
 
 /**
  * Controlador para obtener las alertas de check-out del día actual
  * Filtra solo las alertas que el usuario actual NO ha marcado como leídas
  * @route GET /api/v1/notifications/checkout-alerts
  */
-async function getCheckoutAlerts(req, res, next) {
+export async function getCheckoutAlerts(req, res, next) {
   try {
     // Obtener userId del token JWT (agregado por middleware de autenticación)
     const userId = req.user?.id;
@@ -24,7 +24,6 @@ async function getCheckoutAlerts(req, res, next) {
         : 'No hay check-outs programados para hoy.',
     });
   } catch (error) {
-    console.error('Error al obtener alertas de check-out:', error);
     next(error);
   }
 }
@@ -34,7 +33,7 @@ async function getCheckoutAlerts(req, res, next) {
  * Considera si el usuario autenticado ya vio las alertas de hoy
  * @route GET /api/v1/notifications/checkout-count
  */
-async function getCheckoutAlertsCount(req, res, next) {
+export async function getCheckoutAlertsCount(req, res, next) {
   try {
     // Obtener userId del token JWT (agregado por middleware de autenticación)
     const userId = req.user?.id;
@@ -51,7 +50,6 @@ async function getCheckoutAlertsCount(req, res, next) {
         : 'No hay check-outs pendientes para hoy.',
     });
   } catch (error) {
-    console.error('Error al obtener conteo de alertas:', error);
     next(error);
   }
 }
@@ -60,7 +58,7 @@ async function getCheckoutAlertsCount(req, res, next) {
  * Controlador para marcar las alertas de checkout de hoy como vistas
  * @route POST /api/v1/notifications/checkout-alerts/mark-viewed
  */
-async function markCheckoutAlertsAsViewed(req, res, next) {
+export async function markCheckoutAlertsAsViewed(req, res, next) {
   try {
     // Obtener userId del token JWT
     const userId = req.user?.id;
@@ -80,7 +78,6 @@ async function markCheckoutAlertsAsViewed(req, res, next) {
       data: result,
     });
   } catch (error) {
-    console.error('Error al marcar checkout alerts como vistos:', error);
     next(error);
   }
 }
@@ -89,7 +86,7 @@ async function markCheckoutAlertsAsViewed(req, res, next) {
  * Controlador para verificar si el usuario ya vio los checkouts de hoy
  * @route GET /api/v1/notifications/checkout-alerts/has-viewed
  */
-async function hasViewedCheckoutsToday(req, res, next) {
+export async function hasViewedCheckoutsToday(req, res, next) {
   try {
     // Obtener userId del token JWT
     const userId = req.user?.id;
@@ -108,7 +105,6 @@ async function hasViewedCheckoutsToday(req, res, next) {
       hasViewed,
     });
   } catch (error) {
-    console.error('Error al verificar visualización de checkouts:', error);
     next(error);
   }
 }
@@ -117,7 +113,7 @@ async function hasViewedCheckoutsToday(req, res, next) {
  * Controlador para obtener check-outs pasados
  * @route GET /api/v1/notifications/past-checkouts?days=7
  */
-async function getPastCheckouts(req, res, next) {
+export async function getPastCheckouts(req, res, next) {
   try {
     const daysBack = parseInt(req.query.days) || 7;
     const checkouts = await notificationsService.getPastCheckouts(daysBack);
@@ -134,7 +130,6 @@ async function getPastCheckouts(req, res, next) {
         : `No hay check-outs en los últimos ${daysBack} días.`,
     });
   } catch (error) {
-    console.error('Error al obtener check-outs pasados:', error);
     next(error);
   }
 }
@@ -143,7 +138,7 @@ async function getPastCheckouts(req, res, next) {
  * Controlador para obtener check-outs futuros
  * @route GET /api/v1/notifications/future-checkouts?days=7
  */
-async function getFutureCheckouts(req, res, next) {
+export async function getFutureCheckouts(req, res, next) {
   try {
     const daysAhead = parseInt(req.query.days) || 7;
     const checkouts = await notificationsService.getFutureCheckouts(daysAhead);
@@ -160,7 +155,6 @@ async function getFutureCheckouts(req, res, next) {
         : `No hay check-outs programados en los próximos ${daysAhead} días.`,
     });
   } catch (error) {
-    console.error('Error al obtener check-outs futuros:', error);
     next(error);
   }
 }
@@ -169,7 +163,7 @@ async function getFutureCheckouts(req, res, next) {
  * Controlador para eliminar una alerta de checkout (soft delete)
  * @route DELETE /api/v1/notifications/checkout-alerts/:id
  */
-async function deleteCheckoutAlert(req, res, next) {
+export async function deleteCheckoutAlert(req, res, next) {
   try {
     const alertId = parseInt(req.params.id);
     const userId = req.user?.id;
@@ -189,17 +183,6 @@ async function deleteCheckoutAlert(req, res, next) {
       data: result,
     });
   } catch (error) {
-    console.error('Error al eliminar alerta de checkout:', error);
     next(error);
   }
 }
-
-module.exports = {
-  getCheckoutAlerts,
-  getCheckoutAlertsCount,
-  markCheckoutAlertsAsViewed,
-  hasViewedCheckoutsToday,
-  getPastCheckouts,
-  getFutureCheckouts,
-  deleteCheckoutAlert,
-};

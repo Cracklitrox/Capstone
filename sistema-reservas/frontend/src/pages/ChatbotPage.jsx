@@ -1,4 +1,4 @@
-import { WhatsAppReservationPanel } from '../components/WhatsAppReservationPanel';
+import { WhatsAppReservationPanel } from '../components/notifications/WhatsAppReservationPanel';
 import { MessageSquare } from 'lucide-react';
 
 /**
@@ -6,7 +6,7 @@ import { MessageSquare } from 'lucide-react';
  */
 export default function ChatbotPage() {
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-green-100 rounded-lg">

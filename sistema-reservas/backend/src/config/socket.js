@@ -1,5 +1,5 @@
-const { Server } = require("socket.io");
-const jwt = require("jsonwebtoken");
+import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
 
 let io;
 
@@ -37,27 +37,22 @@ const initializeSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
-    console.log(
-      `✅ Usuario conectado: ${socket.userId} - Role: ${socket.userRole}`
-    );
 
     // Unir al usuario a su sala personal y sala de rol
     socket.join(`user:${socket.userId}`);
     socket.join(`role:${socket.userRole}`);
     socket.on('checkout:requestUpdate', async () => {
       try {
-        const notificationsService = require('../api/notifications/notifications.service');
+        const notificationsService = await import('../api/notifications/notifications.service.js');
         const alerts = await notificationsService.getCheckoutAlertsForToday();
-        
+
         socket.emit('checkout:update', {
           count: alerts.length,
           data: alerts,
           timestamp: new Date().toISOString(),
         });
-        
-        console.log(`📤 Checkout alerts enviados a usuario ${socket.userId}: ${alerts.length} checkouts`);
+
       } catch (error) {
-        console.error('Error al enviar checkout alerts:', error);
         socket.emit('checkout:error', { message: 'Error al obtener checkouts' });
       }
     });
@@ -68,24 +63,12 @@ const initializeSocket = (server) => {
       socket.userRole === "administrator"
     ) {
       socket.join("checkout_alerts");
-      console.log(`📢 Usuario ${socket.userId} unido a sala 'checkout_alerts'`);
     }
 
-    console.log(
-      `👤 Usuario ${socket.userId} unido a salas:`,
-      [
-        `user:${socket.userId}`,
-        `role:${socket.userRole}`,
-        socket.userRole === "receptionist" ||
-        socket.userRole === "administrator"
-          ? "checkout_alerts"
-          : null,
-      ].filter(Boolean)
-    );
+
 
     // Evento: Usuario se conecta
     socket.on("user:connected", () => {
-      console.log(`Usuario ${socket.userId} está en línea`);
       socket.broadcast.emit("user:status", {
         userId: socket.userId,
         status: "online",
@@ -95,7 +78,7 @@ const initializeSocket = (server) => {
     // ⭐ NUEVO: Solicitar actualización inmediata de checkout alerts
     socket.on("checkout:requestUpdate", async () => {
       try {
-        const notificationsService = require("../api/notifications/notifications.service");
+        const notificationsService = await import("../api/notifications/notifications.service.js");
         const alerts = await notificationsService.getCheckoutAlertsForToday();
 
         socket.emit("checkout:update", {
@@ -104,11 +87,8 @@ const initializeSocket = (server) => {
           timestamp: new Date().toISOString(),
         });
 
-        console.log(
-          `📬 Checkout alerts enviados a usuario ${socket.userId}: ${alerts.length} alertas`
-        );
+
       } catch (error) {
-        console.error("❌ Error al enviar checkout alerts:", error);
         socket.emit("checkout:error", {
           message: "Error al obtener alertas de checkout",
         });
@@ -118,7 +98,7 @@ const initializeSocket = (server) => {
     // ⭐ NUEVO: Solicitar conteo de solicitudes WhatsApp pendientes
     socket.on("whatsapp:requestUpdate", async () => {
       try {
-        const prisma = require("../db/prisma.client");
+        const { default: prisma } = await import("../db/prisma.client.js");
         const pendingCount = await prisma.alerts.count({
           where: {
             type: "booking_request",
@@ -131,12 +111,7 @@ const initializeSocket = (server) => {
           count: pendingCount,
           timestamp: new Date().toISOString(),
         });
-
-        console.log(
-          `📱 WhatsApp alerts enviados a usuario ${socket.userId}: ${pendingCount} solicitudes no vistas`
-        );
       } catch (error) {
-        console.error("❌ Error al enviar WhatsApp alerts:", error);
         socket.emit("whatsapp:error", {
           message: "Error al obtener solicitudes de WhatsApp",
         });
@@ -146,7 +121,6 @@ const initializeSocket = (server) => {
     // Evento: Enviar notificación
     socket.on("notification:send", async (data) => {
       try {
-        console.log("📤 Enviando notificación:", data);
 
         // Emitir a usuarios específicos o roles
         if (data.targetUserId) {
@@ -155,7 +129,6 @@ const initializeSocket = (server) => {
           io.to(`role:${data.targetRole}`).emit("notification:new", data);
         }
       } catch (error) {
-        console.error("Error al enviar notificación:", error);
         socket.emit("notification:error", {
           message: "Error al enviar notificación",
         });
@@ -164,9 +137,7 @@ const initializeSocket = (server) => {
 
     // Evento: Marcar como leída
     socket.on("notification:markAsRead", (data) => {
-      console.log(
-        `📖 Notificación ${data.notificationId} marcada como leída por usuario ${socket.userId}`
-      );
+
       // Emitir actualización a todos los clientes del usuario (múltiples tabs)
       io.to(`user:${socket.userId}`).emit("notification:updated", {
         notificationId: data.notificationId,
@@ -176,9 +147,7 @@ const initializeSocket = (server) => {
 
     // Evento: Marcar como archivada
     socket.on("notification:markAsArchived", (data) => {
-      console.log(
-        `📦 Notificación ${data.notificationId} archivada por usuario ${socket.userId}`
-      );
+
       // Emitir actualización a todos los clientes del usuario
       io.to(`user:${socket.userId}`).emit("notification:updated", {
         notificationId: data.notificationId,
@@ -193,9 +162,7 @@ const initializeSocket = (server) => {
 
     // Evento: Desconexión
     socket.on("disconnect", (reason) => {
-      console.log(
-        `❌ Usuario desconectado: ${socket.userId} (razón: ${reason})`
-      );
+
       socket.broadcast.emit("user:status", {
         userId: socket.userId,
         status: "offline",
@@ -203,7 +170,6 @@ const initializeSocket = (server) => {
     });
   });
 
-  console.log("✅ Socket.IO inicializado correctamente");
   return io;
 };
 
@@ -218,19 +184,11 @@ const getIO = () => {
 const emitNotification = (targetUserId, targetRole, notification) => {
   const socketIO = getIO();
 
-  console.log("📤 Emitiendo notificación:", {
-    targetUserId,
-    targetRole,
-    notificationId: notification.id,
-    roomName: targetUserId ? `user:${targetUserId}` : `role:${targetRole}`,
-  });
 
   if (targetUserId) {
     socketIO.to(`user:${targetUserId}`).emit("notification:new", notification);
-    console.log(`✅ Notificación emitida a user:${targetUserId}`);
   } else if (targetRole) {
     socketIO.to(`role:${targetRole}`).emit("notification:new", notification);
-    console.log(`✅ Notificación emitida a role:${targetRole}`);
   }
 };
 
@@ -243,21 +201,20 @@ const emitNotification = (targetUserId, targetRole, notification) => {
  */
 function emitCheckoutAlerts(count, data) {
   const socketIO = getIO();
-  
+
   const payload = {
     count,
     data,
     timestamp: new Date().toISOString(),
   };
-  
+
   // Emitir solo a recepcionistas
   socketIO.to('role:receptionist').emit('checkout:update', payload);
-  console.log(`📬 Checkout alerts emitidos a recepcionistas: ${count} checkouts`);
 }
 
-module.exports = {
+export {
   initializeSocket,
   getIO,
   emitNotification,
-  emitCheckoutAlerts, // ⭐ Agregar esta exportación
+  emitCheckoutAlerts,
 };

@@ -28,7 +28,21 @@
       "Bash(node fix_preferences.js:*)",
       "Bash(npm run build:*)",
       "Bash(.gitignore)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(docker compose:*)",
+      "Bash(xargs:*)",
+      "WebSearch",
+      "Bash(cat:*)",
+      "Bash(npm test)",
+      "Bash(npm install)",
+      "Bash(sudo rm:*)",
+      "Bash(npm test:*)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)",
+      "Bash(./test-endpoints.sh)",
+      "Bash(tree:*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 10 npm run dev:*)"
     ],
     "deny": [],
     "ask": []

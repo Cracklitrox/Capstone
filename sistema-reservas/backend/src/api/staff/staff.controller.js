@@ -1,13 +1,12 @@
-const staffService = require("./staff.service.js");
-const { logError } = require("../../utils/errorLogger");
+import * as staffService from "./staff.service.js";
+import { logError } from "../../utils/errorLogger.js";
 
-const createNewUser = async (req, res) => {
+export const createNewUser = async (req, res) => {
   try {
     const userData = req.body;
     const newUser = await staffService.createUser(userData);
     res.status(201).json(newUser);
   } catch (error) {
-    console.error("Error al crear el usuario:", error);
 
     await logError({
       userId: req.user?.id,
@@ -33,12 +32,11 @@ const createNewUser = async (req, res) => {
   }
 };
 
-const listAllUsers = async (req, res) => {
+export const listAllUsers = async (req, res) => {
   try {
     const users = await staffService.getAllUsers();
     res.status(200).json(users);
   } catch (error) {
-    console.error("Error al listar los usuarios:", error);
 
     await logError({
       userId: req.user?.id,
@@ -57,7 +55,7 @@ const listAllUsers = async (req, res) => {
   }
 };
 
-const getUserDetails = async (req, res) => {
+export const getUserDetails = async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);
 
@@ -70,12 +68,11 @@ const getUserDetails = async (req, res) => {
     const user = await staffService.getUserById(userId);
 
     if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado." });
+      return res.status(404).json({ message: "Usuario no encontrado.", code: "USER_NOT_FOUND" });
     }
 
     res.status(200).json(user);
   } catch (error) {
-    console.error("Error al obtener detalles del usuario:", error);
 
     await logError({
       userId: req.user?.id,
@@ -94,7 +91,7 @@ const getUserDetails = async (req, res) => {
   }
 };
 
-const updateUserInfo = async (req, res) => {
+export const updateUserInfo = async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);
     const userData = req.body;
@@ -108,7 +105,6 @@ const updateUserInfo = async (req, res) => {
     const updatedUser = await staffService.updateUser(userId, userData);
     res.status(200).json(updatedUser);
   } catch (error) {
-    console.error("Error al actualizar el usuario:", error.message);
 
     await logError({
       userId: req.user?.id,
@@ -119,6 +115,13 @@ const updateUserInfo = async (req, res) => {
       errorObject: error,
     });
 
+    if (error.code === "DUPLICATE_EMAIL" || error.code === "DUPLICATE_RUT") {
+      return res.status(409).json({
+        message: error.message,
+        code: error.code,
+      });
+    }
+
     if (
       error.message.includes("obligatorio") ||
       error.message.includes("inválido") ||
@@ -128,7 +131,7 @@ const updateUserInfo = async (req, res) => {
     }
 
     if (error.code === "P2025" || error.message.includes("no encontrado")) {
-      return res.status(404).json({ message: "Usuario no encontrado." });
+      return res.status(404).json({ message: "Usuario no encontrado.", code: "USER_NOT_FOUND" });
     }
 
     res.status(500).json({
@@ -139,7 +142,7 @@ const updateUserInfo = async (req, res) => {
   }
 };
 
-const getMyActivity = async (req, res) => {
+export const getMyActivity = async (req, res) => {
   try {
     const userId = req.user.id;
     const limit = parseInt(req.query.limit) || 15;
@@ -153,7 +156,6 @@ const getMyActivity = async (req, res) => {
     const activities = await staffService.getUserActivity(userId, limit);
     res.status(200).json(activities);
   } catch (error) {
-    console.error("Error al obtener actividad del usuario:", error);
 
     await logError({
       userId: req.user?.id,
@@ -172,13 +174,12 @@ const getMyActivity = async (req, res) => {
   }
 };
 
-const getMyPreferences = async (req, res) => {
+export const getMyPreferences = async (req, res) => {
   try {
     const userId = req.user.id;
     const preferences = await staffService.getUserPreferences(userId);
     res.status(200).json(preferences);
   } catch (error) {
-    console.error("Error al obtener preferencias:", error);
 
     await logError({
       userId: req.user?.id,
@@ -197,7 +198,7 @@ const getMyPreferences = async (req, res) => {
   }
 };
 
-const updateMyPreferences = async (req, res) => {
+export const updateMyPreferences = async (req, res) => {
   try {
     const userId = req.user.id;
     const preferencesData = req.body;
@@ -208,7 +209,6 @@ const updateMyPreferences = async (req, res) => {
     );
     res.status(200).json(updatedPreferences);
   } catch (error) {
-    console.error("Error al actualizar preferencias:", error.message);
 
     await logError({
       userId: req.user?.id,
@@ -229,14 +229,4 @@ const updateMyPreferences = async (req, res) => {
         process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
-};
-
-module.exports = {
-  createNewUser,
-  listAllUsers,
-  getUserDetails,
-  updateUserInfo,
-  getMyActivity,
-  getMyPreferences,
-  updateMyPreferences,
 };

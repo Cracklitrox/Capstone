@@ -6,7 +6,10 @@ import tailwindcss from 'tailwindcss'
 import autoprefixer from 'autoprefixer'
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()], 
+  plugins: [react(), tsconfigPaths()],
+  optimizeDeps: {
+    include: ['xlsx-populate'],
+  },
   css: {
     postcss: {
       plugins: [
@@ -64,5 +67,24 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separar bibliotecas de gráficos en su propio chunk
+          'charts': ['recharts'],
+          // Separar bibliotecas de exportación
+          'export': ['jspdf', 'jspdf-autotable', 'xlsx-populate'],
+          // Separar iconos
+          'icons': ['lucide-react'],
+          // Separar date-fns
+          'date': ['date-fns'],
+          // React y React DOM en su propio chunk
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
 })

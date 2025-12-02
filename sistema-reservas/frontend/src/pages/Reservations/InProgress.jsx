@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Calendar, DollarSign } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import StatusBadge from '@/components/ui/StatusBadge';
-import ReservationDetailsModal from '@/components/ReservationDetailsModal';
+import { Button } from '../../components/ui/Button';
+import StatusBadge from '../../components/ui/StatusBadge';
+import ReservationDetailsModal from '@/components/reservations/ReservationDetailsModal';
 import { toast } from 'sonner';
 
 /**
@@ -42,7 +42,6 @@ const InProgress = () => {
       const data = await response.json();
       setReservations(data.reservations || []);
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cargar reservas en progreso');
     } finally {
       setIsLoading(false);
@@ -99,7 +98,7 @@ const InProgress = () => {
       </div>
 
       {/* Estadísticas de ocupación */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-lg">
+      <div className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-700 dark:to-purple-800 text-white p-6 rounded-lg">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm opacity-90">Ocupación Actual</p>
@@ -111,7 +110,7 @@ const InProgress = () => {
             </p>
           </div>
           <div className="text-right">
-            <div className="w-24 h-24 rounded-full border-4 border-white flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full border-4 border-white/30 flex items-center justify-center">
               <span className="text-2xl font-bold">{occupiedRooms}</span>
             </div>
           </div>
@@ -120,8 +119,16 @@ const InProgress = () => {
 
       {/* Grid de Reservas */}
       {reservations.length === 0 ? (
-        <div className="text-center py-12 bg-muted rounded-lg border-2 border-dashed">
-          <p className="text-muted-foreground">No hay huéspedes hospedados actualmente</p>
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <div className="bg-muted/50 rounded-full p-6 mb-4">
+            <Calendar className="w-16 h-16 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold text-foreground mb-2">
+            No hay huéspedes hospedados
+          </h3>
+          <p className="text-muted-foreground text-center max-w-md">
+            Actualmente no hay reservas en progreso. Todas las habitaciones están disponibles.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -135,64 +142,66 @@ const InProgress = () => {
             return (
               <div
                 key={reservation.id}
-                className="bg-card border-2 border-purple-200 rounded-lg p-4 space-y-3"
+                className="bg-card border-2 border-purple-200 dark:border-purple-700 rounded-lg p-4 flex flex-col h-full"
               >
-                {/* Header */}
-                <div className="flex justify-between items-start">
+                <div className="flex-1 space-y-3">
+                  {/* Header */}
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-lg font-bold">{reservation.code}</p>
+                      <p className="text-sm text-muted-foreground">{guestName}</p>
+                    </div>
+                    <StatusBadge status={reservation.status} size="sm" />
+                  </div>
+
+                  {/* Habitaciones */}
                   <div>
-                    <p className="text-lg font-bold">{reservation.code}</p>
-                    <p className="text-sm text-muted-foreground">{guestName}</p>
+                    <p className="text-xs text-muted-foreground mb-1">Habitaciones Ocupadas:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {reservation.reservation_rooms?.map((rr, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs rounded font-medium"
+                        >
+                          #{rr.rooms?.room_number} - {rr.rooms?.room_type?.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <StatusBadge status={reservation.status} size="sm" />
-                </div>
 
-                {/* Habitaciones */}
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Habitaciones Ocupadas:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {reservation.reservation_rooms?.map((rr, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded font-medium"
-                      >
-                        #{rr.rooms?.room_number} - {rr.rooms?.room_type?.name}
-                      </span>
-                    ))}
+                  {/* Tiempo restante */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <div className="text-sm">
+                      <p className="text-muted-foreground">
+                        {daysRemaining > 0
+                          ? `${daysRemaining} día(s) restante(s)`
+                          : 'Check-out hoy'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Check-out: {new Date(reservation.check_out_date).toLocaleDateString('es-CL')}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                {/* Tiempo restante */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <div className="text-sm">
-                    <p className="text-muted-foreground">
-                      {daysRemaining > 0
-                        ? `${daysRemaining} día(s) restante(s)`
-                        : 'Check-out hoy'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Check-out: {new Date(reservation.check_out_date).toLocaleDateString('es-CL')}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Folio parcial */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded">
-                  <DollarSign className="w-4 h-4 text-yellow-700" />
-                  <div className="text-sm">
-                    <p className="text-gray-700 font-medium">
-                      Folio: {formatCLP(reservation.total_amount)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Pagado: {formatCLP(reservation.paid_amount)}
-                    </p>
+                  {/* Folio parcial */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded">
+                    <DollarSign className="w-4 h-4 text-yellow-700 dark:text-yellow-400" />
+                    <div className="text-sm">
+                      <p className="text-gray-700 dark:text-yellow-100 font-medium">
+                        Folio: {formatCLP(reservation.total_amount)}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-yellow-200/70">
+                        Pagado: {formatCLP(reservation.paid_amount)}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Botón ver detalles */}
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full mt-4"
                   onClick={() => handleViewDetails(reservation.id)}
                 >
                   Ver Detalles / Gestionar

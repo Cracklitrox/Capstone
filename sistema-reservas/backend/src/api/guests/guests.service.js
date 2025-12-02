@@ -1,10 +1,9 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Limpiar RUT (eliminar puntos, espacios y guiones)
  */
-const cleanRut = (rutString) => {
+export const cleanRut = (rutString) => {
   if (!rutString) return "";
   return rutString.replace(/[.\s-]/g, "");
 };
@@ -12,7 +11,7 @@ const cleanRut = (rutString) => {
 /**
  * Separar RUT y DV desde un string
  */
-const parseRut = (rutString) => {
+export const parseRut = (rutString) => {
   if (!rutString) return { rut: "", dv: "" };
 
   const cleanedAll = cleanRut(rutString);
@@ -29,7 +28,7 @@ const parseRut = (rutString) => {
  * ✅ HELPER: Convertir strings vacíos a NULL
  * Mantiene la integridad de datos en la BD
  */
-const sanitizeGuestData = (data) => {
+export const sanitizeGuestData = (data) => {
   const sanitized = {};
 
   // Campos requeridos (nunca null)
@@ -84,7 +83,7 @@ const sanitizeGuestData = (data) => {
 /**
  * ✅ HELPER: Calcular si el huésped está completamente registrado
  */
-const calculateIsFullyRegistered = (cleanData, isMainGuest) => {
+export const calculateIsFullyRegistered = (cleanData, isMainGuest) => {
   if (isMainGuest) {
     // Huésped principal: TODOS los campos obligatorios
     const requiredFields = [
@@ -121,7 +120,7 @@ const calculateIsFullyRegistered = (cleanData, isMainGuest) => {
 /**
  * Buscar huésped por número de identificación
  */
-async function searchGuestByIdentification(identificationNumber) {
+export async function searchGuestByIdentification(identificationNumber) {
   const { rut: rutBase, dv } = parseRut(identificationNumber);
   const cleanIdNumber = `${rutBase}-${dv}`;
 
@@ -177,7 +176,7 @@ async function searchGuestByIdentification(identificationNumber) {
 /**
  * ✅ CREAR huésped nuevo
  */
-async function createGuest(guestData, isMainGuest = true) {
+export async function createGuest(guestData, isMainGuest = true) {
   // Limpiar y formatear datos
   const cleanData = sanitizeGuestData(guestData);
   const { rut: rutBase, dv } = parseRut(cleanData.identificationNumber);
@@ -284,7 +283,7 @@ async function createGuest(guestData, isMainGuest = true) {
 /**
  * ✅ ACTUALIZAR huésped existente
  */
-async function updateGuest(guestId, guestData, isMainGuest = true) {
+export async function updateGuest(guestId, guestData, isMainGuest = true) {
   // Limpiar datos
   const cleanData = sanitizeGuestData(guestData);
 
@@ -352,7 +351,7 @@ async function updateGuest(guestId, guestData, isMainGuest = true) {
 /**
  * ✅ Buscar todos los huéspedes con paginación y filtros
  */
-async function searchAllGuestsService(searchTerm = "", pagination = {}) {
+export async function searchAllGuestsService(searchTerm = "", pagination = {}) {
   const { page = 1, limit = 20 } = pagination;
   const skip = (page - 1) * limit;
 
@@ -415,9 +414,8 @@ async function searchAllGuestsService(searchTerm = "", pagination = {}) {
       return {
         id: guest.id,
         identificationNumber: guest.identification_number,
-        fullName: `${guest.first_name} ${guest.paternal_last_name}${
-          guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ""
-        }`,
+        fullName: `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ""
+          }`,
         email: guest.email || "Sin email",
         phone: guest.phone_number || "Sin teléfono",
         status: guest.status,
@@ -444,7 +442,7 @@ async function searchAllGuestsService(searchTerm = "", pagination = {}) {
 /**
  * ✅ Obtener perfil completo de huésped por ID
  */
-async function getGuestProfileById(guestId) {
+export async function getGuestProfileById(guestId) {
   const guest = await prisma.users.findFirst({
     where: {
       id: guestId,
@@ -591,16 +589,14 @@ async function getGuestProfileById(guestId) {
       paidAmount,
       pendingAmount: (activeReservation.total_amount || 0) - paidAmount,
       mainGuest: {
-        name: `${guest.first_name} ${guest.paternal_last_name}${
-          guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ""
-        }`,
+        name: `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ""
+          }`,
         isMainGuest: true,
       },
       additionalGuests: activeReservation.reservation_guests.map((rg) => ({
         id: rg.users.id,
-        name: `${rg.users.first_name} ${rg.users.paternal_last_name}${
-          rg.users.maternal_last_name ? ` ${rg.users.maternal_last_name}` : ""
-        }`,
+        name: `${rg.users.first_name} ${rg.users.paternal_last_name}${rg.users.maternal_last_name ? ` ${rg.users.maternal_last_name}` : ""
+          }`,
         email: rg.users.email,
         phone: rg.users.phone_number,
         isCurrentGuest: rg.users.id === guestId,
@@ -634,9 +630,8 @@ async function getGuestProfileById(guestId) {
     firstName: guest.first_name,
     paternalLastName: guest.paternal_last_name,
     maternalLastName: guest.maternal_last_name,
-    fullName: `${guest.first_name} ${guest.paternal_last_name}${
-      guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ""
-    }`,
+    fullName: `${guest.first_name} ${guest.paternal_last_name}${guest.maternal_last_name ? ` ${guest.maternal_last_name}` : ""
+      }`,
     email: guest.email,
     phone: guest.phone_number,
     birthDate: guest.birth_date,
@@ -664,7 +659,7 @@ async function getGuestProfileById(guestId) {
 /**
  * ✅ Obtener historial de reservas de un huésped
  */
-async function getGuestReservationsHistory(
+export async function getGuestReservationsHistory(
   guestId,
   filters = {},
   pagination = {}
@@ -754,7 +749,7 @@ async function getGuestReservationsHistory(
 /**
  * ✅ Actualizar observaciones de huésped
  */
-async function updateGuestObservationsService(guestId, observations) {
+export async function updateGuestObservationsService(guestId, observations) {
   // Verificar que el huésped existe
   const guest = await prisma.users.findFirst({
     where: {
@@ -808,9 +803,65 @@ async function updateGuestObservationsService(guestId, observations) {
 }
 
 /**
+ * ✅ Eliminar huésped (soft delete)
+ */
+export async function deleteGuestService(guestId) {
+  // Verificar que el huésped existe
+  const guest = await prisma.users.findFirst({
+    where: {
+      id: guestId,
+      deleted_at: null,
+      user_roles: {
+        some: {
+          roles: {
+            name: "guest",
+          },
+        },
+      },
+    },
+  });
+
+  if (!guest) {
+    return { found: false };
+  }
+
+  // Verificar si tiene reservas activas
+  const activeReservations = await prisma.reservations.count({
+    where: {
+      main_guest_id: guestId,
+      status: { in: ["pending", "confirmed", "in_progress"] },
+      deleted_at: null,
+    },
+  });
+
+  if (activeReservations > 0) {
+    const error = new Error(
+      "No se puede eliminar el huésped porque tiene reservas activas"
+    );
+    error.code = "HAS_ACTIVE_RESERVATIONS";
+    throw error;
+  }
+
+  // Soft delete del huésped
+  await prisma.users.update({
+    where: { id: guestId },
+    data: {
+      deleted_at: new Date(),
+      updated_at: new Date(),
+    },
+  });
+
+  return {
+    found: true,
+    deleted: true,
+    message: "Huésped eliminado exitosamente",
+  };
+}
+
+/**
  * ✅ Actualizar perfil completo de huésped
  */
-async function updateGuestProfileService(guestId, updateData) {
+export async function updateGuestProfileService(guestId, updateData) {
   // Verificar que el huésped existe
   const guest = await prisma.users.findFirst({
     where: {
@@ -929,14 +980,3 @@ async function updateGuestProfileService(guestId, updateData) {
     },
   };
 }
-
-module.exports = {
-  searchGuestByIdentification,
-  createGuest,
-  updateGuest,
-  searchAllGuestsService,
-  getGuestProfileById,
-  getGuestReservationsHistory,
-  updateGuestObservationsService,
-  updateGuestProfileService,
-};

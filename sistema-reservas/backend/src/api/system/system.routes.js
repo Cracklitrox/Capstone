@@ -1,9 +1,10 @@
-const express = require("express");
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import systemController from './system.controller.js';
+import schedulerController from './scheduler.controller.js';
+
 const router = express.Router();
-const rateLimit = require("express-rate-limit");
-const { authenticate, authorize } = require("../../middleware/auth.middleware");
-const { getErrors, markErrorAsResolved } = require("./system.controller");
-const schedulerController = require("./scheduler.controller");
 
 // Rate limiter for sensitive admin actions
 const adminLimiter = rateLimit({
@@ -17,7 +18,7 @@ const adminLimiter = rateLimit({
 });
 
 // Solo administradores pueden ver los logs
-router.get("/errors", adminLimiter, authenticate, authorize(["admin"]), getErrors);
+router.get("/errors", adminLimiter, authenticate, authorize(["admin"]), systemController.getErrors);
 
 // Marcar error como resuelto
 router.patch(
@@ -25,7 +26,7 @@ router.patch(
   adminLimiter,
   authenticate,
   authorize(["admin"]),
-  markErrorAsResolved
+  systemController.markErrorAsResolved
 );
 
 // ==================== SCHEDULER ENDPOINTS ====================
@@ -46,4 +47,4 @@ router.post(
   schedulerController.triggerJob
 );
 
-module.exports = router;
+export default router;

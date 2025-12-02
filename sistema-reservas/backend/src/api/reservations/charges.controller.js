@@ -1,5 +1,5 @@
-const chargesService = require('./charges.service');
-const { logError } = require('../../utils/errorLogger');
+import chargesService from './charges.service.js';
+import { logError } from '../../utils/errorLogger.js';
 
 /**
  * Agregar un cargo manual a una reserva
@@ -38,7 +38,6 @@ async function addManualCharge(req, res) {
       charge,
     });
   } catch (error) {
-    console.error('Error al agregar cargo manual:', error);
 
     await logError({
       userId: req.user?.id,
@@ -67,7 +66,6 @@ async function getManualCharges(req, res) {
 
     return res.status(200).json(charges);
   } catch (error) {
-    console.error('Error al obtener cargos manuales:', error);
 
     await logError({
       userId: req.user?.id,
@@ -109,7 +107,6 @@ async function removeManualCharge(req, res) {
       charge,
     });
   } catch (error) {
-    console.error('Error al eliminar cargo manual:', error);
 
     await logError({
       userId: req.user?.id,
@@ -126,7 +123,7 @@ async function removeManualCharge(req, res) {
   }
 }
 
-module.exports = {
+export default {
   addManualCharge,
   getManualCharges,
   removeManualCharge,

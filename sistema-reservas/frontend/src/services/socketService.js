@@ -10,7 +10,6 @@ class SocketService {
 
   connect(token) {
     if (this.socket?.connected) {
-      console.log('Socket ya está conectado');
       return;
     }
 
@@ -25,20 +24,16 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket conectado:', this.socket.id);
       this.socket.emit('user:connected');
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ Socket desconectado:', reason);
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('❌ Error de conexión:', error.message);
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
-      console.log('🔄 Reconectado después de', attemptNumber, 'intentos');
     });
 
     return this.socket;
@@ -49,7 +44,6 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
       this.listeners.clear();
-      console.log('🔌 Socket desconectado manualmente');
     }
   }
 
@@ -58,10 +52,8 @@ class SocketService {
     if (!this.socket) return;
     
     // Agregar log para verificar que el evento se está registrando
-    console.log('🔔 Registrando listener para notification:new');
     
     this.socket.on('notification:new', (data) => {
-      console.log('📨 Evento notification:new recibido en socketService:', data);
       callback(data);
     });
     this.listeners.set('notification:new', callback);
@@ -99,7 +91,6 @@ class SocketService {
   // Emitir eventos
   sendNotification(data) {
     if (!this.socket) {
-      console.error('Socket no conectado');
       return;
     }
     

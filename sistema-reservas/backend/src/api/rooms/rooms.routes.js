@@ -1,8 +1,9 @@
-const express = require('express');
+import express from 'express';
+import roomsController from './rooms.controller.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import roomsModificationController from '../reservations/rooms-modification.controller.js';
+
 const router = express.Router();
-const roomsController = require('./rooms.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
-const { getAvailableUpgrades } = require('../reservations/rooms-modification.controller');
 
 /**
  * @route GET /api/v1/rooms
@@ -21,7 +22,7 @@ router.get('/types', authenticate, roomsController.getAllRoomTypes);
  * @desc Obtiene habitaciones disponibles para upgrade de una reserva
  * @query reservationId - ID de la reserva
  */
-router.get('/available-upgrades', authenticate, getAvailableUpgrades);
+router.get('/available-upgrades', authenticate, roomsModificationController.getAvailableUpgrades);
 
 /**
  * @route GET /api/v1/rooms/ready-for-cleaning
@@ -97,4 +98,4 @@ router.patch(
   roomsController.updateCleaningObservations
 );
 
-module.exports = router;
+export default router;

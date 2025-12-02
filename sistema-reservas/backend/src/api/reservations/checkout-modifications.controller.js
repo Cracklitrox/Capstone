@@ -1,5 +1,5 @@
-const checkoutModificationsService = require('./checkout-modifications.service');
-const { logError } = require('../../utils/errorLogger');
+import checkoutModificationsService from './checkout-modifications.service.js';
+import { logError } from '../../utils/errorLogger.js';
 
 /**
  * Realizar early checkout
@@ -52,7 +52,6 @@ async function earlyCheckout(req, res) {
       reservation,
     });
   } catch (error) {
-    console.error('Error al realizar early checkout:', error);
 
     await logError({
       userId: req.user?.id,
@@ -99,7 +98,6 @@ async function lateCheckout(req, res) {
       reservation,
     });
   } catch (error) {
-    console.error('Error al realizar late checkout:', error);
 
     await logError({
       userId: req.user?.id,
@@ -116,7 +114,7 @@ async function lateCheckout(req, res) {
   }
 }
 
-module.exports = {
+export default {
   earlyCheckout,
   lateCheckout,
 };

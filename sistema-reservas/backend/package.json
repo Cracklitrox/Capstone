@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Backend para el sistema de reservas del Hotel Don Teo",
   "main": "src/server.js",
+  "type": "module",
   "scripts": {
     "start": "node src/server.js",
     "dev": "dotenv -e .env.development -- nodemon src/server.js",

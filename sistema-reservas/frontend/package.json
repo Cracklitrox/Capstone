@@ -43,8 +43,9 @@
     "cmdk": "^1.1.1",
     "country-state-city": "^3.2.1",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.3",
+    "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.544.0",
@@ -61,7 +62,8 @@
     "tailwindcss-animate": "^1.0.7",
     "use-debounce": "^10.0.6",
     "web-vitals": "^5.1.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-populate": "^1.21.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",

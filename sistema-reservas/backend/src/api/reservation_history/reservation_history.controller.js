@@ -1,4 +1,4 @@
-const historyService = require("./reservation_history.service");
+import historyService from './reservation_history.service.js';
 
 /**
  * Maneja la petición para obtener el historial de reservas.
@@ -36,7 +36,6 @@ const getHistory = async (req, res) => {
 
     res.status(200).json(result);
   } catch (error) {
-    console.error("Error al obtener el historial de reservas:", error);
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
@@ -63,7 +62,6 @@ const getHistoryDetailById = async (req, res) => {
     if (error.message.includes("Reserva no encontrada")) {
       return res.status(404).json({ message: error.message });
     }
-    console.error("Error al obtener detalles de la reserva:", error);
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
@@ -89,12 +87,11 @@ const updateObservation = async (req, res) => {
     );
     res.status(200).json(updatedReservation);
   } catch (error) {
-    console.error("Error al actualizar la observación:", error);
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
 
-module.exports = {
+export default {
   getHistory,
   getHistoryDetailById,
   updateObservation,

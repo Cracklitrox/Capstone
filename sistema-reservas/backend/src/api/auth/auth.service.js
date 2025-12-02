@@ -1,9 +1,9 @@
-const prisma = require("../../db/prisma.client");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const redisClient = require("../../db/redis.client");
+import prisma from "../../db/prisma.client.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import redisClient from "../../db/redis.client.js";
 
-const login = async (email, password, req) => {
+export const login = async (email, password, req) => {
   try {
     if (!email || !password) {
       throw new Error("Credenciales inválidas");
@@ -42,9 +42,6 @@ const login = async (email, password, req) => {
     const role = user.user_roles[0]?.roles?.name;
 
     if (!role) {
-      console.error(
-        `💥 Intento de login fallido: El usuario ${email} no tiene un rol asignado.`
-      );
       throw new Error("El usuario no tiene permisos para acceder.");
     }
 
@@ -52,6 +49,7 @@ const login = async (email, password, req) => {
       id: user.id,
       email: user.email,
       firstName: user.first_name,
+      paternalLastName: user.paternal_last_name,
       role: role,
     };
 
@@ -71,7 +69,6 @@ const login = async (email, password, req) => {
         },
       });
     } catch (logError) {
-      console.error("💥 Error al registrar el historial de login:", logError);
     }
 
     return {
@@ -80,11 +77,11 @@ const login = async (email, password, req) => {
         id: user.id,
         email: user.email,
         firstName: user.first_name,
+        paternalLastName: user.paternal_last_name,
         role: role,
       },
     };
   } catch (error) {
-    console.error("💥 Error en el servicio de login:", error.message);
 
     if (
       error.message === "Credenciales inválidas" ||
@@ -97,7 +94,7 @@ const login = async (email, password, req) => {
   }
 };
 
-const logout = async (token) => {
+export const logout = async (token) => {
   try {
     const decoded = jwt.decode(token);
     if (!decoded || !decoded.exp) {
@@ -118,12 +115,11 @@ const logout = async (token) => {
 
     return { message: "Sesión cerrada exitosamente." };
   } catch (error) {
-    console.error("💥 Error en el servicio de logout:", error);
     throw new Error("Error al intentar cerrar sesión.");
   }
 };
 
-const getProfile = async (userId) => {
+export const getProfile = async (userId) => {
   try {
     return prisma.users.findUnique({
       where: {
@@ -154,34 +150,33 @@ const getProfile = async (userId) => {
       },
     });
   } catch (error) {
-    console.error("💥 Error en el servicio getProfile:", error);
     throw new Error("Error al obtener el perfil de usuario.");
   }
 };
 
-const updateProfile = async (userId, profileData) => {
+export const updateProfile = async (userId, profileData) => {
   try {
     if (profileData.first_name === "" || !profileData.first_name)
       throw new Error("El nombre es obligatorio.");
-    
+
     if (profileData.paternal_last_name === "" || !profileData.paternal_last_name)
       throw new Error("El apellido paterno es obligatorio.");
-    
+
     if (profileData.maternal_last_name === "" || !profileData.maternal_last_name)
       throw new Error("El apellido materno es obligatorio.");
-    
+
     if (profileData.phone_number === "" || !profileData.phone_number)
       throw new Error("El teléfono es obligatorio.");
-    
+
     if (profileData.country === "" || !profileData.country)
       throw new Error("El país es obligatorio.");
-    
+
     if (profileData.region === "" || !profileData.region)
       throw new Error("La región es obligatoria.");
-    
+
     if (profileData.city === "" || !profileData.city)
       throw new Error("La ciudad es obligatoria.");
-    
+
     if (profileData.email && !/\S+@\S+\.\S+/.test(profileData.email))
       throw new Error("El formato del correo es inválido.");
 
@@ -218,7 +213,7 @@ const updateProfile = async (userId, profileData) => {
       "region",
       "city",
     ];
-    
+
     allowedFields.forEach((field) => {
       if (profileData[field] !== undefined) {
         if (field === 'email') {
@@ -260,12 +255,11 @@ const updateProfile = async (userId, profileData) => {
   } catch (error) {
     if (error.code === "P2025")
       throw new Error("El usuario que intentas actualizar no existe.");
-    console.error("💥 Error en el servicio updateProfile:", error.message);
     throw error;
   }
 };
 
-const changePassword = async (
+export const changePassword = async (
   userId,
   currentPassword,
   newPassword,
@@ -308,12 +302,11 @@ const changePassword = async (
 
     return { message: "Contraseña actualizada correctamente." };
   } catch (error) {
-    console.error("💥 Error en el servicio changePassword:", error.message);
     throw error;
   }
 };
 
-const getLoginHistory = async (userId) => {
+export const getLoginHistory = async (userId) => {
   try {
     return prisma.loginHistory.findMany({
       where: { userId: userId },
@@ -321,16 +314,6 @@ const getLoginHistory = async (userId) => {
       take: 10,
     });
   } catch (error) {
-    console.error("💥 Error en el servicio getLoginHistory:", error);
     throw new Error("Error al obtener el historial de inicios de sesión.");
   }
-};
-
-module.exports = {
-  login,
-  logout,
-  getProfile,
-  updateProfile,
-  changePassword,
-  getLoginHistory,
 };

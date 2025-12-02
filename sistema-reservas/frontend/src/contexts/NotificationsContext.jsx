@@ -23,7 +23,7 @@ export function NotificationsProvider({ children, token }) {
   const [error, setError] = useState(null);
   const [connected, setConnected] = useState(false);
   const [initialized, setInitialized] = useState(false);
-  
+
   // Hook de caché con TTL de 3 segundos
   const { cachedFetch, invalidate } = useApiCache(3000);
 
@@ -35,16 +35,15 @@ export function NotificationsProvider({ children, token }) {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Usar caché para evitar peticiones duplicadas
         const response = await cachedFetch(
           `notifications-${JSON.stringify(filters)}`,
-          () => getUserNotifications(token, filters)
+          () => getUserNotifications(filters)
         );
-        
+
         setNotifications(response.data || []);
       } catch (err) {
-        console.error('Error al cargar notificaciones:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -60,11 +59,10 @@ export function NotificationsProvider({ children, token }) {
     try {
       const response = await cachedFetch(
         'notifications-unread-count',
-        () => getUnreadCount(token)
+        () => getUnreadCount()
       );
       setUnreadCount(response.count || 0);
     } catch (err) {
-      console.error('Error al cargar conteo:', err);
     }
   }, [token, cachedFetch]);
 
@@ -73,16 +71,11 @@ export function NotificationsProvider({ children, token }) {
     if (!token) return;
 
     try {
-      console.log('🔄 Recargando notificaciones sin caché...');
       // Llamada directa sin caché
-      const response = await getUserNotifications(token, {});
-      console.log('✅ Notificaciones recargadas:', {
-        count: response.data?.length,
-        first: response.data?.[0]
-      });
+      const response = await getUserNotifications({});
       setNotifications(response.data || []);
     } catch (err) {
-      console.error('Error al recargar notificaciones:', err);
+      // Error silenciado
     }
   }, [token]);
 
@@ -90,24 +83,12 @@ export function NotificationsProvider({ children, token }) {
   useEffect(() => {
     // Contar solo las notificaciones RECIBIDAS (no enviadas) que no han sido leídas
     const count = notifications.filter(
-      (n) => 
+      (n) =>
         n.status !== 'sent' && // No contar las enviadas
         !n.read_status?.read_at && // No leída
         !n.isArchived // No archivada
     ).length;
-    
-    console.log('🔢 Calculando contador de no leídas:', {
-      total: notifications.length,
-      unread: count,
-      notificationsPreview: notifications.slice(0, 3).map(n => ({
-        id: n.id,
-        status: n.status,
-        hasReadStatus: !!n.read_status,
-        readAt: n.read_status?.read_at,
-        isArchived: n.isArchived
-      }))
-    });
-    
+
     setUnreadCount(count);
   }, [notifications]);
 
@@ -115,32 +96,27 @@ export function NotificationsProvider({ children, token }) {
   useEffect(() => {
     if (!token) return;
     if (initialized) {
-      console.log('⏭️ NotificationsProvider ya inicializado, saltando...');
       return;
     }
 
-    console.log('🔌 Inicializando NotificationsProvider...');
 
     // Conectar socket solo si no está conectado
     if (!socketService.isConnected()) {
       socketService.connect(token);
     }
-    
+
     // Actualizar estado de conexión cada vez que cambie
     const updateConnectionStatus = () => {
       const isConnected = socketService.isConnected();
-      console.log('🔌 Estado de conexión actualizado:', isConnected);
       setConnected(isConnected);
     };
 
     // Escuchar eventos de conexión/desconexión
     socketService.onConnect(() => {
-      console.log('✅ Socket conectado');
       updateConnectionStatus();
     });
 
     socketService.onDisconnect((reason) => {
-      console.log('❌ Socket desconectado:', reason);
       updateConnectionStatus();
     });
 
@@ -154,16 +130,13 @@ export function NotificationsProvider({ children, token }) {
 
     // Listener para nuevas notificaciones
     const handleNewNotification = async (notification) => {
-      console.log('📩 Nueva notificación recibida por socket:', notification);
-      
+
       // Invalidar caché y recargar todas las notificaciones para obtener la estructura completa
       invalidate();
-      console.log('🗑️ Caché invalidado');
-      
+
       // Usar la función de recarga sin caché
       await reloadNotifications();
-      console.log('✅ Recarga completada después de nueva notificación');
-      
+
       // Mostrar notificación del navegador si está permitido
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(notification.title, {
@@ -175,8 +148,7 @@ export function NotificationsProvider({ children, token }) {
 
     // Listener para actualizaciones de notificaciones
     const handleNotificationUpdated = (updatedNotification) => {
-      console.log('🔄 Notificación actualizada:', updatedNotification);
-      
+
       setNotifications((prev) =>
         prev.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
       );
@@ -199,7 +171,6 @@ export function NotificationsProvider({ children, token }) {
 
     // Cleanup: NO desconectar el socket, solo remover listeners
     return () => {
-      console.log('🧹 Limpiando listeners de NotificationsProvider');
       // No desconectamos el socket aquí para mantener la conexión activa
     };
   }, [token, initialized, loadNotifications, loadUnreadCount, invalidate, reloadNotifications]);
@@ -210,8 +181,8 @@ export function NotificationsProvider({ children, token }) {
       if (!token) return;
 
       try {
-        await markNotificationAsRead(token, notificationId);
-        
+        await markNotificationAsRead(notificationId);
+
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notificationId
@@ -227,7 +198,6 @@ export function NotificationsProvider({ children, token }) {
         // Emitir evento de actualización por socket
         socketService.markAsRead(notificationId);
       } catch (err) {
-        console.error('Error al marcar como leída:', err);
         throw err;
       }
     },
@@ -240,24 +210,24 @@ export function NotificationsProvider({ children, token }) {
       if (!token) return;
 
       try {
-        await markNotificationAsArchived(token, notificationId);
-        
+        await markNotificationAsArchived(notificationId);
+
         // Actualizar la notificación con isArchived: true en lugar de eliminarla
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notificationId
-              ? { 
-                  ...n, 
-                  isArchived: true,
-                  read_status: { 
-                    ...n.read_status, 
-                    archived_at: new Date().toISOString() 
-                  }
+              ? {
+                ...n,
+                isArchived: true,
+                read_status: {
+                  ...n.read_status,
+                  archived_at: new Date().toISOString()
                 }
+              }
               : n
           )
         );
-        
+
         // Si no estaba leída, decrementar el contador
         const notification = notifications.find((n) => n.id === notificationId);
         if (notification && !notification.read_status?.read_at) {
@@ -270,7 +240,6 @@ export function NotificationsProvider({ children, token }) {
         // Emitir evento de actualización por socket
         socketService.markAsArchived(notificationId);
       } catch (err) {
-        console.error('Error al archivar:', err);
         throw err;
       }
     },
@@ -283,28 +252,27 @@ export function NotificationsProvider({ children, token }) {
       if (!token) return;
 
       try {
-        await unarchiveNotification(token, notificationId);
-        
+        await unarchiveNotification(notificationId);
+
         // Actualizar la notificación con isArchived: false
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notificationId
-              ? { 
-                  ...n, 
-                  isArchived: false,
-                  read_status: { 
-                    ...n.read_status, 
-                    archived_at: null 
-                  }
+              ? {
+                ...n,
+                isArchived: false,
+                read_status: {
+                  ...n.read_status,
+                  archived_at: null
                 }
+              }
               : n
           )
         );
-        
+
         // Actualizar conteo de no leídas
         await loadUnreadCount();
       } catch (err) {
-        console.error('Error al desarchivar:', err);
         throw err;
       }
     },
@@ -317,11 +285,11 @@ export function NotificationsProvider({ children, token }) {
       if (!token) return;
 
       try {
-        await deleteNotification(token, notificationId);
-        
+        await deleteNotification(notificationId);
+
         // Eliminar la notificación del estado local
         setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-        
+
         // Si no estaba leída, decrementar el contador
         const notification = notifications.find((n) => n.id === notificationId);
         if (notification && !notification.read_status?.read_at) {
@@ -331,7 +299,6 @@ export function NotificationsProvider({ children, token }) {
         // Invalidar caché del contador
         invalidate('notifications-unread-count');
       } catch (err) {
-        console.error('Error al eliminar notificación:', err);
         throw err;
       }
     },
@@ -343,8 +310,8 @@ export function NotificationsProvider({ children, token }) {
     if (!token) return;
 
     try {
-      await markAllAsRead(token);
-      
+      await markAllAsRead();
+
       setNotifications((prev) =>
         prev.map((n) => ({
           ...n,
@@ -356,7 +323,6 @@ export function NotificationsProvider({ children, token }) {
       // Invalidar caché del contador
       invalidate('notifications-unread-count');
     } catch (err) {
-      console.error('Error al marcar todas como leídas:', err);
       throw err;
     }
   }, [token, invalidate]);
@@ -367,30 +333,28 @@ export function NotificationsProvider({ children, token }) {
       if (!token) return;
 
       try {
-        const response = await createNotification(token, data);
-        
+        const response = await createNotification(data);
+
         // Emitir por socket (el backend se encarga de broadcast)
         socketService.sendNotification(data);
-        
+
         // Invalidar TODO el caché de notificaciones Y contadores
         invalidate(); // Sin parámetros invalida TODO el caché
-        
+
         // Pequeño delay para asegurar que el backend procesó todo
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         // Cargar todas las notificaciones de nuevo (sin caché)
-        const notificationsResponse = await getUserNotifications(token, {});
+        const notificationsResponse = await getUserNotifications({});
         setNotifications(notificationsResponse.data || []);
-        
+
         // Recargar el contador de no leídas (sin caché)
-        const unreadResponse = await getUnreadCount(token);
+        const unreadResponse = await getUnreadCount();
         setUnreadCount(unreadResponse.count || 0);
-        
-        console.log('✅ Notificación enviada, lista y contadores actualizados');
+
 
         return response.data;
       } catch (err) {
-        console.error('Error al enviar notificación:', err);
         throw err;
       }
     },
@@ -402,11 +366,10 @@ export function NotificationsProvider({ children, token }) {
 
       try {
         setLoading(true);
-        const response = await getUserNotifications(token, filters);
+        const response = await getUserNotifications(filters);
         setNotifications(response.data || []);
         await loadUnreadCount();
       } catch (err) {
-        console.error('Error al recargar notificaciones:', err);
         setError(err.message);
       } finally {
         setLoading(false);

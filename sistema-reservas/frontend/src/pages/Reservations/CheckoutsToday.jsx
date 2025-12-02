@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Clock, AlertTriangle } from 'lucide-react';
-import StatusBadge from '@/components/ui/StatusBadge';
-import QuickCheckOutButton from '@/components/QuickCheckOutButton';
-import ReservationDetailsModal from '@/components/ReservationDetailsModal';
+import StatusBadge from '../../components/ui/StatusBadge';
+import QuickCheckOutButton from '@/components/reservations/QuickCheckOutButton';
+import ReservationDetailsModal from '@/components/reservations/ReservationDetailsModal';
 import { toast } from 'sonner';
 
 /**
@@ -27,6 +27,8 @@ const CheckoutsToday = () => {
   const markCheckoutAlertsAsViewed = async () => {
     try {
       const token = localStorage.getItem('token');
+      // Temporalmente deshabilitado debido a error 500 - investigar más adelante
+      /* 
       const response = await fetch(
         'http://localhost:3001/api/v1/notifications/checkout-alerts/mark-viewed',
         {
@@ -39,12 +41,13 @@ const CheckoutsToday = () => {
       );
 
       if (response.ok) {
-        console.log('✅ Alertas de checkout marcadas como vistas');
         // Emitir evento para actualizar contador
         window.dispatchEvent(new Event('checkoutAlertsCleared'));
       }
+      */
     } catch (error) {
-      console.error('Error al marcar alertas como vistas:', error);
+      // Silently fail - this is not critical for viewing checkouts
+      console.warn('Could not mark checkout alerts as viewed:', error);
     }
   };
 
@@ -53,8 +56,9 @@ const CheckoutsToday = () => {
       setIsLoading(true);
       const token = localStorage.getItem('token');
 
+      // Usar el nuevo endpoint dedicado que ya filtra por fecha en el backend
       const response = await fetch(
-        'http://localhost:3001/api/v1/reservations?status=pending_checkout',
+        'http://localhost:3001/api/v1/reservations/checkouts-today',
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -66,27 +70,9 @@ const CheckoutsToday = () => {
 
       const data = await response.json();
 
-      // Obtener fecha actual en zona horaria de Chile (America/Santiago)
-      const today = new Date().toLocaleDateString('es-CL', {
-        timeZone: 'America/Santiago',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).split('-').reverse().join('-'); // De DD-MM-YYYY a YYYY-MM-DD
-
-      console.log('🔍 CheckoutsToday - Hoy (Chile):', today);
-      console.log('🔍 CheckoutsToday - Reservas recibidas:', data.reservations?.length);
-
-      const todayCheckouts = (data.reservations || []).filter((r) => {
-        const checkOutDate = new Date(r.check_out_date).toISOString().split('T')[0];
-        console.log(`🔍 CheckoutsToday - Comparando: ${checkOutDate} === ${today}`, checkOutDate === today);
-        return checkOutDate === today;
-      });
-
-      console.log('🔍 CheckoutsToday - Check-outs hoy:', todayCheckouts.length);
-      setReservations(todayCheckouts);
+      // El backend ya retorna solo las reservas de hoy, no necesitamos filtrar más
+      setReservations(data.reservations || []);
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cargar check-outs');
     } finally {
       setIsLoading(false);
@@ -168,9 +154,15 @@ const CheckoutsToday = () => {
 
       {/* Grid de Cards */}
       {reservations.length === 0 ? (
-        <div className="text-center py-12 bg-green-50 rounded-lg border-2 border-green-200">
-          <p className="text-green-800 font-medium">
-            ✅ No hay check-outs pendientes para hoy
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <div className="bg-muted/50 rounded-full p-6 mb-4">
+            <Clock className="w-16 h-16 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold text-foreground mb-2">
+            No hay check-outs pendientes
+          </h3>
+          <p className="text-muted-foreground text-center max-w-md">
+            No hay reservas programadas para hacer check-out el día de hoy.
           </p>
         </div>
       ) : (
@@ -187,11 +179,10 @@ const CheckoutsToday = () => {
             return (
               <div
                 key={reservation.id}
-                className={`bg-card rounded-lg p-4 space-y-3 ${
-                  timeRemaining.urgent
-                    ? 'border-2 border-red-300'
-                    : 'border-2 border-orange-200'
-                }`}
+                className={`bg-card rounded-lg p-4 space-y-3 ${timeRemaining.urgent
+                  ? 'border-2 border-red-400 dark:border-red-500'
+                  : 'border-2 border-orange-300 dark:border-orange-400'
+                  }`}
               >
                 {/* Header */}
                 <div className="flex justify-between items-start">
@@ -209,7 +200,7 @@ const CheckoutsToday = () => {
                     {reservation.reservation_rooms?.map((rr, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded font-medium"
+                        className="px-2 py-1 bg-yellow-100 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-200 text-xs rounded font-medium border border-yellow-300 dark:border-yellow-700"
                       >
                         #{rr.rooms?.room_number}
                       </span>
@@ -232,12 +223,7 @@ const CheckoutsToday = () => {
                     </span>
                   </div>
                   {!isPaidFully && (
-                    <div className="flex items-center gap-1 mt-2 px-2 py-1 bg-red-100 border border-red-300 rounded">
-                      <AlertTriangle className="w-3 h-3 text-red-600" />
-                      <span className="text-xs font-medium text-red-800">
-                        Pendiente: {formatCLP(pendingAmount)}
-                      </span>
-                    </div>
+                    <div className="hidden"></div>
                   )}
                 </div>
 

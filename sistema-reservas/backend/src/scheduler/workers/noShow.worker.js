@@ -5,15 +5,15 @@
  * las reservas que estaban ready_for_checkin pero nunca hicieron check-in.
  */
 
-const { Worker } = require('bullmq');
-const { connection, QUEUE_NAMES } = require('../config');
-const prisma = require('../../db/prisma.client');
-const { changeReservationStatus } = require('../../api/reservations/status.service');
+import { Worker } from 'bullmq';
+import { connection, QUEUE_NAMES } from '../config.js';
+import prisma from '../../db/prisma.client.js';
+import statusService from '../../api/reservations/status.service.js';
+const { changeReservationStatus } = statusService;
 
 const processor = async (job) => {
   const { id, data } = job;
 
-  console.log(`\n🔔 [${new Date().toISOString()}] Processing no_show job ${id}`);
 
   try {
     // Obtener configuración de no-show hours
@@ -42,8 +42,6 @@ const processor = async (job) => {
     const noShowDeadline = new Date(today);
     noShowDeadline.setHours(endHour + noShowHours, endMinute, 0, 0);
 
-    console.log(`   No-show deadline: ${noShowDeadline.toISOString()}`);
-    console.log(`   Current time: ${now.toISOString()}`);
 
     // Buscar reservas que:
     // 1. Están ready_for_checkin
@@ -66,7 +64,6 @@ const processor = async (job) => {
       },
     });
 
-    console.log(`   Found ${reservations.length} reservations still in ready_for_checkin`);
 
     const results = {
       success: [],
@@ -89,17 +86,14 @@ const processor = async (job) => {
           });
 
           results.success.push(reservation.code);
-          console.log(`   ✅ Reservation ${reservation.code} → no_show`);
         } else {
           results.skipped.push(reservation.code);
-          console.log(`   ⏭️  Reservation ${reservation.code} skipped (deadline not reached yet)`);
         }
       } catch (error) {
         results.failed.push({
           code: reservation.code,
           error: error.message,
         });
-        console.error(`   ❌ Reservation ${reservation.code} failed:`, error.message);
       }
     }
 
@@ -114,15 +108,9 @@ const processor = async (job) => {
       deadline: noShowDeadline.toISOString(),
     };
 
-    console.log(`\n📊 No-Show Summary:`);
-    console.log(`   Total: ${summary.total}`);
-    console.log(`   Success: ${summary.success}`);
-    console.log(`   Skipped: ${summary.skipped}`);
-    console.log(`   Failed: ${summary.failed}`);
 
     return summary;
   } catch (error) {
-    console.error('❌ No-Show job failed:', error);
     throw error; // Permite que BullMQ reintente
   }
 };
@@ -135,15 +123,12 @@ const worker = new Worker(QUEUE_NAMES.NO_SHOW, processor, {
 
 // Event listeners
 worker.on('completed', (job, returnvalue) => {
-  console.log(`✅ Job ${job.id} completed successfully`);
 });
 
 worker.on('failed', (job, error) => {
-  console.error(`❌ Job ${job.id} failed:`, error.message);
 });
 
 worker.on('error', (error) => {
-  console.error('❌ Worker error:', error);
 });
 
-module.exports = worker;
+export default worker;

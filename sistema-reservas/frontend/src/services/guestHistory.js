@@ -1,15 +1,4 @@
-import axios from "axios";
-
-const API_URL = "http://localhost:3001/api/v1";
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
-};
+import apiClient from "@/lib/apiClient";
 
 export const guestHistoryService = {
   // Buscar todos los huéspedes (lista/búsqueda)
@@ -21,13 +10,9 @@ export const guestHistoryService = {
         limit: limit.toString(),
       });
 
-      const response = await axios.get(
-        `${API_URL}/guests?${params}`,
-        getAuthHeaders()
-      );
+      const response = await apiClient.get(`/guests?${params}`);
       return response.data;
     } catch (error) {
-      console.error("Error al buscar huéspedes:", error);
       throw new Error(
         error.response?.data?.message || "Error al buscar huéspedes"
       );
@@ -37,13 +22,9 @@ export const guestHistoryService = {
   // Obtener perfil completo de huésped
   getGuestProfile: async (guestId) => {
     try {
-      const response = await axios.get(
-        `${API_URL}/guests/${guestId}/profile`,
-        getAuthHeaders()
-      );
+      const response = await apiClient.get(`/guests/${guestId}/profile`);
       return response.data;
     } catch (error) {
-      console.error("Error al obtener perfil de huésped:", error);
       throw new Error(
         error.response?.data?.message || "Error al obtener perfil de huésped"
       );
@@ -61,16 +42,14 @@ export const guestHistoryService = {
       if (filters.startDate) params.append("startDate", filters.startDate);
       if (filters.endDate) params.append("endDate", filters.endDate);
 
-      const response = await axios.get(
-        `${API_URL}/guests/${guestId}/reservations?${params}`,
-        getAuthHeaders()
+      const response = await apiClient.get(
+        `/guests/${guestId}/reservations?${params}`
       );
       return response.data;
     } catch (error) {
-      console.error("Error al obtener historial de reservas:", error);
       throw new Error(
         error.response?.data?.message ||
-          "Error al obtener historial de reservas"
+        "Error al obtener historial de reservas"
       );
     }
   },
@@ -78,14 +57,12 @@ export const guestHistoryService = {
   // Actualizar observaciones de huésped
   updateGuestObservations: async (guestId, observations) => {
     try {
-      const response = await axios.put(
-        `${API_URL}/guests/${guestId}/observations`,
-        { observations },
-        getAuthHeaders()
+      const response = await apiClient.put(
+        `/guests/${guestId}/observations`,
+        { observations }
       );
       return response.data;
     } catch (error) {
-      console.error("Error al actualizar observaciones:", error);
       throw new Error(
         error.response?.data?.message || "Error al actualizar observaciones"
       );
@@ -95,14 +72,12 @@ export const guestHistoryService = {
   // Actualizar campo específico del perfil de huésped
   updateGuestProfile: async (guestId, updateData) => {
     try {
-      const response = await axios.put(
-        `${API_URL}/guests/${guestId}/profile`,
-        updateData,
-        getAuthHeaders()
+      const response = await apiClient.put(
+        `/guests/${guestId}/profile`,
+        updateData
       );
       return response.data;
     } catch (error) {
-      console.error("Error al actualizar perfil de huésped:", error);
       throw new Error(
         error.response?.data?.message || "Error al actualizar perfil de huésped"
       );
@@ -112,13 +87,9 @@ export const guestHistoryService = {
   // Eliminar huésped (soft delete) - Solo Admin
   deleteGuest: async (guestId) => {
     try {
-      const response = await axios.delete(
-        `${API_URL}/guests/${guestId}`,
-        getAuthHeaders()
-      );
+      const response = await apiClient.delete(`/guests/${guestId}`);
       return response.data;
     } catch (error) {
-      console.error("Error al eliminar huésped:", error);
       throw new Error(
         error.response?.data?.message || "Error al eliminar huésped"
       );
