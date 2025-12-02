@@ -1,5 +1,5 @@
-import makeWASocket from '@whiskeysockets/baileys';
 import {
+  makeWASocket,
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,

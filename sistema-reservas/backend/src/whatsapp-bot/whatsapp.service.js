@@ -24,9 +24,12 @@ class WhatsAppService {
    * Obtener o crear sesión de conversación
    */
   async getOrCreateSession(phoneNumber) {
+    console.log('🔍 getOrCreateSession - phoneNumber recibido:', phoneNumber);
     let session = await redisSessionService.getSession(phoneNumber);
+    console.log('📦 getOrCreateSession - session obtenida de Redis:', session);
 
     if (!session) {
+      console.log('➕ Creando nueva sesión para:', phoneNumber);
       // Crear nueva sesión
       session = {
         phoneNumber,
@@ -39,6 +42,7 @@ class WhatsAppService {
       };
 
       await redisSessionService.setSession(phoneNumber, session);
+      console.log('💾 Nueva sesión guardada en Redis con clave:', `whatsapp:session:${phoneNumber}`);
       stats.totalConversations++;
 
     } else {
@@ -56,11 +60,14 @@ class WhatsAppService {
    * Actualizar estado de la sesión
    */
   async updateSession(phoneNumber, updates) {
+    console.log('🔄 updateSession llamado:', { phoneNumber, updates });
     const session = await redisSessionService.getSession(phoneNumber);
+    console.log('📥 Sesión antes de actualizar:', session);
     if (session) {
       // Actualizar estado si viene en updates
       if (updates.state !== undefined) {
         session.state = updates.state;
+        console.log('✏️ Actualizando estado a:', updates.state);
       }
 
       // Actualizar data si viene en updates
@@ -73,7 +80,9 @@ class WhatsAppService {
       Object.assign(session, otherUpdates);
 
       await redisSessionService.setSession(phoneNumber, session);
+      console.log('💾 Sesión guardada en Redis:', { phoneNumber, state: session.state });
     } else {
+      console.log('⚠️ No se encontró sesión para actualizar:', phoneNumber);
     }
   }
 
@@ -183,7 +192,7 @@ class WhatsAppService {
           name: data.name || '',
           rut: data.rut || '',
           email: data.email || '',
-          phone: phoneNumber,
+          phone: data.phone || phoneNumber, // Usar el teléfono del cliente (data.phone), fallback al número del chatbot
           birthdate: data.birthdate || '',
           gender: data.gender || '',
           country: data.country || '',
