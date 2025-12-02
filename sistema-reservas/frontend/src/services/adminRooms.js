@@ -1,100 +1,42 @@
-// Servicios para consumir los endpoints de administración de habitaciones y tipos de habitaciones
+import apiClient from '@/lib/apiClient';
 
 // Funciones de lectura - usando rutas públicas (solo requieren autenticación)
-export async function fetchAdminRooms(token) {
-  const response = await fetch('http://localhost:3001/api/v1/rooms', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) throw new Error('Error al obtener habitaciones');
-  return response.json();
+export async function fetchAdminRooms() {
+  const response = await apiClient.get('/rooms');
+  return response.data;
 }
 
-export async function fetchAdminRoomTypes(token) {
-  const response = await fetch('http://localhost:3001/api/v1/rooms/types', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) throw new Error('Error al obtener tipos de habitación');
-  return response.json();
+export async function fetchAdminRoomTypes() {
+  const response = await apiClient.get('/rooms/types');
+  return response.data;
 }
 
-export async function createAdminRoom(data, token) {
-  const response = await fetch('http://localhost:3001/api/v1/admin/rooms', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) throw new Error('Error al crear habitación');
-  return response.json();
+export async function createAdminRoom(data) {
+  const response = await apiClient.post('/admin/rooms', data);
+  return response.data;
 }
 
-export async function createAdminRoomType(data, token) {
-  const response = await fetch('http://localhost:3001/api/v1/admin/rooms/room-types', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) throw new Error('Error al crear tipo de habitación');
-  return response.json();
+export async function createAdminRoomType(data) {
+  const response = await apiClient.post('/admin/rooms/room-types', data);
+  return response.data;
 }
 
-export async function updateAdminRoom(id, data, token) {
-  const response = await fetch(`http://localhost:3001/api/v1/admin/rooms/${id}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) throw new Error('Error al modificar habitación');
-  return response.json();
+export async function updateAdminRoom(id, data) {
+  const response = await apiClient.put(`/admin/rooms/${id}`, data);
+  return response.data;
 }
 
-export async function updateAdminRoomType(id, data, token) {
-  const response = await fetch(`http://localhost:3001/api/v1/admin/rooms/room-types/${id}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) throw new Error('Error al modificar tipo de habitación');
-  return response.json();
+export async function updateAdminRoomType(id, data) {
+  const response = await apiClient.put(`/admin/rooms/room-types/${id}`, data);
+  return response.data;
 }
 
-export async function deleteAdminRoom(id, token) {
-  const response = await fetch(`http://localhost:3001/api/v1/admin/rooms/${id}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) throw new Error('Error al eliminar habitación');
+export async function deleteAdminRoom(id) {
+  await apiClient.delete(`/admin/rooms/${id}`);
   return true;
 }
 
-export async function deleteAdminRoomType(id, token) {
-  const response = await fetch(`http://localhost:3001/api/v1/admin/rooms/room-types/${id}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) throw new Error('Error al eliminar tipo de habitación');
+export async function deleteAdminRoomType(id) {
+  await apiClient.delete(`/admin/rooms/room-types/${id}`);
   return true;
 }

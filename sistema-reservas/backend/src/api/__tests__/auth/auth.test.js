@@ -19,7 +19,9 @@ describe('Auth Endpoints - /api/v1/auth', () => {
 
   afterAll(async () => {
     await testDb.cleanup();
-    await redisClient.disconnect();
+    if (redisClient.isOpen) {
+      await redisClient.disconnect();
+    }
   });
 
   describe('POST /login', () => {

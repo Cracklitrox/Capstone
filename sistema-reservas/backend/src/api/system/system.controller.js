@@ -1,4 +1,4 @@
-const { getRecentErrors, resolveError } = require("../../utils/errorLogger");
+import { getRecentErrors, resolveError } from '../../utils/errorLogger.js';
 
 /**
  * Obtener errores del sistema con filtros
@@ -18,7 +18,6 @@ async function getErrors(req, res) {
 
     return res.status(200).json(errors);
   } catch (error) {
-    console.error("Error al obtener logs de errores:", error);
     return res.status(500).json({
       message: "Error al obtener logs",
       error: error.message,
@@ -39,7 +38,6 @@ async function markErrorAsResolved(req, res) {
       message: "Error marcado como resuelto",
     });
   } catch (error) {
-    console.error("Error al marcar error como resuelto:", error);
     return res.status(500).json({
       message: "Error al actualizar estado",
       error: error.message,
@@ -47,7 +45,7 @@ async function markErrorAsResolved(req, res) {
   }
 }
 
-module.exports = {
+export default {
   getErrors,
   markErrorAsResolved,
 };

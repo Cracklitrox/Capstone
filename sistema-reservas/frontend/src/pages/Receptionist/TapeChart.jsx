@@ -22,31 +22,30 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
-import { Button } from "@/components/ui/Button";
-import { Calendar } from "@/components/ui/Calendar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { Calendar } from "../../components/ui/Calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/Popover";
+} from "../../components/ui/Popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/Tooltip";
-// Dialog no es necesario aquí ya que ReservationDetailsModal ya incluye su propio Dialog
+} from "../../components/ui/Tooltip";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
-import { Badge } from "@/components/ui/Badge";
-import { Progress } from "@/components/ui/Progress";
-import ReservationDetailsModal from "@/components/ReservationDetailsModal";
+} from "../../components/ui/Select";
+import { Badge } from "../../components/ui/Badge";
+import { Progress } from "../../components/ui/Progress";
+import ReservationDetailsModal from "@/components/reservations/ReservationDetailsModal";
 import { cn } from "@/lib/utils";
 
 // 🎨 COLORES DE ESTADOS
@@ -159,7 +158,10 @@ function TapeChart() {
   useEffect(() => {
     if (token && dateRange.from && dateRange.to && allRooms.length > 0) {
       setLoading(true);
-      getPlanningData(dateRange.from, dateRange.to, token)
+      getPlanningData(
+        format(dateRange.from, 'yyyy-MM-dd'),
+        format(dateRange.to, 'yyyy-MM-dd')
+      )
         .then((response) => {
           setPlanningData(response.rooms || []);
           setStats(response.stats || null);
@@ -254,7 +256,19 @@ function TapeChart() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <div
-                  onClick={() => setSelectedReservation(reservation)}
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`http://localhost:3001/api/v1/reservations/${reservation.reservationId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (response.ok) {
+                        const data = await response.json();
+                        setSelectedReservation(data.reservation);
+                      }
+                    } catch (error) {
+                      console.error('Error fetching reservation details:', error);
+                    }
+                  }}
                   className={cn(
                     "h-full text-white text-xs p-2 flex flex-col justify-start cursor-pointer border-l-4 transition-transform hover:scale-105",
                     statusConfig.color,
@@ -343,7 +357,7 @@ function TapeChart() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-4 h-full flex flex-col">
+    <div className="space-y-4 h-full flex flex-col">
       {/* 🎯 HEADER */}
       <div className="flex-shrink-0 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Calendario de Ocupación</h1>
@@ -673,40 +687,28 @@ function TapeChart() {
       </TooltipProvider>
 
       {/* ✅ MODAL CORRECTO - Detalles de Reserva */}
+      {/* ✅ MODAL CORRECTO - Detalles de Reserva */}
       {selectedReservation && (
         <ReservationDetailsModal
-          reservation={{
-            id: selectedReservation.reservationId,
-            code: selectedReservation.reservationCode,
-            check_in_date: selectedReservation.checkIn,
-            check_out_date: selectedReservation.checkOut,
-            total_amount: selectedReservation.totalAmount,
-            paid_amount: selectedReservation.paidAmount,
-            guest_count: selectedReservation.totalGuests,
-            status: selectedReservation.status,
-            channel: selectedReservation.channel,
-            booking_type: 'individual', // Por defecto, el planning no devuelve este campo
-            // Datos del huésped principal (obtenidos del guestName)
-            main_guest: {
-              first_name: selectedReservation.guestName?.split(' ')[0] || '',
-              last_name_father: selectedReservation.guestName?.split(' ').slice(1).join(' ') || '',
-              paternal_last_name: selectedReservation.guestName?.split(' ').slice(1).join(' ') || '',
-            },
-            // Servicios (si vienen del endpoint)
-            reservation_services: selectedReservation.services?.map((serviceName) => ({
-              services: { name: serviceName }
-            })) || [],
-            // Habitaciones - placeholder vacío (se cargarán con el endpoint completo)
-            reservation_rooms: [],
-            reservation_guests: [],
-            payments: [],
-          }}
+          reservation={selectedReservation}
           isOpen={!!selectedReservation}
           onClose={() => setSelectedReservation(null)}
           onUpdate={() => {
             // Recargar datos del planning después de actualizar la reserva
             setSelectedReservation(null);
-            // Aquí podrías agregar lógica para recargar los datos si es necesario
+            if (token && dateRange.from && dateRange.to) {
+              setLoading(true);
+              getPlanningData(
+                format(dateRange.from, 'yyyy-MM-dd'),
+                format(dateRange.to, 'yyyy-MM-dd')
+              )
+                .then((response) => {
+                  setPlanningData(response.rooms || []);
+                  setStats(response.stats || null);
+                })
+                .catch((e) => setError(e.message))
+                .finally(() => setLoading(false));
+            }
           }}
         />
       )}

@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
-import Sidebar from '../../components/Sidebar.jsx';
-import { AuthProvider } from '../../services/authContext.jsx';
+import Sidebar from '../../components/layout/Sidebar.jsx';
+import { AuthProvider } from '../../contexts/AuthProvider.jsx';
 import { mockUsers, mockTokens, cleanupMocks } from '../utils/testUtils.jsx';
 import { localStorageMock } from '../setup/mocks.js';
 
 const renderSidebar = (sidebarOpen = false, user = mockUsers.admin) => {
   const setSidebarOpen = vi.fn();
-  
+
   localStorageMock.getItem.mockReturnValue(user ? mockTokens[user.role] : null);
   jwtDecode.mockReturnValue(user);
 
@@ -18,9 +18,9 @@ const renderSidebar = (sidebarOpen = false, user = mockUsers.admin) => {
     ...render(
       <BrowserRouter>
         <AuthProvider>
-          <Sidebar 
-            sidebarOpen={sidebarOpen} 
-            setSidebarOpen={setSidebarOpen} 
+          <Sidebar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
           />
         </AuthProvider>
       </BrowserRouter>
@@ -54,14 +54,14 @@ describe('Sidebar Component', () => {
 
     it('debe mostrar el overlay cuando está cerrado', () => {
       renderSidebar(false);
-      
+
       const overlay = screen.getByTestId('sidebar-overlay');
       expect(overlay).toHaveClass('opacity-0', 'pointer-events-none');
     });
 
     it('debe mostrar el overlay cuando está abierto', () => {
       renderSidebar(true);
-      
+
       const overlay = screen.getByTestId('sidebar-overlay');
       expect(overlay).toHaveClass('opacity-100');
       expect(overlay).not.toHaveClass('pointer-events-none');
@@ -71,28 +71,28 @@ describe('Sidebar Component', () => {
   describe('Estados del sidebar', () => {
     it('debe estar cerrado por defecto en móvil', () => {
       renderSidebar(false);
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       expect(sidebar).toHaveClass('-translate-x-full');
     });
 
     it('debe estar abierto cuando sidebarOpen es true', () => {
       renderSidebar(true);
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       expect(sidebar).toHaveClass('translate-x-0');
     });
 
     it('debe tener clases CSS correctas para desktop', () => {
       renderSidebar();
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       expect(sidebar).toHaveClass('md:static', 'md:translate-x-0');
     });
 
     it('debe tener z-index apropiado para móvil', () => {
       renderSidebar();
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       expect(sidebar).toHaveClass('z-30');
     });
@@ -217,7 +217,7 @@ describe('Sidebar Component', () => {
       const links = [
         'Inicio',
         'Gestionar Reservas',
-        'Gestionar Usuarios', 
+        'Gestionar Usuarios',
         'Configuración'
       ];
 
@@ -232,7 +232,7 @@ describe('Sidebar Component', () => {
   describe('Responsive behavior', () => {
     it('debe tener clases responsive apropiadas', () => {
       renderSidebar();
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       expect(sidebar).toHaveClass(
         'fixed', 'md:static',
@@ -242,14 +242,14 @@ describe('Sidebar Component', () => {
 
     it('debe ocultar el overlay en desktop', () => {
       renderSidebar();
-      
+
       const overlay = screen.getByTestId('sidebar-overlay');
       expect(overlay).toHaveClass('md:hidden');
     });
 
     it('debe tener dimensiones correctas', () => {
       renderSidebar();
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       expect(sidebar).toHaveClass('w-64', 'h-full');
     });
@@ -258,7 +258,7 @@ describe('Sidebar Component', () => {
   describe('Estructura del contenido', () => {
     it('debe tener la estructura de layout correcta', () => {
       renderSidebar();
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       const flexContainer = sidebar.querySelector('.flex.flex-col.h-full');
       expect(flexContainer).toBeInTheDocument();
@@ -266,21 +266,21 @@ describe('Sidebar Component', () => {
 
     it('debe mostrar el título con estilos apropiados', () => {
       renderSidebar();
-      
+
       const title = screen.getByText('Hotel Don Teo');
       expect(title).toHaveClass('text-2xl', 'font-bold', 'text-primary');
     });
 
     it('debe mostrar el copyright en el footer', () => {
       renderSidebar();
-      
+
       const copyright = screen.getByText('© 2025 Hotel Don Teo');
       expect(copyright).toHaveClass('text-xs', 'text-muted-foreground');
     });
 
     it('debe tener navegación con espaciado correcto', () => {
       renderSidebar();
-      
+
       const nav = screen.getByRole('list');
       expect(nav).toHaveClass('space-y-2');
     });
@@ -289,21 +289,21 @@ describe('Sidebar Component', () => {
   describe('Accesibilidad', () => {
     it('debe tener rol de complementary', () => {
       renderSidebar();
-      
+
       const sidebar = screen.getByRole('complementary');
       expect(sidebar).toBeInTheDocument();
     });
 
     it('debe tener navegación semánticamente correcta', () => {
       renderSidebar();
-      
+
       expect(screen.getByRole('navigation')).toBeInTheDocument();
       expect(screen.getByRole('list')).toBeInTheDocument();
     });
 
     it('debe tener enlaces accesibles por teclado', () => {
       renderSidebar(false, mockUsers.admin);
-      
+
       const links = screen.getAllByRole('link');
       links.forEach(link => {
         expect(link).not.toHaveAttribute('tabindex', '-1');
@@ -312,7 +312,7 @@ describe('Sidebar Component', () => {
 
     it('debe tener botones accesibles', () => {
       renderSidebar(false, mockUsers.admin);
-      
+
       const buttons = screen.getAllByRole('button');
       buttons.forEach(button => {
         expect(button).not.toHaveAttribute('tabindex', '-1');
@@ -323,11 +323,11 @@ describe('Sidebar Component', () => {
   describe('Manejo de errores', () => {
     it('debe manejar usuario sin rol definido', () => {
       const userWithoutRole = { ...mockUsers.admin, role: undefined };
-      
+
       expect(() => {
         renderSidebar(false, userWithoutRole);
       }).not.toThrow();
-      
+
       // No debería mostrar ningún enlace de navegación
       expect(screen.queryByText('Gestionar Usuarios')).not.toBeInTheDocument();
       expect(screen.queryByText('Gestionar Reservas')).not.toBeInTheDocument();
@@ -337,7 +337,7 @@ describe('Sidebar Component', () => {
       expect(() => {
         renderSidebar(false, null);
       }).not.toThrow();
-      
+
       // Debería mostrar la estructura básica pero sin navegación
       expect(screen.getByText('Hotel Don Teo')).toBeInTheDocument();
     });
@@ -358,7 +358,7 @@ describe('Sidebar Component', () => {
   describe('Performance', () => {
     it('debe renderizar eficientemente con pocos re-renders', () => {
       const { rerender } = renderSidebar();
-      
+
       // Re-render con las mismas props no debería causar cambios
       rerender(
         <BrowserRouter>
@@ -367,14 +367,14 @@ describe('Sidebar Component', () => {
           </AuthProvider>
         </BrowserRouter>
       );
-      
+
       expect(screen.getByText('Hotel Don Teo')).toBeInTheDocument();
     });
 
     it('debe manejar cambios de estado eficientemente', () => {
       const setSidebarOpen = vi.fn();
       const { rerender } = renderSidebar(false);
-      
+
       // Cambiar estado
       rerender(
         <BrowserRouter>
@@ -383,7 +383,7 @@ describe('Sidebar Component', () => {
           </AuthProvider>
         </BrowserRouter>
       );
-      
+
       const sidebar = screen.getByTestId('sidebar-component');
       expect(sidebar).toHaveClass('translate-x-0');
     });

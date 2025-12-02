@@ -1,5 +1,5 @@
-const reportsService = require('./reports.service');
-const { logError } = require('../../utils/errorLogger');
+import reportsService from './reports.service.js';
+import { logError } from '../../utils/errorLogger.js';
 
 // ============================================
 // FASE 1: KPIs Y MÉTRICAS BÁSICAS
@@ -33,7 +33,6 @@ async function getKPIs(req, res) {
       message: 'KPIs obtenidos exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener KPIs:', error);
 
     await logError({
       userId: req.user?.id,
@@ -100,7 +99,6 @@ async function getOccupancy(req, res) {
       message: 'Datos de ocupación obtenidos exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener datos de ocupación:', error);
 
     await logError({
       userId: req.user?.id,
@@ -165,7 +163,6 @@ async function getRevenue(req, res) {
       message: 'Datos de ingresos obtenidos exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener datos de ingresos:', error);
 
     await logError({
       userId: req.user?.id,
@@ -240,7 +237,6 @@ async function getClientsOverview(req, res) {
       message: 'Resumen de clientes obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener resumen de clientes:', error);
 
     await logError({
       userId: req.user?.id,
@@ -295,7 +291,6 @@ async function getClientDetail(req, res) {
       message: 'Detalle del cliente obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener detalle del cliente:', error);
 
     await logError({
       userId: req.user?.id,
@@ -349,7 +344,6 @@ async function getClientsRevenueTimeline(req, res) {
       message: 'Línea de tiempo de ingresos obtenida exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener línea de tiempo de ingresos:', error);
 
     await logError({
       userId: req.user?.id,
@@ -416,7 +410,6 @@ async function getTopClients(req, res) {
       message: 'Ranking de clientes obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener top clientes:', error);
 
     await logError({
       userId: req.user?.id,
@@ -460,7 +453,6 @@ async function getTopRooms(req, res) {
       message: 'Ranking de habitaciones obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener top habitaciones:', error);
 
     await logError({
       userId: req.user?.id,
@@ -504,7 +496,6 @@ async function getTopRoomTypes(req, res) {
       message: 'Ranking de tipos de habitación obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener top tipos de habitación:', error);
 
     await logError({
       userId: req.user?.id,
@@ -548,7 +539,6 @@ async function getTopServices(req, res) {
       message: 'Ranking de servicios obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener top servicios:', error);
 
     await logError({
       userId: req.user?.id,
@@ -601,7 +591,6 @@ async function comparePeriods(req, res) {
       message: 'Comparación de períodos realizada exitosamente'
     });
   } catch (error) {
-    console.error('Error al comparar períodos:', error);
 
     await logError({
       userId: req.user?.id,
@@ -661,7 +650,6 @@ async function compareClients(req, res) {
       message: 'Comparación de clientes realizada exitosamente'
     });
   } catch (error) {
-    console.error('Error al comparar clientes:', error);
 
     await logError({
       userId: req.user?.id,
@@ -708,7 +696,6 @@ async function getClientStats(req, res) {
       message: 'Estadísticas de clientes obtenidas exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener estadísticas de clientes:', error);
 
     await logError({
       userId: req.user?.id,
@@ -741,7 +728,6 @@ async function getTotalPaid(req, res) {
       message: 'Total de pagos obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener total de pagos:', error);
 
     await logError({
       userId: req.user?.id,
@@ -784,7 +770,6 @@ async function getClientCustomReport(req, res) {
       message: 'Reporte de cliente obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener reporte de cliente:', error);
 
     await logError({
       userId: req.user?.id,
@@ -827,7 +812,6 @@ async function getRoomCustomReport(req, res) {
       message: 'Reporte de habitación obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener reporte de habitación:', error);
 
     await logError({
       userId: req.user?.id,
@@ -870,7 +854,6 @@ async function getRoomTypeCustomReport(req, res) {
       message: 'Reporte de tipo de habitación obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener reporte de tipo de habitación:', error);
 
     await logError({
       userId: req.user?.id,
@@ -916,7 +899,6 @@ async function getTopClientsRevenue(req, res) {
       message: 'Ranking de clientes obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener ranking de clientes:', error);
 
     await logError({
       userId: req.user?.id,
@@ -956,7 +938,6 @@ async function getClientsWithReservations(req, res) {
       message: 'Clientes con reservas obtenidos exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener clientes con reservas:', error);
 
     await logError({
       userId: req.user?.id,
@@ -1004,7 +985,6 @@ async function getReportByCountry(req, res) {
       message: 'Reporte por país obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener reporte por país:', error);
 
     await logError({
       userId: req.user?.id,
@@ -1037,7 +1017,6 @@ async function getAvailableCountries(req, res) {
       message: 'Países obtenidos exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener países:', error);
 
     await logError({
       userId: req.user?.id,
@@ -1087,7 +1066,6 @@ async function getReportByAge(req, res) {
       message: 'Reporte por edad obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener reporte por edad:', error);
 
     await logError({
       userId: req.user?.id,
@@ -1135,7 +1113,6 @@ async function getReportBySpending(req, res) {
       message: 'Reporte por monto obtenido exitosamente'
     });
   } catch (error) {
-    console.error('Error al obtener reporte por monto:', error);
 
     await logError({
       userId: req.user?.id,
@@ -1154,7 +1131,7 @@ async function getReportBySpending(req, res) {
   }
 }
 
-module.exports = {
+export default {
   getKPIs,
   getOccupancy,
   getRevenue,

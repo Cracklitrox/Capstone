@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Search, Filter, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import StatusBadge from '@/components/ui/StatusBadge';
-import ReservationDetailsModal from '@/components/ReservationDetailsModal';
-import { ReservationCardSkeleton } from '@/components/ui/Skeleton';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/Select';
+import StatusBadge from '../../components/ui/StatusBadge';
+import ReservationDetailsModal from '@/components/reservations/ReservationDetailsModal';
+import { ReservationCardSkeleton } from '../../components/ui/Skeleton';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
@@ -50,7 +57,6 @@ const ManageReservations = () => {
       const data = await response.json();
       setReservations(data.reservations || []);
     } catch (error) {
-      console.error('Error al cargar reservas:', error);
       toast.error('Error al cargar reservas', {
         description: error.message,
       });
@@ -99,6 +105,18 @@ const ManageReservations = () => {
   // Solo recalcula cuando cambian: reservations, selectedStatus, debouncedSearchTerm
   const filteredReservations = useMemo(() => {
     let filtered = [...reservations];
+
+    // Excluir reservas completadas (ya que esta página es para gestión de reservas activas)
+    filtered = filtered.filter((r) => r.status !== 'completed');
+
+    // Eliminar duplicados basándose en el ID de la reserva
+    filtered = filtered.reduce((acc, current) => {
+      const exists = acc.find(item => item.id === current.id);
+      if (!exists) {
+        return [...acc, current];
+      }
+      return acc;
+    }, []);
 
     // Filtrar por estado
     if (selectedStatus !== 'all') {
@@ -203,20 +221,23 @@ const ManageReservations = () => {
           <label htmlFor="filter-status" className="sr-only">
             Filtrar por estado
           </label>
-          <select
-            id="filter-status"
+          <Select
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 border rounded-md text-sm"
-            aria-label="Filtrar reservas por estado"
+            onValueChange={setSelectedStatus}
           >
-            <option value="all">Todos los estados</option>
-            <option value="pending">Pendiente</option>
-            <option value="confirmed">Confirmado</option>
-            <option value="ready_for_checkin">Ready for Check-in</option>
-            <option value="in_progress">En Progreso</option>
-            <option value="pending_checkout">Pending Checkout</option>
-          </select>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="pending">Pendiente</SelectItem>
+              <SelectItem value="confirmed">Confirmado</SelectItem>
+              <SelectItem value="ready_for_checkin">Ready for Check-in</SelectItem>
+              <SelectItem value="in_progress">En Progreso</SelectItem>
+              <SelectItem value="pending_checkout">Pending Checkout</SelectItem>
+              <SelectItem value="canceled">Cancelada</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -263,14 +284,16 @@ const ManageReservations = () => {
                 aria-label={`Ver detalles de reserva ${reservation.code} para ${guestName}`}
               >
                 {/* Header del card */}
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <p className="text-lg font-bold text-foreground">
+                <div className="flex justify-between items-start mb-3 gap-2">
+                  <div className="min-w-0">
+                    <p className="text-lg font-bold text-foreground truncate">
                       {reservation.code}
                     </p>
-                    <p className="text-sm text-muted-foreground">{guestName}</p>
+                    <p className="text-sm text-muted-foreground truncate">{guestName}</p>
                   </div>
-                  <StatusBadge status={reservation.status} size="sm" />
+                  <div className="flex-shrink-0">
+                    <StatusBadge status={reservation.status} size="sm" />
+                  </div>
                 </div>
 
                 {/* Habitaciones */}
@@ -280,7 +303,7 @@ const ManageReservations = () => {
                     {reservation.reservation_rooms?.map((rr, index) => (
                       <span
                         key={index}
-                        className="px-3 py-1 bg-primary/20 text-primary-foreground rounded-md text-sm font-medium"
+                        className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md text-sm font-medium"
                       >
                         #{rr.rooms?.room_number}
                       </span>
@@ -307,13 +330,12 @@ const ManageReservations = () => {
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full ${
-                        paymentProgress >= 100
-                          ? 'bg-green-500'
-                          : paymentProgress >= 50
+                      className={`h-2 rounded-full ${paymentProgress >= 100
+                        ? 'bg-green-500'
+                        : paymentProgress >= 50
                           ? 'bg-yellow-500'
                           : 'bg-red-500'
-                      }`}
+                        }`}
                       style={{ width: `${paymentProgress}%` }}
                     />
                   </div>

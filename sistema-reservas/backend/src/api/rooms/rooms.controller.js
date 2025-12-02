@@ -1,5 +1,5 @@
-const roomsService = require("./rooms.service");
-const { logError } = require("../../utils/errorLogger");
+import roomsService from './rooms.service.js';
+import { logError } from '../../utils/errorLogger.js';
 
 /**
  * Controlador para obtener todas las habitaciones.
@@ -9,7 +9,6 @@ async function getAllRooms(req, res) {
     const rooms = await roomsService.getAllRooms();
     res.json(rooms);
   } catch (error) {
-    console.error("Error al obtener habitaciones:", error);
 
     await logError({
       userId: req.user?.id,
@@ -41,7 +40,6 @@ async function getRoomDetails(req, res) {
 
     res.json(room);
   } catch (error) {
-    console.error("Error al obtener detalles de habitación:", error);
 
     await logError({
       userId: req.user?.id,
@@ -67,7 +65,6 @@ async function getAllRoomTypes(req, res) {
     const roomTypes = await roomsService.getAllRoomTypes();
     res.json(roomTypes);
   } catch (error) {
-    console.error("Error al obtener tipos de habitación:", error);
 
     await logError({
       userId: req.user?.id,
@@ -110,7 +107,6 @@ async function updateRoomStatus(req, res) {
 
     res.json(updatedRoom);
   } catch (error) {
-    console.error("Error al actualizar estado de habitación:", error);
 
     await logError({
       userId: req.user?.id,
@@ -136,7 +132,6 @@ async function getRoomsReadyForCleaning(req, res) {
     const rooms = await roomsService.getRoomsReadyForCleaning();
     res.json({ rooms });
   } catch (error) {
-    console.error('Error al obtener habitaciones listas para limpieza:', error);
 
     await logError({
       userId: req.user?.id,
@@ -162,7 +157,6 @@ async function getRoomsInCleaning(req, res) {
     const rooms = await roomsService.getRoomsInCleaning();
     res.json({ rooms });
   } catch (error) {
-    console.error('Error al obtener habitaciones en limpieza:', error);
 
     await logError({
       userId: req.user?.id,
@@ -199,7 +193,6 @@ async function completeCleaning(req, res) {
 
     res.json(result);
   } catch (error) {
-    console.error('Error al completar limpieza:', error);
 
     await logError({
       userId: req.user?.id,
@@ -239,7 +232,6 @@ async function updateCleaningObservations(req, res) {
 
     res.json(result);
   } catch (error) {
-    console.error('Error al actualizar observaciones:', error);
 
     await logError({
       userId: req.user?.id,
@@ -269,7 +261,6 @@ async function startCleaning(req, res) {
 
     res.json(result);
   } catch (error) {
-    console.error('Error al iniciar limpieza:', error);
 
     await logError({
       userId: req.user?.id,
@@ -286,7 +277,7 @@ async function startCleaning(req, res) {
   }
 }
 
-module.exports = {
+export default {
   getAllRooms,
   getRoomDetails,
   getAllRoomTypes,

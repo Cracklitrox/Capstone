@@ -20,18 +20,15 @@ export function useApiCache(ttl = 5000) { // TTL por defecto: 5 segundos
     // 1. Verificar si hay datos en caché válidos
     const cached = cache.current.get(key);
     if (cached && (now - cached.timestamp) < ttl) {
-      console.log(`📦 Cache HIT para: ${key}`);
       return cached.data;
     }
 
     // 2. Verificar si ya hay una petición en curso para esta key
     if (pendingRequests.current.has(key)) {
-      console.log(`⏳ Petición en curso para: ${key}, esperando...`);
       return pendingRequests.current.get(key);
     }
 
     // 3. Hacer la petición y guardarla como pendiente
-    console.log(`🌐 Cache MISS para: ${key}, haciendo petición...`);
     const promise = apiFunction()
       .then(data => {
         // Guardar en caché
@@ -60,7 +57,6 @@ export function useApiCache(ttl = 5000) { // TTL por defecto: 5 segundos
    */
   const invalidate = useCallback((key) => {
     cache.current.delete(key);
-    console.log(`🗑️ Cache invalidado para: ${key}`);
   }, []);
 
   /**
@@ -69,7 +65,6 @@ export function useApiCache(ttl = 5000) { // TTL por defecto: 5 segundos
   const clearAll = useCallback(() => {
     cache.current.clear();
     pendingRequests.current.clear();
-    console.log(`🧹 Todo el caché ha sido limpiado`);
   }, []);
 
   return { cachedFetch, invalidate, clearAll };

@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Verificar disponibilidad para extensión de estadía
@@ -262,7 +261,7 @@ async function extendStay(reservationId, newCheckOutDate, userId) {
   return result;
 }
 
-module.exports = {
+export default {
   checkExtensionAvailability,
   extendStay,
 };

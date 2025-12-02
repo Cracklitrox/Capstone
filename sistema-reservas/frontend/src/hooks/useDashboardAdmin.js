@@ -112,7 +112,6 @@ const useDashboardAdmin = (startDate, endDate) => {
       setError(null);
 
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
       setError(err.response?.data?.message || err.message || 'Error al cargar el dashboard');
       setData({
         kpis: null,

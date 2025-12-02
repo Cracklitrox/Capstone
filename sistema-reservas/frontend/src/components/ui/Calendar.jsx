@@ -7,7 +7,7 @@ import {
 import { DayPicker, getDefaultClassNames } from "react-day-picker";
 
 import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "../ui/Button"
 
 function Calendar({
   className,
@@ -67,37 +67,43 @@ function Calendar({
           defaultClassNames.dropdown_root
         ),
         dropdown: cn("bg-popover absolute inset-0 opacity-0", defaultClassNames.dropdown),
-        caption_label: cn("select-none font-medium", captionLayout === "label"
-          ? "text-sm"
-          : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5", defaultClassNames.caption_label),
-        table: "w-full border-collapse",
+        caption_label: cn("text-sm font-medium", captionLayout === "dropdown" && "hidden", defaultClassNames.caption_label),
+        caption_dropdowns: cn("flex justify-center gap-1", defaultClassNames.caption_dropdowns),
+        dropdown_month: cn("relative inline-flex items-center", defaultClassNames.dropdown_month),
+        dropdown_year: cn("relative inline-flex items-center", defaultClassNames.dropdown_year),
+        dropdown: cn("p-2 bg-background border rounded-md text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", defaultClassNames.dropdown),
+        table: "w-full border-collapse space-y-1",
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
-          "text-muted-foreground flex-1 select-none rounded-md text-[0.8rem] font-normal",
+          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
           defaultClassNames.weekday
         ),
-        week: cn("mt-2 flex w-full", defaultClassNames.week),
-        week_number_header: cn("w-[--cell-size] select-none", defaultClassNames.week_number_header),
+        week: cn("flex w-full mt-2", defaultClassNames.week),
+        week_number_header: cn("text-muted-foreground w-9 font-normal text-[0.8rem]", defaultClassNames.week_number_header),
         week_number: cn(
-          "text-muted-foreground select-none text-[0.8rem]",
+          "text-muted-foreground w-9 font-normal text-[0.8rem]",
           defaultClassNames.week_number
         ),
         day: cn(
-          "group/day relative aspect-square h-full w-full select-none p-0 text-center [&:first-child[data-selected=true]_button]:rounded-l-md [&:last-child[data-selected=true]_button]:rounded-r-md",
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
           defaultClassNames.day
         ),
-        range_start: cn("bg-accent rounded-l-md", defaultClassNames.range_start),
-        range_middle: cn("rounded-none", defaultClassNames.range_middle),
-        range_end: cn("bg-accent rounded-r-md", defaultClassNames.range_end),
-        today: cn(
-          "bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none",
-          defaultClassNames.today
+        range_start: cn("day-range-start", defaultClassNames.range_start),
+        range_end: cn("day-range-end", defaultClassNames.range_end),
+        selected: cn(
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+          defaultClassNames.selected
         ),
+        today: cn("bg-accent text-accent-foreground", defaultClassNames.today),
         outside: cn(
-          "text-muted-foreground aria-selected:text-muted-foreground",
+          "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
           defaultClassNames.outside
         ),
         disabled: cn("text-muted-foreground opacity-50", defaultClassNames.disabled),
+        range_middle: cn(
+          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+          defaultClassNames.range_middle
+        ),
         hidden: cn("invisible", defaultClassNames.hidden),
         ...classNames,
       }}

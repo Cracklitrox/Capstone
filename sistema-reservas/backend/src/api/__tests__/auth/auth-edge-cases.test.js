@@ -28,7 +28,9 @@ describe('Auth Edge Cases', () => {
 
   afterAll(async () => {
     await testDb.cleanup();
-    await redisClient.disconnect();
+    if (redisClient.isOpen) {
+      await redisClient.disconnect();
+    }
   });
 
   describe('Auth Controller Error Handling', () => {

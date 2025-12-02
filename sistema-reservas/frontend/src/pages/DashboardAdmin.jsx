@@ -29,7 +29,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import useDashboardAdmin from '../hooks/useDashboardAdmin';
-import ReportFilters from '../components/ReportFilters';
+import ReportFilters from '@/components/reports/ReportFilters';
+import { Tooltip as UITooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/Tooltip';
 
 const DashboardAdmin = () => {
   // Estado para fechas (últimos 30 días por defecto - hasta AYER, no hoy)
@@ -113,7 +114,7 @@ const DashboardAdmin = () => {
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">{title}</p>
-            <p className="mt-2 text-2xl sm:text-3xl font-bold text-foreground">{value}</p>
+            <p className="mt-2 text-xl sm:text-2xl lg:text-3xl font-bold text-foreground break-words">{value}</p>
           </div>
           <div className={`${colorClasses[color]} p-3 sm:p-4 rounded-full flex-shrink-0 ml-2`}>
             <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
@@ -157,8 +158,8 @@ const DashboardAdmin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+    <div className="min-h-screen bg-background">
+      <div className="w-full space-y-4 sm:space-y-6">
         {/* ENCABEZADO */}
         <div className="bg-card rounded-lg shadow-md p-4 sm:p-6 border">
           <div className="flex flex-col gap-4">
@@ -485,8 +486,26 @@ const DashboardAdmin = () => {
                         {client.rank}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-foreground truncate">{client.fullName}</p>
-                        <p className="text-xs sm:text-sm text-muted-foreground truncate">{client.email}</p>
+                        <TooltipProvider>
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <p className="font-semibold text-foreground truncate cursor-help">{client.fullName}</p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{client.fullName}</p>
+                            </TooltipContent>
+                          </UITooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <p className="text-xs sm:text-sm text-muted-foreground truncate cursor-help">{client.email}</p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{client.email}</p>
+                            </TooltipContent>
+                          </UITooltip>
+                        </TooltipProvider>
                         <p className="text-xs text-muted-foreground mt-1">{client.reservationCount} reservas</p>
                       </div>
                     </div>

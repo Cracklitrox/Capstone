@@ -5,19 +5,19 @@
  * Este servicio debe iniciarse junto con el servidor Express.
  */
 
-const { Queue } = require('bullmq');
-const {
+import { Queue } from 'bullmq';
+import {
   connection,
   QUEUE_NAMES,
   SCHEDULER_IDS,
   CRON_PATTERNS,
   DEFAULT_JOB_OPTIONS,
-} = require('./config');
+} from './config.js';
 
 // Importar workers (esto los activa automáticamente)
-const readyForCheckinWorker = require('./workers/readyForCheckin.worker');
-const pendingCheckoutWorker = require('./workers/pendingCheckout.worker');
-const noShowWorker = require('./workers/noShow.worker');
+import readyForCheckinWorker from './workers/readyForCheckin.worker.js';
+import pendingCheckoutWorker from './workers/pendingCheckout.worker.js';
+import noShowWorker from './workers/noShow.worker.js';
 
 // Crear queues
 const queues = {
@@ -30,7 +30,6 @@ const queues = {
  * Inicializa todos los schedulers con sus cron patterns
  */
 async function initializeSchedulers() {
-  console.log('\n🚀 Initializing BullMQ Schedulers...\n');
 
   try {
     // Scheduler 1: Ready for Check-in (11:00 AM diario)
@@ -45,7 +44,6 @@ async function initializeSchedulers() {
         opts: DEFAULT_JOB_OPTIONS,
       }
     );
-    console.log(`✅ Scheduler configured: Ready for Check-in (${CRON_PATTERNS.READY_FOR_CHECKIN})`);
 
     // Scheduler 2: Pending Checkout (09:00 AM diario)
     await queues.pendingCheckout.upsertJobScheduler(
@@ -59,7 +57,6 @@ async function initializeSchedulers() {
         opts: DEFAULT_JOB_OPTIONS,
       }
     );
-    console.log(`✅ Scheduler configured: Pending Checkout (${CRON_PATTERNS.PENDING_CHECKOUT})`);
 
     // Scheduler 3: No-Show (17:00 diario)
     await queues.noShow.upsertJobScheduler(
@@ -73,11 +70,8 @@ async function initializeSchedulers() {
         opts: DEFAULT_JOB_OPTIONS,
       }
     );
-    console.log(`✅ Scheduler configured: No-Show (${CRON_PATTERNS.NO_SHOW})`);
 
-    console.log('\n✨ All schedulers initialized successfully\n');
   } catch (error) {
-    console.error('❌ Error initializing schedulers:', error);
     throw error;
   }
 }
@@ -86,7 +80,6 @@ async function initializeSchedulers() {
  * Detiene todos los workers y cierra conexiones
  */
 async function shutdown() {
-  console.log('\n🛑 Shutting down schedulers...');
 
   try {
     // Cerrar workers
@@ -102,9 +95,7 @@ async function shutdown() {
     // Cerrar conexión Redis
     await connection.quit();
 
-    console.log('✅ Schedulers shut down successfully');
   } catch (error) {
-    console.error('❌ Error during shutdown:', error);
     throw error;
   }
 }
@@ -114,7 +105,6 @@ async function shutdown() {
  * @param {string} jobType - 'ready_for_checkin' | 'pending_checkout' | 'no_show'
  */
 async function triggerManualJob(jobType) {
-  console.log(`\n🔧 Manually triggering job: ${jobType}`);
 
   try {
     let queue;
@@ -142,10 +132,8 @@ async function triggerManualJob(jobType) {
       manual: true,
     });
 
-    console.log(`✅ Job ${job.id} triggered successfully`);
     return job;
   } catch (error) {
-    console.error('❌ Error triggering manual job:', error);
     throw error;
   }
 }
@@ -175,20 +163,27 @@ async function getSchedulersInfo() {
 
     return info;
   } catch (error) {
-    console.error('❌ Error getting schedulers info:', error);
     throw error;
   }
 }
 
-module.exports = {
+export default {
   initializeSchedulers,
   shutdown,
   triggerManualJob,
   getSchedulersInfo,
-  queues, // Exportar queues para uso externo si es necesario
+  queues,
   workers: {
     readyForCheckinWorker,
     pendingCheckoutWorker,
     noShowWorker,
   },
+};
+
+export {
+  initializeSchedulers,
+  shutdown,
+  triggerManualJob,
+  getSchedulersInfo,
+  queues,
 };

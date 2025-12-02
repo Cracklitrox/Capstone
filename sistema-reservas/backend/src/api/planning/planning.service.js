@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Calcula estadísticas de ocupación para un periodo específico
@@ -175,6 +174,6 @@ async function getTapeChartData(startDate, endDate) {
   };
 }
 
-module.exports = {
+export default {
   getTapeChartData,
 };

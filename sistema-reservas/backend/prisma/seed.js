@@ -1,5 +1,5 @@
-const { PrismaClient } = require("@prisma/client");
-const bcrypt = require("bcryptjs");
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 async function getFaker() {
   const { faker } = await import("@faker-js/faker/locale/es");
@@ -932,6 +932,7 @@ async function createLoginHistory(faker, users) {
   console.log("✅ Historial de logins creado");
 }
 
+/*
 async function createUserPreferences(faker, users) {
   console.log("⚙️  Creando preferencias de usuarios...");
 
@@ -952,6 +953,7 @@ async function createUserPreferences(faker, users) {
 
   console.log("✅ Preferencias de usuarios creadas");
 }
+*/
 
 async function createComplexScenarios(
   faker,
@@ -1946,9 +1948,6 @@ async function main() {
   // Crear LoginHistory para todos los usuarios
   await createLoginHistory(faker, allUsers);
 
-  // Crear preferencias para todos los usuarios
-  await createUserPreferences(faker, allUsers);
-
   // Crear reservas y escenarios complejos
   await createComplexScenarios(faker, {
     completeGuests: guests.completeGuests,
@@ -2009,4 +2008,4 @@ async function main() {
   console.log("   Recepcionista: juan.recepcionista@hotel.com / password123");
 }
 
-module.exports = { main };
+export { main };

@@ -1,5 +1,5 @@
-const planningService = require("./planning.service");
-const { logError } = require("../../utils/errorLogger");
+import planningService from "./planning.service.js";
+import { logError } from "../../utils/errorLogger.js";
 
 async function getTapeChart(req, res) {
   try {
@@ -23,7 +23,6 @@ async function getTapeChart(req, res) {
     const data = await planningService.getTapeChartData(start, end);
     res.status(200).json(data);
   } catch (error) {
-    console.error("Error al obtener datos del tape chart:", error);
 
     await logError({
       userId: req.user?.id,
@@ -41,6 +40,6 @@ async function getTapeChart(req, res) {
   }
 }
 
-module.exports = {
+export default {
   getTapeChart,
 };

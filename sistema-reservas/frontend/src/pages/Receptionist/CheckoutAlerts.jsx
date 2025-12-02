@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { fetchCheckoutAlerts, fetchPastCheckouts, fetchFutureCheckouts } from '../../services/notifications';
-import CheckoutAlertCardImproved from '../../components/CheckoutAlertCard';
+import CheckoutAlertCardImproved from '@/components/notifications/CheckoutAlertCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
-import { Badge } from '../../components/ui/badge';
+import { Badge } from '../../components/ui/Badge';
 import { CalendarClock, History, CalendarDays, Loader2 } from 'lucide-react';
 
 export default function CheckoutAlertsImproved() {
@@ -28,7 +28,6 @@ export default function CheckoutAlertsImproved() {
       setTodayAlerts(response.data || []);
       setLastUpdate((prev) => ({ ...prev, today: new Date() }));
     } catch (err) {
-      console.error('Error al cargar alertas de hoy:', err);
       setError((prev) => ({ ...prev, today: err.message }));
     } finally {
       setLoading((prev) => ({ ...prev, today: false }));
@@ -47,7 +46,6 @@ export default function CheckoutAlertsImproved() {
       setPastCheckouts(response.data || []);
       setLastUpdate((prev) => ({ ...prev, past: new Date() }));
     } catch (err) {
-      console.error('Error al cargar checkouts pasados:', err);
       setError((prev) => ({ ...prev, past: err.message }));
     } finally {
       setLoading((prev) => ({ ...prev, past: false }));
@@ -66,7 +64,6 @@ export default function CheckoutAlertsImproved() {
       setFutureCheckouts(response.data || []);
       setLastUpdate((prev) => ({ ...prev, future: new Date() }));
     } catch (err) {
-      console.error('Error al cargar checkouts futuros:', err);
       setError((prev) => ({ ...prev, future: err.message }));
     } finally {
       setLoading((prev) => ({ ...prev, future: false }));
@@ -140,7 +137,7 @@ export default function CheckoutAlertsImproved() {
     }
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-4">
         {alerts.map((alert) => (
           <CheckoutAlertCardImproved key={alert.reservationId} alert={alert} variant={variant} />
         ))}

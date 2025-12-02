@@ -1,10 +1,9 @@
-const reservationsService = require("./reservations.service");
-const availabilityService = require("./availability.service");
-const pricingService = require("./pricing.service");
-const statusService = require("./status.service");
-const { logError } = require("../../utils/errorLogger");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+import reservationsService from './reservations.service.js';
+import availabilityService from './availability.service.js';
+import pricingService from './pricing.service.js';
+import statusService from './status.service.js';
+import { logError } from '../../utils/errorLogger.js';
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Obtener todas las reservas con filtros opcionales
@@ -173,7 +172,6 @@ async function getAllReservations(req, res) {
       total: transformedReservations.length,
     });
   } catch (error) {
-    console.error('Error al obtener reservas:', error);
 
     await logError({
       userId: req.user?.id,
@@ -343,18 +341,8 @@ async function getReservationById(req, res) {
       payments: transformedPayments,
     };
 
-    console.log('🔍 Backend getReservationById - Enviando response:', JSON.stringify({
-      reservationId: transformed.id,
-      main_guest: transformed.main_guest,
-      reservation_rooms_count: transformed.reservation_rooms?.length,
-      reservation_rooms: transformed.reservation_rooms,
-      reservation_guests_count: transformed.reservation_guests?.length,
-      payments_count: transformed.payments?.length,
-    }, null, 2));
-
     return res.status(200).json({ reservation: transformed });
   } catch (error) {
-    console.error('Error al obtener reserva:', error);
     await logError({
       userId: req.user?.id,
       userRole: req.user?.user_roles?.[0]?.roles?.name,
@@ -401,7 +389,6 @@ async function searchAvailability(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error("Error al buscar disponibilidad:", error);
 
     // NUEVO: Log de error
     await logError({
@@ -449,7 +436,6 @@ async function calculatePrice(req, res) {
 
     return res.status(200).json(pricing);
   } catch (error) {
-    console.error("Error al calcular precio:", error);
 
     await logError({
       userId: req.user?.id,
@@ -554,7 +540,6 @@ async function createReservation(req, res) {
       pricing: result.pricing,
     });
   } catch (error) {
-    console.error("Error al crear reserva:", error);
 
     // NUEVO: Log de error con severidad alta
     await logError({
@@ -591,7 +576,6 @@ async function getAvailableServices(req, res) {
 
     return res.status(200).json(services);
   } catch (error) {
-    console.error("Error al obtener servicios:", error);
 
     await logError({
       userId: req.user?.id,
@@ -635,7 +619,6 @@ async function getBreakfastMenu(req, res) {
 
     return res.status(200).json(groupedMenu);
   } catch (error) {
-    console.error("Error al obtener menú de desayunos:", error);
 
     await logError({
       userId: req.user?.id,
@@ -689,7 +672,6 @@ async function changeStatus(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al cambiar estado:', error);
 
     await logError({
       userId: req.user?.id,
@@ -736,7 +718,6 @@ async function checkIn(req, res) {
     });
 
   } catch (error) {
-    console.error('Error en check-in:', error);
 
     await logError({
       userId: req.user?.id,
@@ -783,7 +764,6 @@ async function checkOut(req, res) {
     });
 
   } catch (error) {
-    console.error('Error en check-out:', error);
 
     await logError({
       userId: req.user?.id,
@@ -796,6 +776,354 @@ async function checkOut(req, res) {
 
     return res.status(400).json({
       message: error.message || 'Error al realizar check-out'
+    });
+  }
+}
+
+/**
+ * Obtener check-ins programados para hoy
+ * GET /api/v1/reservations/checkins-today
+ */
+async function getCheckinsToday(req, res) {
+  try {
+    // Obtener fecha actual en zona horaria de Chile (America/Santiago)
+    // Chile está en UTC-3, por lo que necesitamos ajustar
+    const now = new Date();
+    const offset = -3 * 60; // Chile = UTC-3
+    const chileTime = new Date(now.getTime() + offset * 60 * 1000);
+
+    // Obtener inicio del día en Chile (00:00:00)
+    const todayStart = new Date(Date.UTC(
+      chileTime.getUTCFullYear(),
+      chileTime.getUTCMonth(),
+      chileTime.getUTCDate(),
+      0, 0, 0, 0
+    ));
+
+    // Obtener fin del día en Chile (23:59:59)
+    const todayEnd = new Date(Date.UTC(
+      chileTime.getUTCFullYear(),
+      chileTime.getUTCMonth(),
+      chileTime.getUTCDate(),
+      23, 59, 59, 999
+    ));
+
+    const reservations = await prisma.reservations.findMany({
+      where: {
+        deleted_at: null,
+        status: 'ready_for_checkin',
+        check_in_date: {
+          gte: todayStart,
+          lte: todayEnd
+        }
+      },
+      orderBy: {
+        check_in_date: 'asc',
+      },
+      include: {
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true,
+            email: true,
+            phone_number: true,
+          },
+        },
+        users_reservations_receptionist_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            email: true,
+          },
+        },
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true,
+              },
+            },
+          },
+        },
+        reservation_guests: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+              },
+            },
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            payment_method: true,
+            status: true,
+            created_at: true,
+          },
+        },
+      },
+    });
+
+    // Transformar la respuesta
+    const transformedReservations = reservations.map((reservation) => {
+      const mainGuest = reservation.users_reservations_main_guest_idTousers;
+      const receptionist = reservation.users_reservations_receptionist_idTousers;
+
+      const transformedGuests = reservation.reservation_guests?.map(rg => ({
+        ...rg,
+        guests: rg.users ? {
+          ...rg.users,
+          last_name_father: rg.users.paternal_last_name,
+          last_name_mother: rg.users.maternal_last_name,
+          rut: rg.users.identification_number,
+        } : null,
+      })) || [];
+
+      const transformedRooms = reservation.reservation_rooms?.map(rr => {
+        const { room_types, ...roomWithoutDuplicates } = rr.rooms || {};
+        return {
+          ...rr,
+          rooms: rr.rooms ? {
+            ...roomWithoutDuplicates,
+            room_type: rr.rooms.room_types,
+          } : null,
+        };
+      }) || [];
+
+      const transformedPayments = reservation.payments?.map(({ payment_method, ...payment }) => ({
+        ...payment,
+        method: payment_method,
+      })) || [];
+
+      const {
+        users_reservations_main_guest_idTousers,
+        users_reservations_receptionist_idTousers,
+        ...reservationWithoutPrismaRelations
+      } = reservation;
+
+      return {
+        ...reservationWithoutPrismaRelations,
+        main_guest: mainGuest ? {
+          ...mainGuest,
+          last_name_father: mainGuest.paternal_last_name,
+          last_name_mother: mainGuest.maternal_last_name,
+          rut: mainGuest.identification_number,
+          phone: mainGuest.phone_number,
+        } : null,
+        receptionist: receptionist ? {
+          ...receptionist,
+          last_name_father: receptionist.paternal_last_name,
+          last_name_mother: receptionist.maternal_last_name,
+        } : null,
+        reservation_guests: transformedGuests,
+        reservation_rooms: transformedRooms,
+        payments: transformedPayments,
+      };
+    });
+
+    return res.status(200).json({
+      reservations: transformedReservations,
+      total: transformedReservations.length,
+      date: todayStart.toISOString().split('T')[0]
+    });
+  } catch (error) {
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener check-ins de hoy: ${error.message}`,
+      originModule: 'reservations.controller - getCheckinsToday',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: 'Error al obtener check-ins de hoy',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Obtener check-outs programados para hoy
+ * GET /api/v1/reservations/checkouts-today
+ */
+async function getCheckoutsToday(req, res) {
+  try {
+    // Obtener fecha actual en zona horaria de Chile (America/Santiago)
+    // Chile está en UTC-3, por lo que necesitamos ajustar
+    const now = new Date();
+    const offset = -3 * 60; // Chile = UTC-3
+    const chileTime = new Date(now.getTime() + offset * 60 * 1000);
+
+    // Obtener inicio del día en Chile (00:00:00)
+    const todayStart = new Date(Date.UTC(
+      chileTime.getUTCFullYear(),
+      chileTime.getUTCMonth(),
+      chileTime.getUTCDate(),
+      0, 0, 0, 0
+    ));
+
+    // Obtener fin del día en Chile (23:59:59)
+    const todayEnd = new Date(Date.UTC(
+      chileTime.getUTCFullYear(),
+      chileTime.getUTCMonth(),
+      chileTime.getUTCDate(),
+      23, 59, 59, 999
+    ));
+
+    const reservations = await prisma.reservations.findMany({
+      where: {
+        deleted_at: null,
+        status: 'pending_checkout',
+        check_out_date: {
+          gte: todayStart,
+          lte: todayEnd
+        }
+      },
+      orderBy: {
+        check_out_date: 'asc',
+      },
+      include: {
+        users_reservations_main_guest_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            identification_number: true,
+            email: true,
+            phone_number: true,
+          },
+        },
+        users_reservations_receptionist_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            paternal_last_name: true,
+            maternal_last_name: true,
+            email: true,
+          },
+        },
+        reservation_rooms: {
+          include: {
+            rooms: {
+              include: {
+                room_types: true,
+              },
+            },
+          },
+        },
+        reservation_guests: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                paternal_last_name: true,
+                maternal_last_name: true,
+                identification_number: true,
+              },
+            },
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            payment_method: true,
+            status: true,
+            created_at: true,
+          },
+        },
+      },
+    });
+
+    // Transformar la respuesta
+    const transformedReservations = reservations.map((reservation) => {
+      const mainGuest = reservation.users_reservations_main_guest_idTousers;
+      const receptionist = reservation.users_reservations_receptionist_idTousers;
+
+      const transformedGuests = reservation.reservation_guests?.map(rg => ({
+        ...rg,
+        guests: rg.users ? {
+          ...rg.users,
+          last_name_father: rg.users.paternal_last_name,
+          last_name_mother: rg.users.maternal_last_name,
+          rut: rg.users.identification_number,
+        } : null,
+      })) || [];
+
+      const transformedRooms = reservation.reservation_rooms?.map(rr => {
+        const { room_types, ...roomWithoutDuplicates } = rr.rooms || {};
+        return {
+          ...rr,
+          rooms: rr.rooms ? {
+            ...roomWithoutDuplicates,
+            room_type: rr.rooms.room_types,
+          } : null,
+        };
+      }) || [];
+
+      const transformedPayments = reservation.payments?.map(({ payment_method, ...payment }) => ({
+        ...payment,
+        method: payment_method,
+      })) || [];
+
+      const {
+        users_reservations_main_guest_idTousers,
+        users_reservations_receptionist_idTousers,
+        ...reservationWithoutPrismaRelations
+      } = reservation;
+
+      return {
+        ...reservationWithoutPrismaRelations,
+        main_guest: mainGuest ? {
+          ...mainGuest,
+          last_name_father: mainGuest.paternal_last_name,
+          last_name_mother: mainGuest.maternal_last_name,
+          rut: mainGuest.identification_number,
+          phone: mainGuest.phone_number,
+        } : null,
+        receptionist: receptionist ? {
+          ...receptionist,
+          last_name_father: receptionist.paternal_last_name,
+          last_name_mother: receptionist.maternal_last_name,
+        } : null,
+        reservation_guests: transformedGuests,
+        reservation_rooms: transformedRooms,
+        payments: transformedPayments,
+      };
+    });
+
+    return res.status(200).json({
+      reservations: transformedReservations,
+      total: transformedReservations.length,
+      date: todayStart.toISOString().split('T')[0]
+    });
+  } catch (error) {
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.user_roles?.[0]?.roles?.name,
+      description: `Error al obtener check-outs de hoy: ${error.message}`,
+      originModule: 'reservations.controller - getCheckoutsToday',
+      severity: 'medium',
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: 'Error al obtener check-outs de hoy',
+      error: error.message,
     });
   }
 }
@@ -815,7 +1143,6 @@ async function getHistory(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al obtener historial:', error);
 
     await logError({
       userId: req.user?.id,
@@ -858,7 +1185,6 @@ async function getValidTransitions(req, res) {
     });
 
   } catch (error) {
-    console.error('Error al obtener transiciones válidas:', error);
 
     return res.status(500).json({
       message: 'Error al obtener transiciones válidas'
@@ -866,7 +1192,7 @@ async function getValidTransitions(req, res) {
   }
 }
 
-module.exports = {
+export default {
   getAllReservations,
   getReservationById,
   searchAvailability,
@@ -879,5 +1205,8 @@ module.exports = {
   checkIn,
   checkOut,
   getHistory,
-  getValidTransitions
+  getValidTransitions,
+  // Nuevos endpoints optimizados
+  getCheckinsToday,
+  getCheckoutsToday
 };

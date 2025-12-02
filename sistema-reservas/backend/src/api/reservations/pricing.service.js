@@ -1,12 +1,11 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Obtener temporada activa para una fecha
  */
 async function getActiveSeason(date) {
   const targetDate = new Date(date);
-  
+
   const season = await prisma.seasons.findFirst({
     where: {
       is_active: true,
@@ -32,9 +31,9 @@ async function calculateRoomPrice(roomId, checkInDate, checkOutDate) {
   }
 
   const season = await getActiveSeason(checkInDate);
-  
+
   let pricePerNight = room.base_price;
-  
+
   if (season && season.price_modifier) {
     // price_modifier es un valor absoluto que se suma al precio base
     pricePerNight = room.base_price + Number(season.price_modifier);
@@ -145,7 +144,7 @@ async function calculateReservationTotal(roomIds, serviceData, checkInDate, chec
 
   // Calcular precio de servicios
   const nights = calculateNights(checkInDate, checkOutDate);
-  
+
   for (const serviceItem of serviceData) {
     const servicePrice = await calculateServicePrice(
       serviceItem.serviceId,
@@ -170,7 +169,7 @@ async function calculateReservationTotal(roomIds, serviceData, checkInDate, chec
   };
 }
 
-module.exports = {
+export default {
   getActiveSeason,
   calculateRoomPrice,
   calculateServicePrice,

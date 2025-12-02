@@ -4,22 +4,22 @@ import {
   fetchAdminRoomTypes,
 } from "../../services/adminRooms";
 import { useAuth } from "../../hooks/useAuth";
-import CreateRoom from "../../components/AdminRooms/CreateRoom";
-import EditRoom from "../../components/AdminRooms/EditRoom";
-import DeleteRoom from "../../components/AdminRooms/DeleteRoom";
-import DetailRoom from "../../components/AdminRooms/DetailRoom";
-import { Card, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { Badge } from "@/components/ui/Badge";
+import CreateRoom from "../../components/rooms/admin/AdminRooms/CreateRoom";
+import EditRoom from "../../components/rooms/admin/AdminRooms/EditRoom";
+import DeleteRoom from "../../components/rooms/admin/AdminRooms/DeleteRoom";
+import DetailRoom from "../../components/rooms/admin/AdminRooms/DetailRoom";
+import { Card, CardContent } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Label } from "../../components/ui/Label";
+import { Badge } from "../../components/ui/Badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
+} from "../../components/ui/Select";
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -57,8 +57,8 @@ const RoomsCrud = () => {
     setError(null);
     try {
       const [roomsData, typesData] = await Promise.all([
-        fetchAdminRooms(token),
-        fetchAdminRoomTypes(token),
+        fetchAdminRooms(),
+        fetchAdminRoomTypes(),
       ]);
       setRooms(roomsData);
       setRoomTypes(typesData);
@@ -100,12 +100,12 @@ const RoomsCrud = () => {
         filters;
 
       const searchMatch = searchNumber
-        ? String(room.room_number).includes(searchNumber)
+        ? String(room.number).includes(searchNumber)
         : true;
 
       const typeMatch =
         selectedType !== "Todos los tipos"
-          ? room.room_types?.name === selectedType
+          ? room.type === selectedType
           : true;
 
       const floorMatch =
@@ -332,11 +332,11 @@ const RoomsCrud = () => {
                         <div className="flex items-center gap-2">
                           <HomeIcon className="h-5 w-5 text-primary" />
                           <h3 className="text-2xl font-bold text-foreground">
-                            {room.room_number}
+                            {room.number}
                           </h3>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {room.room_types?.name || "Sin tipo"}
+                          {room.type || "Sin tipo"}
                         </p>
                       </div>
                       <Badge variant={variant}>
@@ -389,7 +389,7 @@ const RoomsCrud = () => {
                       <DeleteRoom
                         token={token}
                         roomId={room.id}
-                        roomNumber={room.room_number}
+                        roomNumber={room.number}
                         roomStatus={estadoEsp}
                         onDeleted={loadRoomsAndTypes}
                       />
@@ -443,7 +443,7 @@ const RoomsCrud = () => {
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         room={selectedRoom}
-        roomTypeName={selectedRoom?.room_types?.name}
+        roomTypeName={selectedRoom?.type}
       />
     </div>
   );

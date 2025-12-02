@@ -76,7 +76,6 @@ export const formatActivity = (activity) => {
         return 'Realizaste una acción en el sistema';
     }
   } catch (error) {
-    console.error('Error al formatear actividad:', error);
     return 'Acción registrada en el sistema';
   }
 };

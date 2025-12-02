@@ -1,142 +1,47 @@
-import axios from 'axios';
+import apiClient from '@/lib/apiClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
-
-/**
- * Obtener alertas de reservas de WhatsApp
- * @param {string} token - Token de autenticación
- * @param {boolean} onlyUnviewed - Si es true, solo devuelve alertas no vistas
- */
-export async function getWhatsAppBookingAlerts(token, onlyUnviewed = false) {
-  try {
-    const params = new URLSearchParams();
-    if (onlyUnviewed) {
-      params.append('onlyUnviewed', 'true');
-    }
-    
-    const url = `${API_URL}/whatsapp/booking-alerts${params.toString() ? `?${params.toString()}` : ''}`;
-    
-    const response = await axios.get(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error al obtener alertas de WhatsApp:', error);
-    throw error;
+export async function getWhatsAppBookingAlerts(onlyUnviewed = false) {
+  const params = new URLSearchParams();
+  if (onlyUnviewed) {
+    params.append('onlyUnviewed', 'true');
   }
+
+  const response = await apiClient.get(
+    `/whatsapp/booking-alerts${params.toString() ? `?${params.toString()}` : ''}`
+  );
+  return response.data;
 }
 
-/**
- * Marcar todas las alertas de WhatsApp pendientes como vistas
- */
-export async function markWhatsAppAlertsAsViewed(token) {
-  try {
-    const response = await axios.put(
-      `${API_URL}/whatsapp/mark-as-viewed`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error al marcar alertas como vistas:', error);
-    throw error;
-  }
+export async function markWhatsAppAlertsAsViewed() {
+  const response = await apiClient.put('/whatsapp/mark-as-viewed', {});
+  return response.data;
 }
 
-/**
- * Rechazar una solicitud de reserva de WhatsApp
- * @param {string} token - Token de autenticación
- * @param {number} alertId - ID de la alerta a rechazar
- * @param {string} reason - Razón del rechazo (opcional)
- */
-export async function rejectWhatsAppBookingAlert(token, alertId, reason = '') {
-  try {
-    const response = await axios.put(
-      `${API_URL}/whatsapp/booking-alerts/${alertId}/reject`,
-      { reason },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error al rechazar solicitud de WhatsApp:', error);
-    throw error;
-  }
+export async function rejectWhatsAppBookingAlert(alertId, reason = '') {
+  const response = await apiClient.put(
+    `/whatsapp/booking-alerts/${alertId}/reject`,
+    { reason }
+  );
+  return response.data;
 }
 
-/**
- * Confirmar una solicitud de reserva de WhatsApp
- * @param {string} token - Token de autenticación
- * @param {number} alertId - ID de la alerta a confirmar
- */
-export async function confirmWhatsAppBookingAlert(token, alertId) {
-  try {
-    const response = await axios.put(
-      `${API_URL}/whatsapp/booking-alerts/${alertId}/confirm`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error al confirmar solicitud de WhatsApp:', error);
-    throw error;
-  }
+export async function confirmWhatsAppBookingAlert(alertId) {
+  const response = await apiClient.put(
+    `/whatsapp/booking-alerts/${alertId}/confirm`,
+    {}
+  );
+  return response.data;
 }
 
-/**
- * Eliminar una alerta de WhatsApp confirmada o rechazada
- * @param {string} token - Token de autenticación
- * @param {number} alertId - ID de la alerta a eliminar
- */
-export async function deleteWhatsAppBookingAlert(token, alertId) {
-  try {
-    const response = await axios.delete(
-      `${API_URL}/whatsapp/booking-alerts/${alertId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error al eliminar alerta de WhatsApp:', error);
-    throw error;
-  }
+export async function deleteWhatsAppBookingAlert(alertId) {
+  const response = await apiClient.delete(`/whatsapp/booking-alerts/${alertId}`);
+  return response.data;
 }
 
-/**
- * Eliminar múltiples alertas de WhatsApp confirmadas o rechazadas
- * @param {string} token - Token de autenticación
- * @param {number[]} alertIds - Array de IDs de las alertas a eliminar
- */
-export async function deleteMultipleWhatsAppBookingAlerts(token, alertIds) {
-  try {
-    const response = await axios.post(
-      `${API_URL}/whatsapp/booking-alerts/bulk-delete`,
-      { alertIds },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error al eliminar múltiples alertas de WhatsApp:', error);
-    throw error;
-  }
+export async function deleteMultipleWhatsAppBookingAlerts(alertIds) {
+  const response = await apiClient.post(
+    '/whatsapp/booking-alerts/bulk-delete',
+    { alertIds }
+  );
+  return response.data;
 }

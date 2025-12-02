@@ -1,5 +1,5 @@
-const express = require('express');
-const historyController = require('./reservation_history.controller');
+import express from 'express';
+import historyController from './reservation_history.controller.js';
 
 const router = express.Router();
 
@@ -12,4 +12,4 @@ router.get('/:id', historyController.getHistoryDetailById);
 // para actualizar la observación
 router.put('/:id/observation', historyController.updateObservation);
 
-module.exports = router;
+export default router;

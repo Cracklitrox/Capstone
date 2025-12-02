@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
-import Layout from '../../components/Layout.jsx';
-import { AuthProvider } from '../../services/authContext.jsx';
+import Layout from '../../components/layout/Layout.jsx';
+import { AuthProvider } from '../../contexts/AuthProvider.jsx';
 import { mockUsers, mockTokens, cleanupMocks } from '../utils/testUtils.jsx';
 import { localStorageMock } from '../setup/mocks.js';
 
@@ -71,7 +71,7 @@ describe('Layout Component', () => {
       await waitFor(() => {
         const main = screen.getByRole('main');
         expect(main).toHaveClass('flex-1', 'overflow-y-auto');
-        
+
         // Verificar el contenedor interno
         const container = main.querySelector('.max-w-7xl');
         expect(container).toHaveClass('max-w-7xl', 'mx-auto');
@@ -96,7 +96,7 @@ describe('Layout Component', () => {
       await waitFor(() => {
         const menuButton = screen.getByTestId('menu-icon').closest('button');
         fireEvent.click(menuButton);
-        
+
         const sidebar = screen.getByTestId('sidebar-component');
         expect(sidebar).toHaveClass('translate-x-0');
       });
@@ -109,14 +109,14 @@ describe('Layout Component', () => {
         // Primero abrir el sidebar
         const menuButton = screen.getByTestId('menu-icon').closest('button');
         fireEvent.click(menuButton);
-        
+
         const sidebar = screen.getByTestId('sidebar-component');
         expect(sidebar).toHaveClass('translate-x-0');
-        
+
         // Luego hacer clic en el overlay para cerrarlo
         const overlay = screen.getByTestId('sidebar-overlay');
         fireEvent.click(overlay);
-        
+
         expect(sidebar).toHaveClass('-translate-x-full');
       });
     });
@@ -128,11 +128,11 @@ describe('Layout Component', () => {
         // Abrir sidebar
         const menuButton = screen.getByTestId('menu-icon').closest('button');
         fireEvent.click(menuButton);
-        
+
         // Hacer clic en un link del sidebar
         const navLink = screen.getByText('Inicio').closest('a');
         fireEvent.click(navLink);
-        
+
         // El sidebar debería cerrarse
         const sidebar = screen.getByTestId('sidebar-component');
         expect(sidebar).toHaveClass('-translate-x-full');
@@ -189,7 +189,7 @@ describe('Layout Component', () => {
         // Verificar que solo se muestran las opciones disponibles para recepcionista
         expect(screen.getByText('Gestionar Reservas')).toBeInTheDocument();
         expect(screen.getByText('Inicio')).toBeInTheDocument();
-        
+
         // Verificar que NO se muestran opciones de admin
         expect(screen.queryByText('Gestionar Usuarios')).not.toBeInTheDocument();
         expect(screen.queryByText('Configuración')).not.toBeInTheDocument();
@@ -214,10 +214,10 @@ describe('Layout Component', () => {
       await waitFor(() => {
         const reservasLink = screen.getByText('Gestionar Reservas');
         expect(reservasLink.closest('a')).toHaveAttribute('href', '/reservations');
-        
+
         const usuariosLink = screen.getByText('Gestionar Usuarios');
         expect(usuariosLink.closest('a')).toHaveAttribute('href', '/users');
-        
+
         const configuracionLink = screen.getByText('Configuración');
         expect(configuracionLink.closest('a')).toHaveAttribute('href', '/settings');
       });
@@ -226,7 +226,7 @@ describe('Layout Component', () => {
     it('debe resaltar la ruta activa', async () => {
       // Mock de useLocation para simular una ruta específica
       const mockLocation = { pathname: '/reservations' };
-      
+
       vi.doMock('react-router-dom', async () => {
         const actual = await vi.importActual('react-router-dom');
         return {
@@ -294,7 +294,7 @@ describe('Layout Component', () => {
       await waitFor(() => {
         const menuButton = screen.getByTestId('menu-icon').closest('button');
         const logoutButton = screen.getByTestId('logout-icon').closest('button');
-        
+
         expect(menuButton).not.toHaveAttribute('tabindex', '-1');
         expect(logoutButton).not.toHaveAttribute('tabindex', '-1');
       });
@@ -306,7 +306,7 @@ describe('Layout Component', () => {
       await waitFor(() => {
         const themeSwitch = screen.getByRole('switch');
         expect(themeSwitch).toHaveAttribute('id', 'theme-switch');
-        
+
         const label = screen.getByLabelText(/cambiar tema/i);
         expect(label).toBeInTheDocument();
       });
@@ -348,18 +348,18 @@ describe('Layout Component', () => {
       await waitFor(() => {
         const menuButton = screen.getByTestId('menu-icon').closest('button');
         const sidebar = screen.getByTestId('sidebar-component');
-        
+
         // Estado inicial: cerrado
         expect(sidebar).toHaveClass('-translate-x-full');
-        
+
         // Abrir
         fireEvent.click(menuButton);
         expect(sidebar).toHaveClass('translate-x-0');
-        
+
         // Cerrar
         fireEvent.click(menuButton);
         expect(sidebar).toHaveClass('-translate-x-full');
-        
+
         // Abrir de nuevo
         fireEvent.click(menuButton);
         expect(sidebar).toHaveClass('translate-x-0');
@@ -372,7 +372,7 @@ describe('Layout Component', () => {
       await waitFor(() => {
         const menuButton = screen.getByTestId('menu-icon').closest('button');
         fireEvent.click(menuButton);
-        
+
         const sidebar = screen.getByTestId('sidebar-component');
         expect(sidebar).toHaveClass('translate-x-0');
       });

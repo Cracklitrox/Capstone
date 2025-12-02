@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Label } from '@/components/ui/Label';
-import { Textarea } from '@/components/ui/Textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
+import { Button } from '../../components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Label } from '../../components/ui/Label';
+import { Textarea } from '../../components/ui/Textarea';
 import {
   Sparkles,
   Wrench,
-  Clock,
   CheckCircle2,
   AlertCircle,
   Calendar,
   User,
   ClipboardCheck,
   Send,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,14 +24,12 @@ import { toast } from 'sonner';
  * - Listas para Limpieza (después de checkout)
  * - En Limpieza
  * - En Mantenimiento
- * - Reservadas (Esperando Check-in)
  */
 const RoomsPending = () => {
   const [activeTab, setActiveTab] = useState('ready');
   const [readyForCleaningRooms, setReadyForCleaningRooms] = useState([]);
   const [cleaningRooms, setCleaningRooms] = useState([]);
   const [maintenanceRooms, setMaintenanceRooms] = useState([]);
-  const [pendingRooms, setPendingRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [editingObservations, setEditingObservations] = useState({});
 
@@ -48,7 +46,6 @@ const RoomsPending = () => {
       const data = await response.json();
       setReadyForCleaningRooms(data.rooms || []);
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cargar habitaciones listas para limpieza');
     }
   };
@@ -66,7 +63,6 @@ const RoomsPending = () => {
       const data = await response.json();
       setCleaningRooms(data.rooms || []);
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cargar habitaciones en limpieza');
     }
   };
@@ -85,27 +81,7 @@ const RoomsPending = () => {
       const maintenance = data.filter((room) => room.status === 'maintenance');
       setMaintenanceRooms(maintenance);
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cargar habitaciones en mantenimiento');
-    }
-  };
-
-  // Fetch habitaciones pendientes (reservadas)
-  const fetchPendingRooms = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/v1/rooms', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) throw new Error('Error al obtener habitaciones');
-
-      const data = await response.json();
-      const pending = data.filter((room) => room.status === 'pending');
-      setPendingRooms(pending);
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar habitaciones pendientes');
     }
   };
 
@@ -141,7 +117,6 @@ const RoomsPending = () => {
       // Recargar datos
       fetchCleaningRooms();
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al completar limpieza', {
         description: error.message,
       });
@@ -174,15 +149,13 @@ const RoomsPending = () => {
       }
 
       toast.success('Estado actualizado', {
-        description: `Habitación ${roomNumber} ahora está ${
-          newStatus === 'available' ? 'disponible' : newStatus
-        }`,
+        description: `Habitación ${roomNumber} ahora está ${newStatus === 'available' ? 'disponible' : newStatus
+          }`,
       });
 
       // Recargar datos
       fetchCleaningRooms();
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cambiar estado', {
         description: error.message,
       });
@@ -223,7 +196,6 @@ const RoomsPending = () => {
       setEditingObservations((prev) => ({ ...prev, [roomId]: false }));
       fetchCleaningRooms();
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al actualizar observaciones');
     }
   };
@@ -260,7 +232,6 @@ const RoomsPending = () => {
       fetchReadyForCleaningRooms();
       fetchCleaningRooms();
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al iniciar limpieza', {
         description: error.message,
       });
@@ -292,14 +263,12 @@ const RoomsPending = () => {
     fetchReadyForCleaningRooms();
     fetchCleaningRooms();
     fetchMaintenanceRooms();
-    fetchPendingRooms();
 
     // Auto-refresh cada 2 minutos
     const interval = setInterval(() => {
       if (activeTab === 'ready') fetchReadyForCleaningRooms();
       if (activeTab === 'cleaning') fetchCleaningRooms();
       if (activeTab === 'maintenance') fetchMaintenanceRooms();
-      if (activeTab === 'pending') fetchPendingRooms();
     }, 120000);
 
     return () => clearInterval(interval);
@@ -315,7 +284,7 @@ const RoomsPending = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="ready" className="flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4" />
             <span>Listas para Limpieza ({readyForCleaningRooms.length})</span>
@@ -327,10 +296,6 @@ const RoomsPending = () => {
           <TabsTrigger value="maintenance" className="flex items-center gap-2">
             <Wrench className="w-4 h-4" />
             <span>En Mantenimiento ({maintenanceRooms.length})</span>
-          </TabsTrigger>
-          <TabsTrigger value="pending" className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            <span>Reservadas ({pendingRooms.length})</span>
           </TabsTrigger>
         </TabsList>
 
@@ -589,65 +554,6 @@ const RoomsPending = () => {
           )}
         </TabsContent>
 
-        {/* TAB 3: Reservadas (Esperando Check-in) */}
-        <TabsContent value="pending" className="mt-6">
-          {pendingRooms.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No hay habitaciones reservadas</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pendingRooms.map((room) => (
-                <Card key={room.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Habitación {room.number}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {room.type} • Piso {room.floor}
-                    </p>
-                  </CardHeader>
-
-                  <CardContent className="space-y-3">
-                    {room.reservation ? (
-                      <>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm">
-                            <User className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {room.reservation.guest?.first_name}{' '}
-                              {room.reservation.guest?.paternal_last_name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="w-4 h-4" />
-                            <span>
-                              Check-in:{' '}
-                              {new Date(
-                                room.reservation.check_in_date
-                              ).toLocaleDateString('es-CL')}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-sm text-blue-800">
-                            Esperando check-in del huésped
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Sin información de reserva
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
       </Tabs>
     </div>
   );

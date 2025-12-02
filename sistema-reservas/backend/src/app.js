@@ -1,7 +1,8 @@
-const express = require('express');
-const helmet = require('helmet');
-const cors = require('cors');
-const apiRoutes = require('./api/routes');
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import apiRoutes from './api/routes.js';
+import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
 
@@ -35,4 +36,14 @@ app.get('/test', (req, res) => {
 
 app.use('/api/v1', apiRoutes);
 
-module.exports = app;
+// Manejo de rutas no encontradas (404)
+app.use((req, res, next) => {
+  const error = new Error(`Ruta no encontrada: ${req.originalUrl}`);
+  error.statusCode = 404;
+  next(error);
+});
+
+// Middleware de manejo de errores global
+app.use(errorHandler);
+
+export default app;

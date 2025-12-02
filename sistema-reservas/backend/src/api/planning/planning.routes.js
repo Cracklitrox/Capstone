@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const planningController = require('./planning.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
+import planningController from './planning.controller.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
 // Protegida para que solo personal autorizado pueda verla.
 router.get(
@@ -11,4 +11,4 @@ router.get(
   planningController.getTapeChart
 );
 
-module.exports = router;
+export default router;

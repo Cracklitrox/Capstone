@@ -5,7 +5,7 @@
  * Solo accesible para administradores.
  */
 
-const { triggerManualJob, getSchedulersInfo } = require('../../scheduler');
+import { triggerManualJob, getSchedulersInfo } from '../../scheduler/index.js';
 
 /**
  * Ejecutar manualmente un job específico
@@ -39,7 +39,6 @@ async function triggerJob(req, res) {
       jobData: job.data,
     });
   } catch (error) {
-    console.error('Error triggering manual job:', error);
     res.status(500).json({
       error: 'Error al ejecutar el job manualmente',
       details: error.message,
@@ -64,7 +63,6 @@ async function getInfo(req, res) {
       },
     });
   } catch (error) {
-    console.error('Error getting schedulers info:', error);
     res.status(500).json({
       error: 'Error al obtener información de schedulers',
       details: error.message,
@@ -72,7 +70,7 @@ async function getInfo(req, res) {
   }
 }
 
-module.exports = {
+export default {
   triggerJob,
   getInfo,
 };

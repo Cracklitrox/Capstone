@@ -50,10 +50,10 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
 
     // Crear usuarios
     const adminPassword = await bcrypt.hash('adminpass', 10);
+    const adminRut = `${testId.slice(-7).padStart(8, '1')}`;
     adminUser = await prisma.users.create({
       data: {
-        rut: `${testId.slice(-7).padStart(8, '1')}`,
-        rut_dv: '1',
+        identification_number: `${adminRut}-1`,
         first_name: 'Admin',
         paternal_last_name: 'User',
         email: `staff.admin.${testId}@test.com`,
@@ -67,10 +67,10 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
     });
 
     const recepPassword = await bcrypt.hash('receppass', 10);
+    const recepRut = `${testId.slice(-7).padStart(8, '2')}`;
     receptionistUser = await prisma.users.create({
       data: {
-        rut: `${testId.slice(-7).padStart(8, '2')}`,
-        rut_dv: '2',
+        identification_number: `${recepRut}-2`,
         first_name: 'Recep',
         paternal_last_name: 'User',
         email: `staff.recep.${testId}@test.com`,
@@ -122,7 +122,9 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
     });
 
     await prisma.$disconnect();
-    await redisClient.disconnect();
+    if (redisClient.isOpen) {
+      await redisClient.disconnect();
+    }
   });
 
   describe('Middleware de Autenticación y Autorización', () => {
@@ -160,24 +162,24 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
 
     it('POST / - debería crear un nuevo miembro del personal (Happy Path)', async () => {
       const uniqueId = Date.now() + 100;
+      const newRut = `${uniqueId.toString().slice(-8)}`;
       const newStaff = {
-        rut: `${uniqueId.toString().slice(-8)}`,
-        rut_dv: '3',
+        identification_number: `${newRut}-3`,
         first_name: 'Nuevo',
         paternal_last_name: 'Staff',
         email: `nuevo.staff.${uniqueId}@test.com`,
         password_hash: 'newpassword'
       };
-      
+
       const response = await request(app)
         .post('/api/v1/staff')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(newStaff);
-      
+
       expect(response.statusCode).toBe(201);
       expect(response.body.email).toBe(newStaff.email);
       expect(response.body.id).toBeDefined();
-      
+
       // Guardar ID para limpieza posterior
       createdUserId = response.body.id;
     });
@@ -186,10 +188,10 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
       const uniqueId = Date.now() + 200;
       
       // Crear usuario existente
+      const existingRut = `${uniqueId.toString().slice(-8)}`;
       await prisma.users.create({
         data: {
-          rut: `${uniqueId.toString().slice(-8)}`,
-          rut_dv: '5',
+          identification_number: `${existingRut}-5`,
           first_name: 'Existing',
           paternal_last_name: 'User',
           email: `existing.staff.${uniqueId}@test.com`,
@@ -199,9 +201,9 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
       });
 
       // Intentar crear duplicado
+      const dupRut = `${(uniqueId + 1).toString().slice(-8)}`;
       const duplicateStaff = {
-        rut: `${(uniqueId + 1).toString().slice(-8)}`,
-        rut_dv: '4',
+        identification_number: `${dupRut}-4`,
         first_name: 'Duplicado',
         paternal_last_name: 'Staff',
         email: `existing.staff.${uniqueId}@test.com`,
@@ -224,8 +226,7 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
       // Crear usuario con RUT existente
       await prisma.users.create({
         data: {
-          rut: existingRut,
-          rut_dv: '6',
+          identification_number: `${existingRut}-6`,
           first_name: 'Existing',
           paternal_last_name: 'RUT',
           email: `existing.rut.${uniqueId}@test.com`,
@@ -236,8 +237,7 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
 
       // Intentar crear con RUT duplicado
       const duplicateRutStaff = {
-        rut: existingRut, // RUT duplicado
-        rut_dv: '6',
+        identification_number: `${existingRut}-6`, // RUT duplicado
         first_name: 'Duplicado',
         paternal_last_name: 'RUT',
         email: `new.email.${uniqueId}@test.com`,
@@ -284,10 +284,10 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
     it('PUT /:id - debería actualizar un miembro del personal', async () => {
       // Crear un usuario para actualizar
       const uniqueId = Date.now() + 400;
+      const updateRut = `${uniqueId.toString().slice(-8)}`;
       const userToUpdate = await prisma.users.create({
         data: {
-          rut: `${uniqueId.toString().slice(-8)}`,
-          rut_dv: '7',
+          identification_number: `${updateRut}-7`,
           first_name: 'Para',
           paternal_last_name: 'Actualizar',
           email: `para.actualizar.${uniqueId}@test.com`,
@@ -345,10 +345,10 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
       const uniqueId = Date.now() + 500;
       
       // Crear dos usuarios
+      const rut1 = `${uniqueId.toString().slice(-8)}`;
       const user1 = await prisma.users.create({
         data: {
-          rut: `${uniqueId.toString().slice(-8)}`,
-          rut_dv: '8',
+          identification_number: `${rut1}-8`,
           first_name: 'Usuario',
           paternal_last_name: 'Uno',
           email: `usuario.uno.${uniqueId}@test.com`,
@@ -357,10 +357,10 @@ describe('Staff & Middleware Endpoints - /api/v1/staff', () => {
         }
       });
 
+      const rut2 = `${(uniqueId + 1).toString().slice(-8)}`;
       const user2 = await prisma.users.create({
         data: {
-          rut: `${(uniqueId + 1).toString().slice(-8)}`,
-          rut_dv: '9',
+          identification_number: `${rut2}-9`,
           first_name: 'Usuario',
           paternal_last_name: 'Dos',
           email: `usuario.dos.${uniqueId}@test.com`,

@@ -1,6 +1,7 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-const { calculateReservationTotal } = require('./pricing.service');
+import prisma from '../../db/prisma.client.js';
+import pricingService from './pricing.service.js';
+
+const { calculateReservationTotal } = pricingService;
 
 /**
  * Generar código único de reserva
@@ -27,7 +28,6 @@ async function createActivityLog(userId, userRole, actionType, affectedTable, re
       },
     });
   } catch (error) {
-    console.error('Error al crear log de actividad:', error);
   }
 }
 
@@ -76,7 +76,7 @@ async function createReservation(reservationData, receptionistId, receptionistRo
   });
 
   const totalCapacity = roomsCapacity.reduce((sum, r) => sum + r.capacity, 0);
-  
+
   if (totalCapacity < guestCount) {
     throw new Error(`La capacidad total (${totalCapacity}) es menor que el número de huéspedes (${guestCount})`);
   }
@@ -315,6 +315,6 @@ async function createReservation(reservationData, receptionistId, receptionistRo
   };
 }
 
-module.exports = {
+export default {
   createReservation,
 };

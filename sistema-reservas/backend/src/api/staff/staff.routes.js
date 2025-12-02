@@ -1,8 +1,8 @@
-const express = require('express');
-const staffController = require('./staff.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
+import express from 'express';
+import * as staffController from './staff.controller.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
-const RateLimit = require('express-rate-limit');
+import RateLimit from 'express-rate-limit';
 const router = express.Router();
 
 const limiter = RateLimit({
@@ -26,4 +26,4 @@ router.get('/', authenticate, authorize(['administrator']), staffController.list
 router.get('/:id', authenticate, authorize(['administrator']), staffController.getUserDetails);
 router.put('/:id', authenticate, authorize(['administrator']), staffController.updateUserInfo);
 
-module.exports = router;
+export default router;

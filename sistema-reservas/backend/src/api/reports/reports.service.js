@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 // ============================================
 // UTILIDADES Y HELPERS
@@ -11,10 +10,10 @@ const prisma = new PrismaClient();
 function normalizeDateRange(startDate, endDate) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
-  
+
   return { start, end };
 }
 
@@ -63,22 +62,22 @@ function formatPeriodLabel(date, groupBy) {
         const [yearStr, weekStr] = date.split('-W');
         const year = parseInt(yearStr);
         const week = parseInt(weekStr);
-        
+
         // Calcular el inicio de la semana (lunes)
         const jan4 = new Date(year, 0, 4);
         const daysSinceMonday = (jan4.getDay() + 6) % 7;
         const firstMonday = new Date(year, 0, 4 - daysSinceMonday);
         const startOfWeek = new Date(firstMonday);
         startOfWeek.setDate(firstMonday.getDate() + (week - 1) * 7);
-        
+
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 6);
-        
+
         const startDay = startOfWeek.getDate();
         const startMonth = months[startOfWeek.getMonth()];
         const endDay = endOfWeek.getDate();
         const endMonth = months[endOfWeek.getMonth()];
-        
+
         // Si están en el mismo mes, mostrar rango corto
         if (startOfWeek.getMonth() === endOfWeek.getMonth()) {
           return `${startDay}-${endDay} ${startMonth}`;
@@ -165,7 +164,7 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
   // Normalizar fechas para incluir todo el día
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
@@ -222,7 +221,7 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
       const rrEnd = new Date(rr.end_date);
       const checkIn = new Date(Math.max(rrStart, start));
       const checkOut = new Date(Math.min(rrEnd, end));
-      
+
       if (checkOut > checkIn) {
         const nights = getDaysBetween(checkIn, checkOut);
         totalRoomNights += nights;
@@ -235,16 +234,16 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
   const totalAvailableRoomNights = totalRooms * totalDays;
 
   // Calcular métricas
-  const occupancyRate = totalAvailableRoomNights > 0 
-    ? (totalRoomNights / totalAvailableRoomNights) * 100 
+  const occupancyRate = totalAvailableRoomNights > 0
+    ? (totalRoomNights / totalAvailableRoomNights) * 100
     : 0;
-  
-  const revPAR = totalAvailableRoomNights > 0 
-    ? totalRevenue / totalAvailableRoomNights 
+
+  const revPAR = totalAvailableRoomNights > 0
+    ? totalRevenue / totalAvailableRoomNights
     : 0;
-  
-  const adr = totalRoomNights > 0 
-    ? totalRevenue / totalRoomNights 
+
+  const adr = totalRoomNights > 0
+    ? totalRevenue / totalRoomNights
     : 0;
 
   // Contar clientes únicos
@@ -253,7 +252,7 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
 
   // Identificar clientes nuevos (primera reserva en el período) - OPTIMIZADO: evitar N+1
   const clientIds = Array.from(uniqueClients);
-  
+
   // Obtener TODAS las primeras reservas en una sola consulta
   const firstReservations = await prisma.reservations.groupBy({
     by: ['main_guest_id'],
@@ -265,7 +264,7 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
       created_at: true
     }
   });
-  
+
   // Contar cuántos clientes tuvieron su primera reserva en el período
   const newClientsCount = firstReservations.filter(fr => {
     const firstDate = fr._min.created_at;
@@ -282,8 +281,8 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
   });
 
   const totalScheduledReservations = totalReservations + cancelledReservations;
-  const cancellationRate = totalScheduledReservations > 0 
-    ? (cancelledReservations / totalScheduledReservations) * 100 
+  const cancellationRate = totalScheduledReservations > 0
+    ? (cancelledReservations / totalScheduledReservations) * 100
     : 0;
 
   // Calcular tasa de no-show
@@ -295,8 +294,8 @@ async function calculateKPIs(startDate, endDate, compareWithPrevious = true) {
     }
   });
 
-  const noShowRate = totalScheduledReservations > 0 
-    ? (noShowReservations / totalScheduledReservations) * 100 
+  const noShowRate = totalScheduledReservations > 0
+    ? (noShowReservations / totalScheduledReservations) * 100
     : 0;
 
   // Calcular duración promedio de estadía
@@ -380,7 +379,7 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
   // Normalizar fechas para incluir todo el día
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
@@ -437,21 +436,21 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
   if (groupBy === 'day' || groupBy === 'hour') {
     const result = [];
     const currentDate = new Date(start);
-    
+
     while (currentDate <= end) {
       const dayStart = new Date(currentDate);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(currentDate);
       dayEnd.setHours(23, 59, 59, 999);
-      
+
       // Contar habitaciones únicas ocupadas en este día específico
       const occupiedRooms = new Set();
       const reservationsOnThisDay = [];
-      
+
       reservationRooms.forEach(rr => {
         const rrStart = new Date(rr.start_date);
         const rrEnd = new Date(rr.end_date);
-        
+
         // Una habitación está ocupada si el día está entre start_date (inclusive) y end_date (exclusive)
         // Ejemplo: reserva 14/10 - 19/10 ocupa habitación los días 14, 15, 16, 17, 18 (NO el 19, es checkout)
         if (dayStart >= rrStart && dayStart < rrEnd) {
@@ -459,18 +458,18 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
           reservationsOnThisDay.push(rr);
         }
       });
-      
+
       const occupiedRoomCount = occupiedRooms.size;
       const occupancyRate = totalRooms > 0 ? (occupiedRoomCount / totalRooms) * 100 : 0;
       const uniqueReservations = new Set(reservationsOnThisDay.map(rr => rr.reservation_id));
-      
+
       // Calcular total de huéspedes (personas)
       const totalGuests = reservationsOnThisDay.reduce((sum, rr) => {
         return sum + (rr.reservations?.guest_count || 0);
       }, 0);
-      
+
       const period = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
-      
+
       result.push({
         period,
         periodLabel: formatPeriodLabel(period, groupBy),
@@ -482,10 +481,10 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
         reservationCount: uniqueReservations.size,
         totalGuests // Número total de personas
       });
-      
+
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return result;
   }
 
@@ -495,12 +494,12 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
   // Calcular métricas para cada grupo
   const result = Object.keys(grouped).sort().map(period => {
     const periodData = grouped[period];
-    
+
     // Calcular total de huéspedes (personas)
     const totalGuests = periodData.reduce((sum, rr) => {
       return sum + (rr.reservations?.guest_count || 0);
     }, 0);
-    
+
     // Calcular noches ocupadas en este período
     let occupiedRoomNights = 0;
     periodData.forEach(rr => {
@@ -508,7 +507,7 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
       const rrEnd = new Date(rr.end_date);
       const checkIn = new Date(Math.max(rrStart, start));
       const checkOut = new Date(Math.min(rrEnd, end));
-      
+
       if (checkOut > checkIn) {
         const nights = getDaysBetween(checkIn, checkOut);
         occupiedRoomNights += nights;
@@ -531,8 +530,8 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
     }
 
     const totalAvailableNights = totalRooms * periodDays;
-    const occupancyRate = totalAvailableNights > 0 
-      ? (occupiedRoomNights / totalAvailableNights) * 100 
+    const occupancyRate = totalAvailableNights > 0
+      ? (occupiedRoomNights / totalAvailableNights) * 100
       : 0;
 
     const uniqueReservations = new Set(periodData.map(rr => rr.reservation_id));
@@ -559,7 +558,7 @@ async function getOccupancyData(startDate, endDate, groupBy, roomTypeId = null, 
 function generateAllPeriods(start, end, groupBy) {
   const periods = [];
   const current = new Date(start);
-  
+
   switch (groupBy) {
     case 'hour': {
       // Generar todas las horas del día
@@ -584,10 +583,10 @@ function generateAllPeriods(start, end, groupBy) {
       const endWeek = getWeekNumber(end);
       const startYear = current.getFullYear();
       const endYear = end.getFullYear();
-      
+
       let year = startYear;
       let week = startWeek;
-      
+
       while (year < endYear || (year === endYear && week <= endWeek)) {
         periods.push(`${year}-W${week.toString().padStart(2, '0')}`);
         week++;
@@ -617,7 +616,7 @@ function generateAllPeriods(start, end, groupBy) {
       break;
     }
   }
-  
+
   return periods;
 }
 
@@ -628,7 +627,7 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
   // Normalizar fechas para incluir todo el día
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
@@ -678,7 +677,7 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
     },
     include: {
       reservation_rooms: {
-        where: { 
+        where: {
           deleted_at: null,
           ...roomFilters
         }
@@ -697,14 +696,14 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
 
   // Generar TODOS los períodos del rango
   const allPeriods = generateAllPeriods(start, end, groupBy);
-  
+
   // Agrupar por período - usar check_in_date como referencia
   const grouped = groupByPeriod(reservations, 'check_in_date', groupBy);
 
   // Calcular métricas para cada período (incluso los vacíos)
   const result = allPeriods.map(period => {
     const periodData = grouped[period] || [];
-    
+
     // Si no hay datos para este período, retornar valores en 0
     if (periodData.length === 0) {
       return {
@@ -734,7 +733,7 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
           const rrEnd = new Date(rr.end_date);
           const checkIn = new Date(Math.max(rrStart, start));
           const checkOut = new Date(Math.min(rrEnd, end));
-          
+
           if (checkOut > checkIn) {
             const nights = getDaysBetween(checkIn, checkOut);
             totalRoomNights += nights;
@@ -784,17 +783,17 @@ async function getRevenueData(startDate, endDate, groupBy, includeServices = tru
     const endYear = end.getFullYear();
     const startMonth = start.getMonth();
     const endMonth = end.getMonth();
-    
+
     // Si es el mismo año y abarca todo el año (Ene-Dic), generar 12 meses
     if (startYear === endYear && startMonth === 0 && endMonth === 11) {
       const fullYearData = [];
-      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-      
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
       for (let month = 0; month < 12; month++) {
         const monthKey = `${startYear}-${(month + 1).toString().padStart(2, '0')}`;
         const existingData = result.find(r => r.period === monthKey);
-        
+
         fullYearData.push({
           period: monthKey,
           periodLabel: monthNames[month],
@@ -900,7 +899,7 @@ async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
           roomTypeCounts[typeName] = (roomTypeCounts[typeName] || 0) + 1;
         });
       });
-      const favoriteRoomType = Object.keys(roomTypeCounts).sort((a, b) => 
+      const favoriteRoomType = Object.keys(roomTypeCounts).sort((a, b) =>
         roomTypeCounts[b] - roomTypeCounts[a]
       )[0] || null;
 
@@ -937,9 +936,9 @@ async function getClientsOverview(startDate, endDate, sortBy, order, limit) {
   const validClients = clientsData.filter(client => client !== null);
 
   // Ordenar según el criterio especificado
-  const sortField = sortBy === 'revenue' ? 'totalSpent' : 
-                    sortBy === 'reservations' ? 'totalReservations' :
-                    sortBy === 'frequency' ? 'totalReservations' : 'lastReservation';
+  const sortField = sortBy === 'revenue' ? 'totalSpent' :
+    sortBy === 'reservations' ? 'totalReservations' :
+      sortBy === 'frequency' ? 'totalReservations' : 'lastReservation';
 
   validClients.sort((a, b) => {
     if (order === 'asc') {
@@ -1100,7 +1099,7 @@ async function getClientDetail(clientId, startDate = null, endDate = null) {
     code: res.code,
     checkIn: res.check_in_date,
     checkOut: res.check_out_date,
-    nights: res.reservation_rooms.reduce((sum, rr) => 
+    nights: res.reservation_rooms.reduce((sum, rr) =>
       sum + getDaysBetween(rr.start_date, rr.end_date), 0
     ),
     roomType: res.reservation_rooms[0]?.rooms.room_types.name || 'N/A',
@@ -1173,7 +1172,7 @@ async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId =
 
   // Para todos los clientes: separar nuevos vs recurrentes - OPTIMIZADO: evitar N+1
   const uniqueClientIds = [...new Set(reservations.map(r => r.main_guest_id))];
-  
+
   // Obtener TODAS las primeras reservas en una sola consulta
   const firstReservationsData = await prisma.reservations.groupBy({
     by: ['main_guest_id'],
@@ -1185,7 +1184,7 @@ async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId =
       created_at: true
     }
   });
-  
+
   // Crear mapa de primera fecha por cliente
   const clientFirstReservations = {};
   firstReservationsData.forEach(fr => {
@@ -1211,7 +1210,7 @@ async function getClientsRevenueTimeline(startDate, endDate, groupBy, clientId =
 
   // Combinar resultados
   const allPeriods = new Set([...Object.keys(newGrouped), ...Object.keys(returningGrouped)]);
-  
+
   return Array.from(allPeriods).sort().map(period => {
     const newData = newGrouped[period] || [];
     const returningData = returningGrouped[period] || [];
@@ -1273,7 +1272,7 @@ async function getClientStats(startDate, endDate) {
     const registrationDate = new Date(client.created_at);
     return registrationDate >= start && registrationDate <= end;
   }).length;
-  
+
   const recurringClientsCount = totalClientsCount - newClientsCount;
 
   // Calcular segmentación por tipo de cliente con colores para el frontend
@@ -1309,7 +1308,7 @@ async function getClientStats(startDate, endDate) {
  */
 async function getTopClients(startDate, endDate, metric, limit) {
   const clientsData = await getClientsOverview(startDate, endDate, metric, 'desc', limit);
-  
+
   const ranking = clientsData.clients.map((client, index) => ({
     rank: index + 1,
     userId: client.userId,
@@ -1400,7 +1399,7 @@ async function getTopRooms(startDate, endDate, metric) {
     // Eliminar el Set de reservations antes de retornar
     const reservationCount = room.reservations.size;
     delete room.reservations;
-    
+
     return {
       ...room,
       reservationCount,
@@ -1495,8 +1494,8 @@ async function getTopRoomTypes(startDate, endDate, metric) {
   // Calcular porcentaje del total
   const totalRevenue = typeStats.reduce((sum, t) => sum + t.totalRevenue, 0);
   typeStats.forEach(type => {
-    type.percentageOfTotal = totalRevenue > 0 
-      ? parseFloat(((type.totalRevenue / totalRevenue) * 100).toFixed(2)) 
+    type.percentageOfTotal = totalRevenue > 0
+      ? parseFloat(((type.totalRevenue / totalRevenue) * 100).toFixed(2))
       : 0;
   });
 
@@ -1565,11 +1564,11 @@ async function getTopServices(startDate, endDate) {
 
   // Convertir a array y calcular métricas
   const servicesArray = Object.values(serviceStats).map(service => {
-    const avgPrice = service.timesRequested > 0 
-      ? service.totalRevenue / service.timesRequested 
+    const avgPrice = service.timesRequested > 0
+      ? service.totalRevenue / service.timesRequested
       : 0;
-    const percentageOfReservations = totalReservations > 0 
-      ? (service.uniqueReservations.size / totalReservations) * 100 
+    const percentageOfReservations = totalReservations > 0
+      ? (service.uniqueReservations.size / totalReservations) * 100
       : 0;
 
     return {
@@ -2052,8 +2051,8 @@ async function getTopClientsRevenue(startDate, endDate, limit = 50) {
     .map((client, index) => ({
       rank: index + 1,
       ...client,
-      averageReservationValue: client.totalReservations > 0 
-        ? client.totalRevenue / client.totalReservations 
+      averageReservationValue: client.totalReservations > 0
+        ? client.totalRevenue / client.totalReservations
         : 0
     }));
 
@@ -2145,7 +2144,7 @@ async function getClientsWithReservations(filters) {
 async function getReportByCountry(startDate, endDate, country = null, floor = null, roomTypeId = null) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
@@ -2212,10 +2211,10 @@ async function getReportByCountry(startDate, endDate, country = null, floor = nu
 
   // Agrupar por país
   const countryMap = new Map();
-  
+
   reservations.forEach(reservation => {
     const countryName = reservation.users_reservations_main_guest_idTousers?.country || 'Sin especificar';
-    
+
     if (!countryMap.has(countryName)) {
       countryMap.set(countryName, {
         country: countryName,
@@ -2224,7 +2223,7 @@ async function getReportByCountry(startDate, endDate, country = null, floor = nu
         totalRevenue: 0
       });
     }
-    
+
     const data = countryMap.get(countryName);
     data.reservationCount++;
     data.totalGuests += reservation.guest_count || 0;
@@ -2261,7 +2260,7 @@ async function getAvailableCountries() {
 async function getReportByAge(startDate, endDate, ageRange = null, minAge = null, maxAge = null, floor = null, roomTypeId = null) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
@@ -2313,20 +2312,20 @@ async function getReportByAge(startDate, endDate, ageRange = null, minAge = null
 
   // Si se especifica rango manual (minAge y maxAge), crear un solo rango personalizado
   if (minAge !== null && maxAge !== null) {
-    const customRange = { 
-      min: parseInt(minAge), 
-      max: parseInt(maxAge), 
-      reservationCount: 0, 
-      totalGuests: 0, 
-      totalRevenue: 0 
+    const customRange = {
+      min: parseInt(minAge),
+      max: parseInt(maxAge),
+      reservationCount: 0,
+      totalGuests: 0,
+      totalRevenue: 0
     };
 
     reservations.forEach(reservation => {
       const birthDate = reservation.users_reservations_main_guest_idTousers?.birth_date;
-      
+
       if (birthDate) {
         const age = Math.floor((new Date() - new Date(birthDate)) / (365.25 * 24 * 60 * 60 * 1000));
-        
+
         if (age >= customRange.min && age <= customRange.max) {
           customRange.reservationCount++;
           customRange.totalGuests += reservation.guest_count || 0;
@@ -2355,10 +2354,10 @@ async function getReportByAge(startDate, endDate, ageRange = null, minAge = null
   reservations.forEach(reservation => {
     const birthDate = reservation.users_reservations_main_guest_idTousers?.birth_date;
     let rangeKey = 'Sin datos';
-    
+
     if (birthDate) {
       const age = Math.floor((new Date() - new Date(birthDate)) / (365.25 * 24 * 60 * 60 * 1000));
-      
+
       for (const [key, value] of ageRangeMap.entries()) {
         if (value.min !== null && age >= value.min && age <= value.max) {
           rangeKey = key;
@@ -2366,7 +2365,7 @@ async function getReportByAge(startDate, endDate, ageRange = null, minAge = null
         }
       }
     }
-    
+
     const data = ageRangeMap.get(rangeKey);
     data.reservationCount++;
     data.totalGuests += reservation.guest_count || 0;
@@ -2392,7 +2391,7 @@ async function getReportByAge(startDate, endDate, ageRange = null, minAge = null
 async function getReportBySpending(startDate, endDate, spendingRange = null, floor = null, roomTypeId = null) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
@@ -2450,7 +2449,7 @@ async function getReportBySpending(startDate, endDate, spendingRange = null, flo
   reservations.forEach(reservation => {
     const totalAmount = reservation.payments.reduce((sum, p) => sum + p.amount, 0);
     let rangeKey = 'Sin monto';
-    
+
     if (totalAmount > 0) {
       for (const [key, value] of spendingRangeMap.entries()) {
         if (value.min !== null && totalAmount >= value.min && totalAmount <= value.max) {
@@ -2459,7 +2458,7 @@ async function getReportBySpending(startDate, endDate, spendingRange = null, flo
         }
       }
     }
-    
+
     const data = spendingRangeMap.get(rangeKey);
     data.reservationCount++;
     data.totalGuests += reservation.guest_count || 0;
@@ -2479,7 +2478,7 @@ async function getReportBySpending(startDate, endDate, spendingRange = null, flo
   return result;
 }
 
-module.exports = {
+export default {
   calculateKPIs,
   getOccupancyData,
   getRevenueData,

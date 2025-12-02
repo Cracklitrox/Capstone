@@ -1,10 +1,9 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+import prisma from '../db/prisma.client.js';
 
 /**
  * Registrar error en la base de datos
  */
-async function logError({
+export async function logError({
   userId = null,
   userRole = null,
   description,
@@ -38,20 +37,16 @@ async function logError({
       },
     });
 
-    console.error(`[${severity.toUpperCase()}] ${originModule}:`, description);
     if (errorObject) {
-      console.error(errorObject);
     }
   } catch (error) {
-    console.error("Error al registrar en BD:", error);
-    console.error("Error original:", description);
   }
 }
 
 /**
  * Obtener errores recientes
  */
-async function getRecentErrors(limit = 50, filters = {}) {
+export async function getRecentErrors(limit = 50, filters = {}) {
   const { severity, status, module } = filters;
 
   const where = {};
@@ -78,15 +73,9 @@ async function getRecentErrors(limit = 50, filters = {}) {
 /**
  * Marcar error como resuelto
  */
-async function resolveError(errorId) {
+export async function resolveError(errorId) {
   return await prisma.system_errors.update({
     where: { id: errorId },
     data: { status: "resolved" },
   });
 }
-
-module.exports = {
-  logError,
-  getRecentErrors,
-  resolveError,
-};

@@ -1,8 +1,8 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
-const rateLimit = require("express-rate-limit");
-const { authenticate } = require("../../middleware/auth.middleware");
-const {
+import rateLimit from "express-rate-limit";
+import { authenticate } from "../../middleware/auth.middleware.js";
+import {
   searchGuest,
   createGuest,
   updateGuest,
@@ -11,7 +11,8 @@ const {
   getGuestReservations,
   updateGuestObservations,
   updateGuestProfile,
-} = require("./guests.controller");
+  deleteGuest,
+} from "./guests.controller.js";
 
 // Define rate limiters
 const guestUpdateLimiter = rateLimit({
@@ -73,4 +74,7 @@ router.post("/", authenticate, guestCreateLimiter, createGuest);
 // Actualizar huésped
 router.put("/:id", authenticate, guestUpdateLimiter, updateGuest);
 
-module.exports = router;
+// Eliminar huésped
+router.delete("/:id", authenticate, deleteGuest);
+
+export default router;

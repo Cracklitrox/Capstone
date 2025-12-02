@@ -1,6 +1,7 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-const { getActiveSeason } = require('./pricing.service');
+import prisma from '../../db/prisma.client.js';
+import pricingService from './pricing.service.js';
+
+const { getActiveSeason } = pricingService;
 
 /**
  * Buscar habitaciones disponibles
@@ -89,7 +90,7 @@ async function searchAvailableRooms(checkInDate, checkOutDate, guests, filters =
   // Calcular precios con temporada
   const roomsWithPrices = availableRooms.map(room => {
     let pricePerNight = room.basePrice;
-    
+
     if (activeSeason && activeSeason.price_modifier) {
       pricePerNight = room.basePrice + Number(activeSeason.price_modifier);
     }
@@ -136,13 +137,13 @@ function generateRoomSuggestions(rooms, guests, checkIn, checkOut, season) {
   // Sugerencia 2: Múltiples habitaciones
   if (guests > 1) {
     const doubleRooms = rooms.filter(r => r.capacity === 2).slice(0, Math.ceil(guests / 2));
-    
+
     if (doubleRooms.length > 0) {
       const totalCapacity = doubleRooms.reduce((sum, r) => sum + r.capacity, 0);
-      
+
       if (totalCapacity >= guests) {
         const pricePerNight = doubleRooms.reduce((sum, r) => sum + r.pricePerNight, 0);
-        
+
         suggestions.push({
           id: 'multiple',
           name: `${doubleRooms.length} Habitaciones Dobles`,
@@ -158,6 +159,6 @@ function generateRoomSuggestions(rooms, guests, checkIn, checkOut, season) {
   return suggestions;
 }
 
-module.exports = {
+export default {
   searchAvailableRooms,
 };

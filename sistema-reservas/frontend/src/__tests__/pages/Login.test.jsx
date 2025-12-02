@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import Login from '../../pages/Login.jsx';
-import { AuthProvider } from '../../services/authContext.jsx';
+import { AuthProvider } from '../../contexts/AuthProvider.jsx';
 import { mockUsers, mockTokens, mockAxiosResponses, cleanupMocks } from '../utils/testUtils.jsx';
 import { localStorageMock, mockNavigate } from '../setup/mocks.js';
 
@@ -62,10 +62,10 @@ describe('Login Page', () => {
 
     it('debe tener los campos requeridos', () => {
       renderLogin();
-      
+
       const emailInput = screen.getByLabelText(/correo electrónico/i);
       const passwordInput = screen.getByLabelText(/contraseña/i);
-      
+
       expect(emailInput).toHaveAttribute('required');
       expect(passwordInput).toHaveAttribute('required');
       expect(emailInput).toHaveAttribute('type', 'email');
@@ -187,7 +187,7 @@ describe('Login Page', () => {
     it('debe limpiar el mensaje de error al hacer login exitoso', async () => {
       // Primero, simular un error
       axios.post.mockRejectedValueOnce(mockAxiosResponses.loginError);
-      
+
       renderLogin();
 
       const emailInput = screen.getByLabelText(/correo electrónico/i);

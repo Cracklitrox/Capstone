@@ -1,10 +1,10 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const authController = require('./auth.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
+import * as authController from './auth.controller.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
 // Rate Limiting configuration
-const rateLimit = require('express-rate-limit');
+import rateLimit from 'express-rate-limit';
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 100, // máximo 100 solicitudes por ventana
@@ -32,4 +32,4 @@ router.put('/change-password', authLimiter, authenticate, authController.changeP
 router.get('/login-history', authLimiter, authenticate, authController.getLoginHistory);
 
 
-module.exports = router;
+export default router;

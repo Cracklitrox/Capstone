@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
-import { authService, reservationService } from '../../services/services.jsx';
+import { authService, reservationService } from '../../services/services.js';
 import { mockAxiosResponses, cleanupMocks } from '../utils/testUtils.jsx';
 
 // Mock de axios

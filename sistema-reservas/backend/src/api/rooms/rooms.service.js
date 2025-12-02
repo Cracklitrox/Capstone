@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 // Función helper para crear logs de actividad
 async function createActivityLog(
@@ -22,7 +21,6 @@ async function createActivityLog(
       },
     });
   } catch (error) {
-    console.error("Error al crear log de actividad:", error);
   }
 }
 
@@ -66,16 +64,16 @@ async function getAllRooms() {
       base_price: room.base_price,
       reservation: activeReservation
         ? {
-            id: activeReservation.id,
-            check_in_date: activeReservation.check_in_date,
-            check_out_date: activeReservation.check_out_date,
-            guest: guest
-              ? {
-                  first_name: guest.first_name,
-                  paternal_last_name: guest.paternal_last_name,
-                }
-              : null,
-          }
+          id: activeReservation.id,
+          check_in_date: activeReservation.check_in_date,
+          check_out_date: activeReservation.check_out_date,
+          guest: guest
+            ? {
+              first_name: guest.first_name,
+              paternal_last_name: guest.paternal_last_name,
+            }
+            : null,
+        }
         : null,
     };
   });
@@ -413,16 +411,16 @@ async function updateRoomStatus(roomId, newStatus, userId, userRole) {
     base_price: room.base_price,
     reservation: activeReservation
       ? {
-          id: activeReservation.id,
-          check_in_date: activeReservation.check_in_date,
-          check_out_date: activeReservation.check_out_date,
-          guest: guest
-            ? {
-                first_name: guest.first_name,
-                paternal_last_name: guest.paternal_last_name,
-              }
-            : null,
-        }
+        id: activeReservation.id,
+        check_in_date: activeReservation.check_in_date,
+        check_out_date: activeReservation.check_out_date,
+        guest: guest
+          ? {
+            first_name: guest.first_name,
+            paternal_last_name: guest.paternal_last_name,
+          }
+          : null,
+      }
       : null,
   };
 }
@@ -549,11 +547,11 @@ async function getRoomsInCleaning() {
       status: room.status,
       cleaningRecord: currentCleaning
         ? {
-            id: currentCleaning.id,
-            startedAt: currentCleaning.record_date,
-            observations: currentCleaning.observations,
-            receptionistName: `${currentCleaning.users.first_name} ${currentCleaning.users.paternal_last_name}`,
-          }
+          id: currentCleaning.id,
+          startedAt: currentCleaning.record_date,
+          observations: currentCleaning.observations,
+          receptionistName: `${currentCleaning.users.first_name} ${currentCleaning.users.paternal_last_name}`,
+        }
         : null,
     };
   });
@@ -743,7 +741,7 @@ async function startCleaning(roomId, userId, userRole) {
   };
 }
 
-module.exports = {
+export default {
   getAllRooms,
   getRoomById,
   getAllRoomTypes,

@@ -1,5 +1,5 @@
-const extensionService = require('./extension.service');
-const { logError } = require('../../utils/errorLogger');
+import extensionService from './extension.service.js';
+import { logError } from '../../utils/errorLogger.js';
 
 /**
  * Verificar disponibilidad para extensión de estadía
@@ -23,7 +23,6 @@ async function checkExtensionAvailability(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error('Error al verificar disponibilidad para extensión:', error);
 
     await logError({
       userId: req.user?.id,
@@ -67,7 +66,6 @@ async function extendStay(req, res) {
       reservation,
     });
   } catch (error) {
-    console.error('Error al extender estadía:', error);
 
     await logError({
       userId: req.user?.id,
@@ -84,7 +82,7 @@ async function extendStay(req, res) {
   }
 }
 
-module.exports = {
+export default {
   checkExtensionAvailability,
   extendStay,
 };

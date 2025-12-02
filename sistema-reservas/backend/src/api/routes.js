@@ -1,23 +1,23 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
 
 // Import express-rate-limit for rate limiting
-const rateLimit = require("express-rate-limit");
+import rateLimit from "express-rate-limit";
 
-const staffRoutes = require("./staff/staff.routes");
-const authRoutes = require("./auth/auth.routes");
-const reservationHistoryRoutes = require('./reservation_history/reservation_history.routes'); 
-const roomsRoutes = require("./rooms/rooms.routes");
-const adminRoomsRoutes = require('./rooms/admin/adminRooms.routes');
-const planningRoutes = require("./planning/planning.routes");
-const guestsRoutes = require("./guests/guests.routes");
-const reservationsRoutes = require("./reservations/reservations.routes");
-const systemRoutes = require("./system/system.routes");
-const notificationsRoutes = require('./notifications/notifications.routes');
-const whatsappRoutes = require('./whatsapp/whatsapp.routes');
-const reportsRoutes = require('./reports/reports.routes');
+import staffRoutes from "./staff/staff.routes.js";
+import authRoutes from "./auth/auth.routes.js";
+import reservationHistoryRoutes from './reservation_history/reservation_history.routes.js';
+import roomsRoutes from "./rooms/rooms.routes.js";
+import adminRoomsRoutes from './rooms/admin/adminRooms.routes.js';
+import planningRoutes from "./planning/planning.routes.js";
+import guestsRoutes from "./guests/guests.routes.js";
+import reservationsRoutes from "./reservations/reservations.routes.js";
+import systemRoutes from "./system/system.routes.js";
+import notificationsRoutes from './notifications/notifications.routes.js';
+import whatsappRoutes from './booking-alerts/whatsapp.routes.js';
+import reportsRoutes from './reports/reports.routes.js';
 
-const { authenticate } = require("../middleware/auth.middleware");
+import { authenticate } from "../middleware/auth.middleware.js";
 
 // ⭐ Rate limiter mejorado: por usuario autenticado, no por IP
 const cummonLimiter = rateLimit({
@@ -54,7 +54,7 @@ router.use("/auth", authRoutes);
 
 // ⭐ Todas las demás rutas: authenticate PRIMERO, luego cummonLimiter
 router.use("/rooms", authenticate, cummonLimiter, roomsRoutes);
-router.use('/reservation_history', authenticate, cummonLimiter, reservationHistoryRoutes); 
+router.use('/reservation_history', authenticate, cummonLimiter, reservationHistoryRoutes);
 router.use('/admin/rooms', authenticate, cummonLimiter, adminRoomsRoutes);
 router.use("/staff", authenticate, cummonLimiter, staffRoutes);
 router.use("/planning", authenticate, cummonLimiter, planningRoutes);
@@ -65,4 +65,4 @@ router.use("/system", authenticate, cummonLimiter, systemRoutes);
 router.use("/whatsapp", authenticate, cummonLimiter, whatsappRoutes);
 router.use("/reports", authenticate, cummonLimiter, reportsRoutes);
 
-module.exports = router;
+export default router;

@@ -1,25 +1,23 @@
-// Página principal para la administración de tipos de habitación
-// Incluye CRUD completo, diseño moderno y responsivo, y validaciones
 import React, { useState, useEffect, useMemo } from "react";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/Card";
 import { fetchAdminRoomTypes } from "@/services/adminRooms";
-import CreateRoomType from "../../components/AdminRoomTypes/CreateRoomType";
-import EditRoomType from "../../components/AdminRoomTypes/EditRoomType";
-import DeleteRoomType from "../../components/AdminRoomTypes/DeleteRoomType";
-import DetailRoomType from "../../components/AdminRoomTypes/DetailRoomType";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { Badge } from "@/components/ui/Badge";
+import CreateRoomType from "../../components/rooms/admin/AdminRoomTypes/CreateRoomType";
+import EditRoomType from "../../components/rooms/admin/AdminRoomTypes/EditRoomType";
+import DeleteRoomType from "../../components/rooms/admin/AdminRoomTypes/DeleteRoomType";
+import DetailRoomType from "../../components/rooms/admin/AdminRoomTypes/DetailRoomType";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Label } from "../../components/ui/Label";
+import { Badge } from "../../components/ui/Badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
+} from "../../components/ui/Select";
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -52,7 +50,7 @@ const RoomTypesCrud = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchAdminRoomTypes(token);
+      const data = await fetchAdminRoomTypes();
       setRoomTypes(data);
     } catch (err) {
       setError(err?.message || "Error al cargar tipos de habitación");

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Clock } from 'lucide-react';
-import StatusBadge from '@/components/ui/StatusBadge';
-import QuickCheckInButton from '@/components/QuickCheckInButton';
-import ReservationDetailsModal from '@/components/ReservationDetailsModal';
+import StatusBadge from '../../components/ui/StatusBadge';
+import QuickCheckInButton from '@/components/reservations/QuickCheckInButton';
+import ReservationDetailsModal from '@/components/reservations/ReservationDetailsModal';
 import { toast } from 'sonner';
 
 /**
@@ -27,9 +27,9 @@ const CheckinsToday = () => {
       setIsLoading(true);
       const token = localStorage.getItem('token');
 
-      // Filtrar reservas con status=ready_for_checkin y check_in_date=TODAY
+      // Usar el nuevo endpoint dedicado que ya filtra por fecha en el backend
       const response = await fetch(
-        'http://localhost:3001/api/v1/reservations?status=ready_for_checkin',
+        'http://localhost:3001/api/v1/reservations/checkins-today',
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -41,27 +41,9 @@ const CheckinsToday = () => {
 
       const data = await response.json();
 
-      // Obtener fecha actual en zona horaria de Chile (America/Santiago)
-      const today = new Date().toLocaleDateString('es-CL', {
-        timeZone: 'America/Santiago',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).split('-').reverse().join('-'); // De DD-MM-YYYY a YYYY-MM-DD
-
-      console.log('🔍 CheckinsToday - Hoy (Chile):', today);
-      console.log('🔍 CheckinsToday - Reservas recibidas:', data.reservations?.length);
-
-      const todayCheckins = (data.reservations || []).filter((r) => {
-        const checkInDate = new Date(r.check_in_date).toISOString().split('T')[0];
-        console.log(`🔍 CheckinsToday - Comparando: ${checkInDate} === ${today}`, checkInDate === today);
-        return checkInDate === today;
-      });
-
-      console.log('🔍 CheckinsToday - Check-ins hoy:', todayCheckins.length);
-      setReservations(todayCheckins);
+      // El backend ya retorna solo las reservas de hoy, no necesitamos filtrar más
+      setReservations(data.reservations || []);
     } catch (error) {
-      console.error('Error:', error);
       toast.error('Error al cargar check-ins');
     } finally {
       setIsLoading(false);
@@ -108,9 +90,15 @@ const CheckinsToday = () => {
 
       {/* Grid de Cards */}
       {reservations.length === 0 ? (
-        <div className="text-center py-12 bg-green-50 rounded-lg border-2 border-green-200">
-          <p className="text-green-800 font-medium">
-            ✅ No hay check-ins pendientes para hoy
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <div className="bg-muted/50 rounded-full p-6 mb-4">
+            <Clock className="w-16 h-16 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold text-foreground mb-2">
+            No hay check-ins pendientes
+          </h3>
+          <p className="text-muted-foreground text-center max-w-md">
+            No hay reservas programadas para hacer check-in el día de hoy.
           </p>
         </div>
       ) : (
@@ -126,7 +114,7 @@ const CheckinsToday = () => {
             return (
               <div
                 key={reservation.id}
-                className="bg-card border-2 border-blue-200 rounded-lg p-4 space-y-3"
+                className="bg-card border-2 border-blue-300 dark:border-blue-500 rounded-lg p-4 space-y-3"
               >
                 {/* Header */}
                 <div className="flex justify-between items-start">
@@ -144,7 +132,7 @@ const CheckinsToday = () => {
                     {reservation.reservation_rooms?.map((rr, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground text-xs rounded font-medium border border-primary/30"
+                        className="px-2 py-1 bg-yellow-100 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-200 text-xs rounded font-medium border border-yellow-300 dark:border-yellow-700"
                       >
                         #{rr.rooms?.room_number} - {rr.rooms?.room_type?.name}
                       </span>
@@ -162,9 +150,8 @@ const CheckinsToday = () => {
                   </div>
                   <div className="w-full bg-secondary rounded-full h-1.5">
                     <div
-                      className={`h-1.5 rounded-full ${
-                        isPaidFully ? 'bg-green-500' : 'bg-yellow-500'
-                      }`}
+                      className={`h-1.5 rounded-full ${isPaidFully ? 'bg-green-500' : 'bg-yellow-500'
+                        }`}
                       style={{
                         width: `${Math.min(
                           (reservation.paid_amount / reservation.total_amount) * 100,

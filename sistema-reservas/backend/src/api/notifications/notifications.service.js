@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
 
 /**
  * Obtiene las alertas de checkout del día actual desde la tabla alerts
@@ -180,7 +179,6 @@ async function createOrUpdateCheckoutAlerts() {
             full_summary: checkout,
           },
         });
-        console.log(`✅ Alerta de checkout creada para reserva ${checkout.reservationId}`);
       } else {
         // Actualizar alerta existente con datos más recientes
         await prisma.alerts.update({
@@ -199,7 +197,6 @@ async function createOrUpdateCheckoutAlerts() {
       message: `${checkouts.length} alertas de checkout procesadas`,
     };
   } catch (error) {
-    console.error('❌ Error al crear/actualizar alertas de checkout:', error);
     throw error;
   }
 }
@@ -211,7 +208,6 @@ async function createOrUpdateCheckoutAlerts() {
  */
 async function getCheckoutAlertsCount(userId) {
   try {
-    console.log(`🔍 getCheckoutAlertsCount called for userId: ${userId}`);
 
     // Obtener fecha actual UTC
     const now = new Date();
@@ -237,9 +233,6 @@ async function getCheckoutAlertsCount(userId) {
     // Convertir a UTC
     const endOfDay = new Date(endOfDayChile.getTime() - (chileOffsetHours * 60 * 60 * 1000));
 
-    console.log(`🔍 Hora actual UTC: ${now.toISOString()}`);
-    console.log(`🔍 Hora actual Chile: ${chileNow.toISOString()}`);
-    console.log(`🔍 Buscando alertas entre ${startOfDay.toISOString()} y ${endOfDay.toISOString()}`);
 
     // Primero contar TODAS las alertas de checkout de hoy
     const totalCheckoutAlerts = await prisma.alerts.count({
@@ -252,7 +245,6 @@ async function getCheckoutAlertsCount(userId) {
       },
     });
 
-    console.log(`🔍 Total de alertas de checkout hoy: ${totalCheckoutAlerts}`);
 
     // Contar alertas de checkout creadas hoy que el usuario no ha marcado como leídas o eliminadas
     const count = await prisma.alerts.count({
@@ -283,12 +275,9 @@ async function getCheckoutAlertsCount(userId) {
       },
     });
 
-    console.log(`🔍 Alertas NO leídas por usuario ${userId}: ${count}`);
 
     return count;
   } catch (error) {
-    console.error('❌ Error al obtener conteo de alertas de checkout:', error);
-    console.error('Stack:', error.stack);
     return 0;
   }
 }
@@ -329,37 +318,50 @@ async function markCheckoutAlertsAsViewed(userId) {
       },
     });
 
+    // Si no hay alertas, retornar éxito sin hacer nada
+    if (!checkoutAlerts || checkoutAlerts.length === 0) {
+      return {
+        success: true,
+        message: 'No hay alertas de checkout para hoy',
+        count: 0,
+      };
+    }
+
     // Actualizar cada alerta con last_viewed_at y crear registros de lectura
     const updatePromises = checkoutAlerts.map(async (alert) => {
-      // Actualizar last_viewed_at en la alerta
-      await prisma.alerts.update({
-        where: { id: alert.id },
-        data: { last_viewed_at: viewedAt },
-      });
+      try {
+        // Actualizar last_viewed_at en la alerta
+        await prisma.alerts.update({
+          where: { id: alert.id },
+          data: { last_viewed_at: viewedAt },
+        });
 
-      // Crear/actualizar registro de lectura
-      await prisma.alert_read_status.upsert({
-        where: {
-          alert_id_user_id: {
+        // Crear/actualizar registro de lectura
+        await prisma.alert_read_status.upsert({
+          where: {
+            alert_id_user_id: {
+              alert_id: alert.id,
+              user_id: userId,
+            },
+          },
+          update: {
+            status: 'resolved',
+            updated_at: viewedAt,
+          },
+          create: {
             alert_id: alert.id,
             user_id: userId,
+            status: 'resolved',
           },
-        },
-        update: {
-          status: 'resolved',
-          updated_at: viewedAt,
-        },
-        create: {
-          alert_id: alert.id,
-          user_id: userId,
-          status: 'resolved',
-        },
-      });
+        });
+      } catch (err) {
+        // Log individual error but don't fail the entire operation
+        console.error(`Error updating alert ${alert.id}:`, err.message);
+      }
     });
 
     await Promise.all(updatePromises);
 
-    console.log(`✅ Usuario ${userId} marcó ${checkoutAlerts.length} alertas de checkout como vistas`);
 
     return {
       success: true,
@@ -367,8 +369,15 @@ async function markCheckoutAlertsAsViewed(userId) {
       count: checkoutAlerts.length,
     };
   } catch (error) {
-    console.error('❌ Error al marcar checkout alerts como vistos:', error);
-    throw error;
+    console.error('Error in markCheckoutAlertsAsViewed:', error);
+    console.error('Error stack:', error.stack);
+    // Return error response instead of throwing
+    return {
+      success: false,
+      message: 'Error al marcar alertas como vistas',
+      error: error.message,
+      count: 0,
+    };
   }
 }
 
@@ -382,7 +391,6 @@ async function hasUserViewedCheckoutsToday(userId) {
     const count = await getCheckoutAlertsCount(userId);
     return count === 0;
   } catch (error) {
-    console.error('❌ Error al verificar si usuario vio checkouts:', error);
     return false;
   }
 }
@@ -427,14 +435,12 @@ async function deleteCheckoutAlert(alertId, userId) {
       },
     });
 
-    console.log(`🗑️ Usuario ${userId} eliminó alerta de checkout ${alertId}`);
 
     return {
       success: true,
       message: 'Alerta de checkout eliminada',
     };
   } catch (error) {
-    console.error('❌ Error al eliminar alerta de checkout:', error);
     throw error;
   }
 }
@@ -448,7 +454,7 @@ function getChileTime() {
   const chileOffset = -3 * 60; // Chile está en UTC-3
   const localOffset = now.getTimezoneOffset();
   const chileTime = new Date(now.getTime() + (localOffset + chileOffset) * 60 * 1000);
-  
+
   return {
     date: chileTime.toISOString().split('T')[0],
     time: chileTime.toTimeString().split(' ')[0],
@@ -465,11 +471,11 @@ async function getPastCheckouts(daysBack = 7) {
   const chileOffset = -3 * 60;
   const localOffset = now.getTimezoneOffset();
   const chileTime = new Date(now.getTime() + (localOffset + chileOffset) * 60 * 1000);
-  
+
   // Inicio de hoy
   const startOfToday = new Date(chileTime);
   startOfToday.setHours(0, 0, 0, 0);
-  
+
   // Inicio del rango (X días atrás)
   const startOfRange = new Date(startOfToday);
   startOfRange.setDate(startOfRange.getDate() - daysBack);
@@ -522,11 +528,11 @@ async function getFutureCheckouts(daysAhead = 7) {
   const chileOffset = -3 * 60;
   const localOffset = now.getTimezoneOffset();
   const chileTime = new Date(now.getTime() + (localOffset + chileOffset) * 60 * 1000);
-  
+
   // Fin de hoy
   const endOfToday = new Date(chileTime);
   endOfToday.setHours(23, 59, 59, 999);
-  
+
   // Fin del rango (X días adelante)
   const endOfRange = new Date(endOfToday);
   endOfRange.setDate(endOfRange.getDate() + daysAhead);
@@ -577,7 +583,7 @@ async function getFutureCheckouts(daysAhead = 7) {
 function formatCheckoutData(reservations) {
   return reservations.map((reservation) => {
     const guest = reservation.users_reservations_main_guest_idTousers;
-    
+
     // Obtener todas las habitaciones de esta reserva
     const rooms = reservation.reservation_rooms.map((roomData) => ({
       id: roomData.rooms.id,
@@ -616,7 +622,7 @@ function formatCheckoutData(reservations) {
   });
 }
 
-module.exports = {
+export default {
   getCheckoutAlertsForToday,
   getCheckoutAlertsCount,
   getChileTime,

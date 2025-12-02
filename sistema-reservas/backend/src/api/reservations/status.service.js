@@ -1,5 +1,7 @@
-const prisma = require('../../db/prisma.client');
-const { calculateFirstDayPrice } = require('./pricing.helpers');
+import prisma from '../../db/prisma.client.js';
+import pricingHelpersModule from './pricing.helpers.js';
+
+const { calculateFirstDayPrice } = pricingHelpersModule;
 
 /**
  * MATRIZ DE TRANSICIONES VÁLIDAS
@@ -433,7 +435,6 @@ async function changeReservationStatus({
     return result;
 
   } catch (error) {
-    console.error('Error al cambiar estado de reserva:', error);
     throw error;
   }
 }
@@ -476,7 +477,7 @@ async function getReservationHistory(reservationId) {
   return history;
 }
 
-module.exports = {
+export default {
   changeReservationStatus,
   getValidTransitions,
   getReservationHistory,

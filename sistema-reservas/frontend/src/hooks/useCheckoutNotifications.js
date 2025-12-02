@@ -14,7 +14,6 @@ export function useCheckoutNotifications() {
   // Solicitar permisos de notificación
   const requestPermission = useCallback(async () => {
     if (!('Notification' in window)) {
-      console.warn('Este navegador no soporta notificaciones de escritorio');
       return 'denied';
     }
 
@@ -27,7 +26,6 @@ export function useCheckoutNotifications() {
       setPermission(result);
       return result;
     } catch (error) {
-      console.error('Error al solicitar permisos de notificación:', error);
       return 'denied';
     }
   }, []);
@@ -36,12 +34,10 @@ export function useCheckoutNotifications() {
   const showNotification = useCallback(
     (title, options = {}) => {
       if (!('Notification' in window)) {
-        console.warn('Este navegador no soporta notificaciones');
         return null;
       }
 
       if (Notification.permission !== 'granted') {
-        console.warn('No hay permisos para mostrar notificaciones');
         return null;
       }
 
@@ -54,7 +50,6 @@ export function useCheckoutNotifications() {
 
         return notification;
       } catch (error) {
-        console.error('Error al mostrar notificación:', error);
         return null;
       }
     },

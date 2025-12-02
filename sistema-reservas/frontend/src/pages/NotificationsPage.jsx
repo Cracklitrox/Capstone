@@ -1,5 +1,5 @@
-import { useNotificationsContext } from '../hooks/useNotificationsContext';
-import { NotificationPanel } from '../components/NotificationPanel';
+import { useNotificationsContext } from '@/hooks/useNotificationsContext';
+import { NotificationPanel } from '../components/notifications/NotificationPanel';
 import { Wifi, WifiOff } from 'lucide-react';
 
 /**
@@ -38,16 +38,16 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Centro de Notificaciones</h1>
         
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-md border ${connected ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-md border ${connected ? 'border-green-500 bg-green-50 dark:bg-green-950 dark:border-green-600' : 'border-red-500 bg-red-50 dark:bg-red-950 dark:border-red-600'}`}>
           {connected ? (
             <>
-              <Wifi className="h-4 w-4 text-green-700 dark:text-green-400" />
-              <span className="text-sm text-green-700 dark:text-green-400">Conectado en tiempo real</span>
+              <Wifi className="h-4 w-4 text-green-700 dark:text-green-300" />
+              <span className="text-sm text-green-700 dark:text-green-300 font-medium">Conectado en tiempo real</span>
             </>
           ) : (
             <>
-              <WifiOff className="h-4 w-4 text-red-600" />
-              <span className="text-sm text-red-600">Desconectado</span>
+              <WifiOff className="h-4 w-4 text-red-600 dark:text-red-300" />
+              <span className="text-sm text-red-600 dark:text-red-300 font-medium">Desconectado</span>
             </>
           )}
         </div>

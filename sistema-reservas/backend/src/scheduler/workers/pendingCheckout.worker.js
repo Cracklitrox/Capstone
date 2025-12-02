@@ -5,15 +5,15 @@
  * a 'pending_checkout' cuando es su día de check-out.
  */
 
-const { Worker } = require('bullmq');
-const { connection, QUEUE_NAMES } = require('../config');
-const prisma = require('../../db/prisma.client');
-const { changeReservationStatus } = require('../../api/reservations/status.service');
+import { Worker } from 'bullmq';
+import { connection, QUEUE_NAMES } from '../config.js';
+import prisma from '../../db/prisma.client.js';
+import statusService from '../../api/reservations/status.service.js';
+const { changeReservationStatus } = statusService;
 
 const processor = async (job) => {
   const { id, data } = job;
 
-  console.log(`\n🔔 [${new Date().toISOString()}] Processing pending_checkout job ${id}`);
 
   try {
     // Obtener fecha actual (solo fecha, sin hora)
@@ -40,7 +40,6 @@ const processor = async (job) => {
       },
     });
 
-    console.log(`   Found ${reservations.length} reservations pending checkout`);
 
     const results = {
       success: [],
@@ -70,13 +69,11 @@ const processor = async (job) => {
         });
 
         results.success.push(reservation.code);
-        console.log(`   ✅ Reservation ${reservation.code} → pending_checkout + alerta creada`);
       } catch (error) {
         results.failed.push({
           code: reservation.code,
           error: error.message,
         });
-        console.error(`   ❌ Reservation ${reservation.code} failed:`, error.message);
       }
     }
 
@@ -88,14 +85,9 @@ const processor = async (job) => {
       failures: results.failed,
     };
 
-    console.log(`\n📊 Pending Checkout Summary:`);
-    console.log(`   Total: ${summary.total}`);
-    console.log(`   Success: ${summary.success}`);
-    console.log(`   Failed: ${summary.failed}`);
 
     return summary;
   } catch (error) {
-    console.error('❌ Pending Checkout job failed:', error);
     throw error; // Permite que BullMQ reintente
   }
 };
@@ -108,15 +100,12 @@ const worker = new Worker(QUEUE_NAMES.PENDING_CHECKOUT, processor, {
 
 // Event listeners
 worker.on('completed', (job, returnvalue) => {
-  console.log(`✅ Job ${job.id} completed successfully`);
 });
 
 worker.on('failed', (job, error) => {
-  console.error(`❌ Job ${job.id} failed:`, error.message);
 });
 
 worker.on('error', (error) => {
-  console.error('❌ Worker error:', error);
 });
 
-module.exports = worker;
+export default worker;

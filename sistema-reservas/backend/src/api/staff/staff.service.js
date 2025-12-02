@@ -1,11 +1,11 @@
-const prisma = require("../../db/prisma.client");
-const bcrypt = require("bcryptjs");
+import prisma from "../../db/prisma.client.js";
+import bcrypt from "bcryptjs";
 
 /**
  * Crea un nuevo usuario en la base de datos.
  * @param {object} userData
  */
-const createUser = async (userData) => {
+export const createUser = async (userData) => {
   try {
     const { password_hash, ...restOfUserData } = userData;
 
@@ -19,14 +19,16 @@ const createUser = async (userData) => {
       throw error;
     }
 
-    const existingUserByRut = await prisma.users.findUnique({
-      where: { rut: restOfUserData.rut },
-    });
+    if (restOfUserData.identification_number) {
+      const existingUserByIdNumber = await prisma.users.findUnique({
+        where: { identification_number: restOfUserData.identification_number },
+      });
 
-    if (existingUserByRut) {
-      const error = new Error("El RUT ya está registrado");
-      error.code = "DUPLICATE_RUT";
-      throw error;
+      if (existingUserByIdNumber) {
+        const error = new Error("El número de identificación ya está registrado");
+        error.code = "DUPLICATE_RUT";
+        throw error;
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password_hash, 10);
@@ -52,14 +54,13 @@ const createUser = async (userData) => {
         customError.code = "DUPLICATE_EMAIL";
         throw customError;
       }
-      if (target?.includes("rut")) {
-        const customError = new Error("El RUT ya está registrado");
+      if (target?.includes("identification_number")) {
+        const customError = new Error("El número de identificación ya está registrado");
         customError.code = "DUPLICATE_RUT";
         throw customError;
       }
     }
 
-    console.error("Error en createUser:", error);
     throw error;
   }
 };
@@ -67,7 +68,7 @@ const createUser = async (userData) => {
 /**
  * Obtiene una lista de todos los usuarios con su información básica y roles.
  */
-const getAllUsers = () => {
+export const getAllUsers = () => {
   return prisma.users.findMany({
     select: {
       id: true,
@@ -93,7 +94,7 @@ const getAllUsers = () => {
  * @param {number} userId
  * @returns {Promise<object|null>}
  */
-const getUserById = (userId) => {
+export const getUserById = (userId) => {
   return prisma.users.findUnique({
     where: {
       id: userId,
@@ -119,7 +120,7 @@ const getUserById = (userId) => {
  * @param {object} userData - Los datos a actualizar.
  * @returns {Promise<object>} - El objeto del usuario actualizado.
  */
-const updateUser = async (userId, userData) => {
+export const updateUser = async (userId, userData) => {
   try {
     if (
       userData.hasOwnProperty("first_name") &&
@@ -139,10 +140,13 @@ const updateUser = async (userId, userData) => {
       const existingUserByEmail = await prisma.users.findFirst({
         where: { email: userData.email, id: { not: userId } },
       });
-      if (existingUserByEmail)
-        throw new Error(
+      if (existingUserByEmail) {
+        const error = new Error(
           "El correo electrónico ya está en uso por otro usuario."
         );
+        error.code = "DUPLICATE_EMAIL";
+        throw error;
+      }
     }
 
     if (
@@ -160,6 +164,26 @@ const updateUser = async (userId, userData) => {
         throw new Error(
           "El número de teléfono ya está en uso por otro usuario."
         );
+      }
+    }
+
+    if (
+      userData.hasOwnProperty("identification_number") &&
+      userData.identification_number &&
+      userData.identification_number.trim()
+    ) {
+      const existingUserByIdNumber = await prisma.users.findFirst({
+        where: {
+          identification_number: userData.identification_number,
+          id: { not: userId },
+        },
+      });
+      if (existingUserByIdNumber) {
+        const error = new Error(
+          "El número de identificación ya está en uso por otro usuario."
+        );
+        error.code = "DUPLICATE_RUT";
+        throw error;
       }
     }
 
@@ -208,7 +232,7 @@ const updateUser = async (userId, userData) => {
  * @param {number} limit - Cantidad de registros a devolver
  * @returns {Promise<Array>}
  */
-const getUserActivity = async (userId, limit = 15) => {
+export const getUserActivity = async (userId, limit = 15) => {
   try {
     const activities = await prisma.activity_logs.findMany({
       where: { user_id: userId },
@@ -224,16 +248,26 @@ const getUserActivity = async (userId, limit = 15) => {
       },
     });
 
-    return activities.map((activity) => ({
-      id: activity.id,
-      action: activity.action,
-      timestamp: activity.timestamp,
-      affectedTable: activity.affected_table,
-      recordId: activity.record_id,
-      details: activity.details ? JSON.parse(activity.details) : null,
-    }));
+    return activities.map((activity) => {
+      let parsedDetails = null;
+      if (activity.details) {
+        try {
+          parsedDetails = JSON.parse(activity.details);
+        } catch (e) {
+          // Si no es JSON válido, devolver como string o null
+          parsedDetails = activity.details;
+        }
+      }
+      return {
+        id: activity.id,
+        action: activity.action,
+        timestamp: activity.timestamp,
+        affectedTable: activity.affected_table,
+        recordId: activity.record_id,
+        details: parsedDetails,
+      };
+    });
   } catch (error) {
-    console.error("Error al obtener actividad del usuario:", error);
     throw new Error("Error al obtener la actividad del usuario.");
   }
 };
@@ -243,7 +277,7 @@ const getUserActivity = async (userId, limit = 15) => {
  * @param {number} userId
  * @returns {Promise<object>}
  */
-const getUserPreferences = async (userId) => {
+export const getUserPreferences = async (userId) => {
   try {
     let preferences = await prisma.user_preferences.findUnique({
       where: { user_id: userId },
@@ -265,7 +299,6 @@ const getUserPreferences = async (userId) => {
       defaultDashboard: preferences.default_dashboard,
     };
   } catch (error) {
-    console.error("Error al obtener preferencias del usuario:", error);
     throw new Error("Error al obtener las preferencias del usuario.");
   }
 };
@@ -276,7 +309,7 @@ const getUserPreferences = async (userId) => {
  * @param {object} preferencesData
  * @returns {Promise<object>}
  */
-const updateUserPreferences = async (userId, preferencesData) => {
+export const updateUserPreferences = async (userId, preferencesData) => {
   try {
     const { defaultTheme, defaultDashboard } = preferencesData;
 
@@ -305,17 +338,6 @@ const updateUserPreferences = async (userId, preferencesData) => {
       defaultDashboard: preferences.default_dashboard,
     };
   } catch (error) {
-    console.error("Error al actualizar preferencias:", error);
     throw error;
   }
-};
-
-module.exports = {
-  createUser,
-  getAllUsers,
-  getUserById,
-  updateUser,
-  getUserActivity,
-  getUserPreferences,
-  updateUserPreferences,
 };

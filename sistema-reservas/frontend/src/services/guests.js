@@ -1,42 +1,25 @@
-import axios from "axios";
-
-const API_URL = "http://localhost:3001/api/v1";
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
-};
+import apiClient from "@/lib/apiClient";
 
 export const guestsService = {
-  // Buscar huésped por número de identificación (actualizado)
+  // Buscar huésped por número de identificación
   searchByIdentification: async (identificationNumber) => {
-    const response = await axios.get(
-      `${API_URL}/guests/search/${identificationNumber}`,
-      getAuthHeaders()
+    const response = await apiClient.get(
+      `/guests/search/${identificationNumber}`
     );
     return response.data;
   },
 
   // Crear nuevo huésped
   createGuest: async (guestData) => {
-    const response = await axios.post(
-      `${API_URL}/guests`,
-      guestData,
-      getAuthHeaders()
-    );
+    const response = await apiClient.post('/guests', guestData);
     return response.data;
   },
 
   // Actualizar huésped
   updateGuest: async (guestId, guestData) => {
-    const response = await axios.put(
-      `${API_URL}/guests/${guestId}`,
-      guestData,
-      getAuthHeaders()
+    const response = await apiClient.put(
+      `/guests/${guestId}`,
+      guestData
     );
     return response.data;
   },

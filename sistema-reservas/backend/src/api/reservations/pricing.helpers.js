@@ -1,6 +1,6 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-const { calculateRoomPrice, calculateNights } = require('./pricing.service');
+import prisma from '../../db/prisma.client.js';
+import pricingService from './pricing.service.js';
+const { calculateRoomPrice, calculateNights } = pricingService;
 
 /**
  * Calcular precio del primer día de una reserva
@@ -161,7 +161,7 @@ async function validatePaymentByType(reservation, currentDate = new Date()) {
   };
 }
 
-module.exports = {
+export default {
   calculateFirstDayPrice,
   calculateConsumedDays,
   calculateRemainingDays,

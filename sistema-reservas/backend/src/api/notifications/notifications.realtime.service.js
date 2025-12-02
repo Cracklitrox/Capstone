@@ -1,12 +1,10 @@
-const { PrismaClient } = require("@prisma/client");
-const { emitNotification, emitCheckoutAlerts } = require("../../config/socket");
-
-const prisma = new PrismaClient();
+import prisma from '../../db/prisma.client.js';
+import { emitNotification, emitCheckoutAlerts } from "../../config/socket.js";
 
 /**
  * Crea una notificación y la envía en tiempo real
  */
-async function createNotification(data) {
+export async function createNotification(data) {
   const {
     senderId,
     targetRoleId,
@@ -56,7 +54,6 @@ async function createNotification(data) {
     },
   });
 
-  console.log("🎯 Notificación creada con target_role_id:", targetRoleId);
 
   // Determinar qué usuarios deben recibir la notificación
   let targetUsers = [];
@@ -69,7 +66,6 @@ async function createNotification(data) {
         ? targetUserIds
         : [targetUserId];
 
-    console.log("👤 Enviando a usuarios específicos:", userIds);
 
     // Obtener información de los usuarios
     targetUsers = await prisma.users.findMany({
@@ -85,7 +81,6 @@ async function createNotification(data) {
     });
   } else {
     // Enviar a TODOS los usuarios del rol
-    console.log("👥 Enviando a todos los usuarios del rol:", targetRoleId);
 
     targetUsers = await prisma.users.findMany({
       where: {
@@ -107,11 +102,6 @@ async function createNotification(data) {
       },
     });
   }
-
-  console.log(
-    "✅ Usuarios destinatarios:",
-    targetUsers.map((u) => ({ id: u.id, name: u.first_name }))
-  );
 
   // Crear estados de lectura para cada usuario destinatario
   const readStatusPromises = targetUsers.map((user) =>
@@ -152,7 +142,7 @@ async function createNotification(data) {
 /**
  * Obtiene todas las notificaciones del usuario (recibidas Y enviadas)
  */
-async function getUserNotifications(userId, filters = {}) {
+export async function getUserNotifications(userId, filters = {}) {
   const { status, archived, limit = 50, offset = 0 } = filters;
 
   // 1. Obtener notificaciones RECIBIDAS
@@ -251,13 +241,11 @@ async function getUserNotifications(userId, filters = {}) {
     category: readStatus.notifications.category || "general",
     sender: {
       id: readStatus.notifications.users.id,
-      name: `${readStatus.notifications.users.first_name} ${
-        readStatus.notifications.users.paternal_last_name
-      }${
-        readStatus.notifications.users.maternal_last_name
+      name: `${readStatus.notifications.users.first_name} ${readStatus.notifications.users.paternal_last_name
+        }${readStatus.notifications.users.maternal_last_name
           ? " " + readStatus.notifications.users.maternal_last_name
           : ""
-      }`,
+        }`,
     },
     targetRole: readStatus.notifications.roles?.name || null,
     sentAt: readStatus.notifications.sent_at,
@@ -281,13 +269,11 @@ async function getUserNotifications(userId, filters = {}) {
     category: notification.category || "general",
     sender: {
       id: notification.users.id,
-      name: `${notification.users.first_name} ${
-        notification.users.paternal_last_name
-      }${
-        notification.users.maternal_last_name
+      name: `${notification.users.first_name} ${notification.users.paternal_last_name
+        }${notification.users.maternal_last_name
           ? " " + notification.users.maternal_last_name
           : ""
-      }`,
+        }`,
     },
     targetRole: notification.roles?.name || null,
     sentAt: notification.sent_at,
@@ -310,8 +296,8 @@ async function getUserNotifications(userId, filters = {}) {
 /**
  * Marca una notificación como leída para un usuario
  */
-async function markAsRead(notificationId, userId) {
-  const readStatus = await prisma.notification_read_status.updateMany({
+export async function markAsRead(notificationId, userId) {
+  const readStatus = await prisma.notification_read_read_status.updateMany({
     where: {
       notification_id: notificationId,
       user_id: userId,
@@ -332,7 +318,7 @@ async function markAsRead(notificationId, userId) {
 /**
  * Marca una notificación como archivada para un usuario
  */
-async function markAsArchived(notificationId, userId) {
+export async function markAsArchived(notificationId, userId) {
   const readStatus = await prisma.notification_read_status.updateMany({
     where: {
       notification_id: notificationId,
@@ -353,7 +339,7 @@ async function markAsArchived(notificationId, userId) {
 /**
  * Desmarca una notificación archivada (la restaura)
  */
-async function unarchiveNotification(notificationId, userId) {
+export async function unarchiveNotification(notificationId, userId) {
   const readStatus = await prisma.notification_read_status.updateMany({
     where: {
       notification_id: notificationId,
@@ -374,7 +360,7 @@ async function unarchiveNotification(notificationId, userId) {
 /**
  * Elimina una notificación para un usuario específico
  */
-async function deleteNotification(notificationId, userId) {
+export async function deleteNotification(notificationId, userId) {
   // Primero verificar si la notificación fue enviada por este usuario
   const sentNotification = await prisma.notifications.findFirst({
     where: {
@@ -394,9 +380,6 @@ async function deleteNotification(notificationId, userId) {
       },
     });
 
-    console.log(
-      `🗑️ Emisor ${userId} marcó notificación ${notificationId} como eliminada para todos`
-    );
     return {
       success: true,
       message: "Notificación marcada como eliminada para todos los receptores",
@@ -418,16 +401,13 @@ async function deleteNotification(notificationId, userId) {
     throw new Error("Notificación no encontrada para este usuario");
   }
 
-  console.log(
-    `🗑️ Receptor ${userId} marcó notificación ${notificationId} como eliminada`
-  );
   return { success: true, message: "Notificación marcada como eliminada" };
 }
 
 /**
  * Obtiene el conteo de notificaciones no leídas de un usuario
  */
-async function getUnreadCount(userId) {
+export async function getUnreadCount(userId) {
   const count = await prisma.notification_read_status.count({
     where: {
       user_id: userId,
@@ -443,7 +423,7 @@ async function getUnreadCount(userId) {
 /**
  * Marca todas las notificaciones como leídas para un usuario
  */
-async function markAllAsRead(userId) {
+export async function markAllAsRead(userId) {
   const result = await prisma.notification_read_status.updateMany({
     where: {
       user_id: userId,
@@ -465,7 +445,7 @@ async function markAllAsRead(userId) {
 /**
  * Obtiene usuarios por rol (excluyendo al usuario actual)
  */
-async function getUsersByRole(roleId, currentUserId) {
+export async function getUsersByRole(roleId, currentUserId) {
   const users = await prisma.users.findMany({
     where: {
       status: "active",
@@ -501,7 +481,7 @@ async function getUsersByRole(roleId, currentUserId) {
 /**
  * Elimina (archiva permanentemente) notificaciones antiguas
  */
-async function deleteOldNotifications(daysOld = 90) {
+export async function deleteOldNotifications(daysOld = 90) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
@@ -523,7 +503,7 @@ async function deleteOldNotifications(daysOld = 90) {
  * Obtiene estadísticas de lectura de una notificación
  * Devuelve quién ha leído y quién no ha leído el mensaje
  */
-async function getNotificationReadStats(notificationId, userId) {
+export async function getNotificationReadStats(notificationId, userId) {
   // Verificar que la notificación existe y fue enviada por el usuario
   const notification = await prisma.notifications.findFirst({
     where: {
@@ -575,9 +555,8 @@ async function getNotificationReadStats(notificationId, userId) {
     const userData = {
       id: status.users.id,
       name: `${status.users.first_name} ${status.users.paternal_last_name}`,
-      fullName: `${status.users.first_name} ${
-        status.users.paternal_last_name
-      } ${status.users.maternal_last_name || ""}`.trim(),
+      fullName: `${status.users.first_name} ${status.users.paternal_last_name
+        } ${status.users.maternal_last_name || ""}`.trim(),
       email: status.users.email,
       readAt: status.status === "read" ? status.updated_at : null,
     };
@@ -607,28 +586,9 @@ async function getNotificationReadStats(notificationId, userId) {
  * @param {number} count - Número de checkouts pendientes
  * @param {Array} data - Array con los datos de los checkouts
  */
-async function emitCheckoutNotifications(count, data) {
+export async function emitCheckoutNotifications(count, data) {
   try {
     emitCheckoutAlerts(count, data);
-    console.log(
-      `📬 Notificación de ${count} checkout(s) emitida a recepcionistas`
-    );
   } catch (error) {
-    console.error("❌ Error al emitir notificaciones de checkout:", error);
   }
 }
-
-module.exports = {
-  createNotification,
-  getUserNotifications,
-  markAsRead,
-  markAsArchived,
-  unarchiveNotification,
-  deleteNotification,
-  getUnreadCount,
-  markAllAsRead,
-  getUsersByRole,
-  deleteOldNotifications,
-  getNotificationReadStats,
-  emitCheckoutNotifications,
-};

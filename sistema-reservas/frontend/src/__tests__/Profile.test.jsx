@@ -1,7 +1,7 @@
 import { beforeEach, test, expect, vi } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import Profile from '../components/Profile';
+import Profile from '@/components/profile/Profile';
 import { BrowserRouter } from 'react-router-dom';
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';

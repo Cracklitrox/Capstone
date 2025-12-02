@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
 // Rate limiting middleware
-const rateLimit = require('express-rate-limit');
+import rateLimit from 'express-rate-limit';
 
 // Limit each IP to 100 requests per 15 minutes for admin routes
 const limiter = rateLimit({
@@ -15,8 +15,8 @@ const limiter = rateLimit({
 // Apply rate limiting to all routes in this router
 router.use(limiter);
 
-const adminRoomsController = require('./adminRooms.controller');
-const { authenticate, authorize } = require('../../../middleware/auth.middleware');
+import * as adminRoomsController from './adminRooms.controller.js';
+import { authenticate, authorize } from '../../../middleware/auth.middleware.js';
 
 
 // Listar habitaciones y tipos
@@ -39,4 +39,4 @@ router.delete('/room-types/:id', authenticate, authorize(['administrator']), adm
 router.get('/:id', authenticate, authorize(['administrator']), adminRoomsController.getRoomDetail);
 router.get('/room-types/:id', authenticate, authorize(['administrator']), adminRoomsController.getRoomTypeDetail);
 
-module.exports = router;
+export default router;

@@ -1,19 +1,20 @@
-const {
+import {
   searchGuestByIdentification,
-  createGuest: createGuestService,
-  updateGuest: updateGuestService,
+  createGuest as createGuestService,
+  updateGuest as updateGuestService,
   searchAllGuestsService,
   getGuestProfileById,
   getGuestReservationsHistory,
   updateGuestObservationsService,
   updateGuestProfileService,
-} = require("./guests.service");
-const { logError } = require("../../utils/errorLogger");
+  deleteGuestService,
+} from "./guests.service.js";
+import { logError } from "../../utils/errorLogger.js";
 
 /**
  * Buscar huésped por identificación
  */
-async function searchGuest(req, res) {
+export async function searchGuest(req, res) {
   try {
     const { identificationNumber } = req.params;
 
@@ -29,7 +30,6 @@ async function searchGuest(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error("Error al buscar huésped:", error);
 
     await logError({
       userId: req.user?.id,
@@ -50,7 +50,7 @@ async function searchGuest(req, res) {
 /**
  * ✅ Crear nuevo huésped
  */
-async function createGuest(req, res) {
+export async function createGuest(req, res) {
   try {
     const guestData = req.body;
     const isMainGuest =
@@ -102,7 +102,6 @@ async function createGuest(req, res) {
       guest: newGuest,
     });
   } catch (error) {
-    console.error("Error al crear huésped:", error);
 
     // ✅ Si es error 409 (duplicado), devolver con los datos del existente
     if (error.statusCode === 409) {
@@ -131,7 +130,7 @@ async function createGuest(req, res) {
 /**
  * ✅ Actualizar huésped existente
  */
-async function updateGuest(req, res) {
+export async function updateGuest(req, res) {
   try {
     const { id } = req.params;
     const guestData = req.body;
@@ -150,7 +149,6 @@ async function updateGuest(req, res) {
       guest: updatedGuest,
     });
   } catch (error) {
-    console.error("Error al actualizar huésped:", error);
 
     await logError({
       userId: req.user?.id,
@@ -171,7 +169,7 @@ async function updateGuest(req, res) {
 /**
  * ✅ Obtener todos los huéspedes con búsqueda y paginación
  */
-async function getAllGuests(req, res) {
+export async function getAllGuests(req, res) {
   try {
     const { search = "", page = 1, limit = 20 } = req.query;
 
@@ -182,7 +180,6 @@ async function getAllGuests(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error("Error al obtener huéspedes:", error);
 
     await logError({
       userId: req.user?.id,
@@ -203,7 +200,7 @@ async function getAllGuests(req, res) {
 /**
  * ✅ Obtener perfil completo de huésped
  */
-async function getGuestProfile(req, res) {
+export async function getGuestProfile(req, res) {
   try {
     const { id } = req.params;
 
@@ -214,7 +211,6 @@ async function getGuestProfile(req, res) {
       profile,
     });
   } catch (error) {
-    console.error("Error al obtener perfil de huésped:", error);
 
     if (error.message.includes("no encontrado")) {
       return res.status(404).json({
@@ -242,7 +238,7 @@ async function getGuestProfile(req, res) {
 /**
  * ✅ Obtener historial de reservas de huésped
  */
-async function getGuestReservations(req, res) {
+export async function getGuestReservations(req, res) {
   try {
     const { id } = req.params;
     const { status, startDate, endDate, page = 1, limit = 10 } = req.query;
@@ -262,7 +258,6 @@ async function getGuestReservations(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error("Error al obtener reservas de huésped:", error);
 
     await logError({
       userId: req.user?.id,
@@ -283,7 +278,7 @@ async function getGuestReservations(req, res) {
 /**
  * ✅ Actualizar observaciones de huésped
  */
-async function updateGuestObservations(req, res) {
+export async function updateGuestObservations(req, res) {
   try {
     const { id } = req.params;
     const { observations } = req.body;
@@ -302,7 +297,6 @@ async function updateGuestObservations(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error("Error al actualizar observaciones:", error);
 
     await logError({
       userId: req.user?.id,
@@ -323,7 +317,7 @@ async function updateGuestObservations(req, res) {
 /**
  * ✅ Actualizar perfil de huésped
  */
-async function updateGuestProfile(req, res) {
+export async function updateGuestProfile(req, res) {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -339,7 +333,6 @@ async function updateGuestProfile(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error("Error al actualizar perfil de huésped:", error);
 
     await logError({
       userId: req.user?.id,
@@ -357,13 +350,45 @@ async function updateGuestProfile(req, res) {
   }
 }
 
-module.exports = {
-  searchGuest,
-  createGuest,
-  updateGuest,
-  getAllGuests,
-  getGuestProfile,
-  getGuestReservations,
-  updateGuestObservations,
-  updateGuestProfile,
-};
+/**
+ * ✅ Eliminar huésped
+ */
+export async function deleteGuest(req, res) {
+  try {
+    const { id } = req.params;
+
+    const result = await deleteGuestService(parseInt(id));
+
+    if (!result.found) {
+      return res.status(404).json({
+        found: false,
+        message: "Huésped no encontrado",
+      });
+    }
+
+    return res.status(200).json(result);
+  } catch (error) {
+
+    // Si tiene reservas activas, devolver 409
+    if (error.code === "HAS_ACTIVE_RESERVATIONS") {
+      return res.status(409).json({
+        message: error.message,
+        code: error.code,
+      });
+    }
+
+    await logError({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      description: `Error al eliminar huésped: ${error.message}`,
+      originModule: "guests.controller - deleteGuest",
+      severity: "medium",
+      errorObject: error,
+    });
+
+    return res.status(500).json({
+      message: "Error al eliminar huésped",
+      error: error.message,
+    });
+  }
+}
