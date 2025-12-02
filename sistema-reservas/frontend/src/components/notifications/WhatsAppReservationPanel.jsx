@@ -73,7 +73,7 @@ export function WhatsAppReservationPanel() {
     // Cargar alertas existentes
     const loadExistingAlerts = async () => {
       try {
-        const response = await getWhatsAppBookingAlerts(token);
+        const response = await getWhatsAppBookingAlerts(false); // false = traer todas las alertas
         if (response.success && response.data) {
           const alerts = response.data
             .filter(alert => alert.fullSummary) // Solo alertas con fullSummary
@@ -87,6 +87,8 @@ export function WhatsAppReservationPanel() {
           setReservations(alerts);
         }
       } catch (error) {
+        console.error('Error al cargar alertas de WhatsApp:', error);
+        setLoading(false);
       }
     };
 
@@ -141,8 +143,7 @@ export function WhatsAppReservationPanel() {
   const handleReject = async (reason) => {
     setActionLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await rejectWhatsAppBookingAlert(token, rejectDialog.alertId, reason);
+      await rejectWhatsAppBookingAlert(rejectDialog.alertId, reason);
 
       // Actualizar el estado local para reflejar el rechazo
       setReservations((prev) =>
@@ -164,8 +165,7 @@ export function WhatsAppReservationPanel() {
   const handleConfirm = async () => {
     setActionLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await confirmWhatsAppBookingAlert(token, confirmDialog.alertId);
+      await confirmWhatsAppBookingAlert(confirmDialog.alertId);
 
       // Actualizar el estado local para reflejar la confirmación
       setReservations((prev) =>

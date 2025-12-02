@@ -8,9 +8,12 @@ class WhatsAppController {
    */
   async handleMessage(from, messageText, rawMessage) {
     try {
-      // Normalizar número de teléfono
-      const phoneNumber = from.replace('@s.whatsapp.net', '');
-
+      // Normalizar número de teléfono - eliminar tanto @s.whatsapp.net como @lid
+      const phoneNumber = from.replace(/@s\.whatsapp\.net|@lid/g, '');
+      
+      console.log('🎯 Controller: Mensaje recibido');
+      console.log('📞 From:', from);
+      console.log('💬 Text:', messageText);
 
       // Verificar rate limit (30 mensajes por minuto)
       const rateCheck = await rateLimiter.checkLimit(phoneNumber);
@@ -29,6 +32,9 @@ class WhatsAppController {
 
       // Obtener o crear sesión del usuario
       const session = await whatsappService.getOrCreateSession(phoneNumber);
+      
+      console.log('📱 Phone normalizado:', phoneNumber);
+      console.log('📋 Sesión obtenida:', { state: session.state, hasData: !!session.data });
 
       // Procesar mensaje según el flujo
       const response = await reservationFlow.processMessage(
@@ -36,10 +42,14 @@ class WhatsAppController {
         messageText,
         phoneNumber
       );
+      
+      console.log('💭 Respuesta del flujo:', response?.substring(0, 100) + '...');
 
       // Enviar respuesta
       if (response) {
+        console.log('📤 Enviando respuesta al usuario...');
         await whatsappService.sendMessage(from, response);
+        console.log('✅ Respuesta enviada');
       }
 
       // Volver a obtener la sesión actualizada para verificar si se completó

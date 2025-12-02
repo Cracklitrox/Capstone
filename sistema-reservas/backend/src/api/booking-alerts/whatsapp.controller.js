@@ -217,11 +217,12 @@ async function rejectWhatsAppBookingAlert(req, res) {
     const clientName = fullSummary.guest_principal.name || 'Cliente';
 
     // Formatear número de teléfono para WhatsApp
-    // Si el número ya tiene @s.whatsapp.net, dejarlo como está
-    // Si no, agregarlo
-    const formattedPhone = clientPhone.includes('@s.whatsapp.net')
-      ? clientPhone
-      : `${clientPhone}@s.whatsapp.net`;
+    // Remover cualquier sufijo existente (@s.whatsapp.net o @lid), +, espacios y formatear correctamente
+    const cleanPhone = clientPhone
+      .replace(/@s\.whatsapp\.net|@lid/g, '')
+      .replace(/\+/g, '')
+      .replace(/\s/g, '');
+    const formattedPhone = `${cleanPhone}@s.whatsapp.net`;
 
     const userId = req.user.id; // Obtener userId del token JWT
 
@@ -260,10 +261,15 @@ async function rejectWhatsAppBookingAlert(req, res) {
       `Gracias por su comprensión.\n` +
       `Hotel Don Teo`;
 
+    console.log('📞 Enviando rechazo a:', formattedPhone);
+    console.log('💬 Mensaje:', rejectionMessage);
+
     // Enviar mensaje de rechazo por WhatsApp
     try {
       await whatsappService.sendMessage(formattedPhone, rejectionMessage);
+      console.log('✅ Mensaje de rechazo enviado exitosamente');
     } catch (whatsappError) {
+      console.error('❌ Error al enviar mensaje de rechazo:', whatsappError);
       // No fallar la petición si el mensaje no se envía
       // La alerta ya fue rechazada en la BD
     }
@@ -327,9 +333,12 @@ async function confirmWhatsAppBookingAlert(req, res) {
     const reservation = fullSummary.reservation;
 
     // Formatear número de teléfono para WhatsApp
-    const formattedPhone = clientPhone.includes('@s.whatsapp.net')
-      ? clientPhone
-      : `${clientPhone}@s.whatsapp.net`;
+    // Remover cualquier sufijo existente (@s.whatsapp.net o @lid), +, espacios y formatear correctamente
+    const cleanPhone = clientPhone
+      .replace(/@s\.whatsapp\.net|@lid/g, '')
+      .replace(/\+/g, '')
+      .replace(/\s/g, '');
+    const formattedPhone = `${cleanPhone}@s.whatsapp.net`;
 
     const userId = req.user.id; // Obtener userId del token JWT
 
@@ -373,10 +382,15 @@ async function confirmWhatsAppBookingAlert(req, res) {
       `Para cualquier consulta, estamos a su disposición.\n\n` +
       `¡Gracias por su preferencia!`;
 
+    console.log('📞 Enviando confirmación a:', formattedPhone);
+    console.log('💬 Mensaje:', confirmationMessage);
+
     // Enviar mensaje de confirmación por WhatsApp
     try {
       await whatsappService.sendMessage(formattedPhone, confirmationMessage);
+      console.log('✅ Mensaje de confirmación enviado exitosamente');
     } catch (whatsappError) {
+      console.error('❌ Error al enviar mensaje de confirmación:', whatsappError);
       // No fallar la petición si el mensaje no se envía
       // La alerta ya fue confirmada en la BD
     }
