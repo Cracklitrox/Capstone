@@ -42,7 +42,8 @@
       "Bash(./test-endpoints.sh)",
       "Bash(tree:*)",
       "Bash(npm install:*)",
-      "Bash(timeout 10 npm run dev:*)"
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
