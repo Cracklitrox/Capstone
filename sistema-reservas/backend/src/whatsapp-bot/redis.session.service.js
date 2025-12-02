@@ -25,7 +25,9 @@ class RedisSessionService {
   async getSession(phoneNumber) {
     try {
       const key = this._getKey(phoneNumber);
+      console.log('🔑 Redis getSession - Buscando clave:', key);
       const data = await redisClient.get(key);
+      console.log('📂 Redis getSession - Datos encontrados:', data ? 'SÍ' : 'NO');
 
       if (!data) {
         return null;
@@ -51,10 +53,13 @@ class RedisSessionService {
   async setSession(phoneNumber, session) {
     try {
       const key = this._getKey(phoneNumber);
+      console.log('💾 Redis setSession - Guardando en clave:', key);
       const data = JSON.stringify(session);
+      console.log('📝 Redis setSession - Estado a guardar:', session.state);
 
       // Guardar con TTL de 30 minutos
       await redisClient.setEx(key, this.ttl, data);
+      console.log('✅ Redis setSession - Guardado exitoso');
 
       return true;
     } catch (error) {

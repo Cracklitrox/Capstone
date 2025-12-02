@@ -20,7 +20,10 @@ const io = initializeSocket(server);
 // ==================== INICIALIZAR WHATSAPP BOT ====================
 const whatsappEnabled = process.env.WHATSAPP_ENABLED === 'true';
 
+console.log('🔍 WHATSAPP_ENABLED:', whatsappEnabled);
+
 if (whatsappEnabled) {
+  console.log('✅ Inicializando WhatsApp Bot...');
   const whatsappClient = new WhatsAppClient(io);
 
   // Configurar el cliente en el servicio
@@ -31,9 +34,11 @@ if (whatsappEnabled) {
 
   // Inicializar el cliente (conectar a WhatsApp)
   whatsappClient.initialize().catch(error => {
+    console.error('❌ Error al inicializar WhatsApp:', error);
   });
 
 } else {
+  console.log('⚠️ WhatsApp Bot deshabilitado');
 }
 
 server.listen(port, () => {
